@@ -1,0 +1,115 @@
+// 登录 / 注册页共用布局与表单样式
+.auth-page {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0 !important;
+  background: #ffffff;
+}
+
+.auth-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 8vh 6%;
+  background: #0458f5;
+}
+
+.auth-visual__image {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 78%;
+  max-height: 72vh;
+  object-fit: contain;
+}
+
+.auth-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 48px 8%;
+  background: #ffffff;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 8px 0 0;
+}
+
+.auth-kicker {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.auth-title {
+  display: block;
+  margin: 0 0 28px;
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
+.auth-form .el-form-item:last-of-type {
+  margin-bottom: 0;
+}
+
+.auth-form .el-input__wrapper {
+  background-color: #ffffff;
+}
+
+.auth-form .el-input__inner {
+  background-color: transparent;
+}
+
+.auth-form .el-input__inner:-webkit-autofill,
+.auth-form .el-input__inner:-webkit-autofill:hover,
+.auth-form .el-input__inner:-webkit-autofill:focus {
+  -webkit-text-fill-color: inherit;
+  caret-color: inherit;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 99999s ease-out;
+}
+
+.auth-form .el-button.auth-submit {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.auth-switch {
+  display: block;
+  margin: 22px 0 0;
+  text-align: center;
+}
+
+.auth-switch .el-link {
+  margin-left: 6px;
+  vertical-align: baseline;
+}
+
+@media (max-width: 767px) {
+  .auth-visual {
+    min-height: 200px;
+    padding: 24px 16px;
+  }
+
+  .auth-visual__image {
+    max-width: 86%;
+    max-height: 152px;
+  }
+
+  .auth-panel {
+    min-height: auto;
+    padding: 32px 20px 48px;
+  }
+}

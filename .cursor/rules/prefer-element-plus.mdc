@@ -1,0 +1,30 @@
+---
+description: 前端优先使用 Element Plus 组件，避免原生 HTML 控件
+globs: front/**/*.{vue,js,less,css}
+alwaysApply: false
+---
+
+# 优先使用 Element Plus
+
+写或改 `front/` 下的 UI 时，优先用 Element Plus 组件，不要手写原生按钮、链接、布局骨架。
+
+## 对照
+
+- 按钮：`<el-button>`，不要 `<button>`
+- 链接：`<el-link>`，不要 `<a>` / 仅用 `router-link` 当可见链接
+- 输入与表单：`<el-input>` / `<el-form>` / `<el-form-item>`
+- 布局：`<el-container>` / `<el-header>` / `<el-main>` / `<el-row>` / `<el-col>` / `<el-space>`
+- 文本：可见文案优先 `<el-text>`
+- 反馈：`<el-message>` / 需要确认时用 `<el-message-box>`
+
+```vue
+<!-- ❌ BAD -->
+<button type="submit" :disabled="loading">登录</button>
+<router-link to="/register">去注册</router-link>
+
+<!-- ✅ GOOD -->
+<el-button type="primary" native-type="submit" :loading="loading">登录</el-button>
+<el-link type="primary" :underline="false" @click="router.push('/register')">去注册</el-link>
+```
+
+仅当 Element Plus 没有对应能力（例如全屏背景装饰层）时，才使用原生标签。

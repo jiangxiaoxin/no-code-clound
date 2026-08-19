@@ -1,0 +1,38 @@
+---
+description: Vue 单文件组件块顺序为 template、script、style
+globs: front/**/*.vue
+alwaysApply: false
+---
+
+# Vue SFC 块顺序
+
+`.vue` 文件必须按这个顺序写，不要把 `<script>` 放在 `<template>` 前面。
+
+1. `<template>`
+2. `<script>`（本项目用 `<script setup>`）
+3. `<style>`（没有样式可省略）
+
+```vue
+<!-- ❌ BAD -->
+<script setup>
+const title = '登录'
+</script>
+<template>
+  <el-text>{{ title }}</el-text>
+</template>
+
+<!-- ✅ GOOD -->
+<template>
+  <el-text>{{ title }}</el-text>
+</template>
+
+<script setup>
+const title = '登录'
+</script>
+
+<style scoped lang="less">
+/* 样式放最后 */
+</style>
+```
+
+新建或改写 Vue 组件时，直接按此顺序输出完整文件。

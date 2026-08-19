@@ -1,0 +1,441 @@
+<template>
+  <el-container class="workspace">
+    <el-aside class="workspace-aside" width="280px" v-loading="loading">
+      <el-space class="aside-head" alignment="center" :size="4">
+        <el-button
+          :icon="ArrowLeft"
+          text
+          @click="router.push('/')"
+        />
+        <el-text class="app-title" truncated>{{ app?.name || ' ' }}</el-text>
+      </el-space>
+
+      <el-space class="aside-toolbar" alignment="center" :size="8">
+        <el-input
+          v-model="keyword"
+          class="aside-search"
+          clearable
+          placeholder="搜索分组或表单"
+          :prefix-icon="Search"
+        />
+        <el-dropdown trigger="click" @command="onCreateCommand">
+          <el-button :icon="Plus" circle />
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="form">新建表单</el-dropdown-item>
+              <el-dropdown-item command="group">新建分组</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </el-space>
+
+      <el-empty
+        v-if="!loading && treeData.length === 0"
+        :description="keyword.trim() ? '没有匹配的分组或表单' : '还没有分组和表单'"
+      />
+      <el-tree
+        v-else
+        ref="treeRef"
+        class="aside-tree"
+        :data="treeData"
+        node-key="key"
+        highlight-current
+        default-expand-all
+        :expand-on-click-node="true"
+        :props="{ label: 'name', children: 'children' }"
+        @node-click="onNodeClick"
+      >
+        <template #default="{ data }">
+          <el-space class="tree-node" :size="4" alignment="center">
+            <el-icon class="tree-icon">
+              <Folder v-if="data.nodeType === 'group'" />
+              <Document v-else />
+            </el-icon>
+            <el-text class="tree-name" truncated>{{ data.name }}</el-text>
+            <el-dropdown
+              trigger="click"
+              @command="(cmd) => onNodeCommand(cmd, data)"
+            >
+              <el-button
+                class="tree-more"
+                text
+                :icon="MoreFilled"
+                @click.stop
+              />
+              <template #dropdown>
+                <el-dropdown-menu v-if="data.nodeType === 'group'">
+                  <el-dropdown-item command="create-form">新建</el-dropdown-item>
+                  <el-dropdown-item command="rename">修改分组名</el-dropdown-item>
+                  <el-dropdown-item command="delete">删除分组</el-dropdown-item>
+                </el-dropdown-menu>
+                <el-dropdown-menu v-else>
+                  <el-dropdown-item command="rename">改表单名字</el-dropdown-item>
+                  <el-dropdown-item command="delete">删除</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </el-space>
+        </template>
+      </el-tree>
+    </el-aside>
+    <el-main class="workspace-main" />
+  </el-container>
+
+  <el-dialog
+    v-model="nameVisible"
+    :title="nameDialogTitle"
+    width="420px"
+    align-center
+    @closed="resetNameDialog"
+  >
+    <el-form
+      ref="nameFormRef"
+      :model="nameForm"
+      :rules="nameRules"
+      label-position="top"
+      @submit.prevent="onSubmitName"
+    >
+      <el-form-item label="名称" prop="name">
+        <el-input
+          v-model="nameForm.name"
+          maxlength="32"
+          show-word-limit
+          placeholder="请输入名称"
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="nameVisible = false">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="onSubmitName">
+        确定
+      </el-button>
+    </template>
+  </el-dialog>
+</template>
+
+<script setup>
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  ArrowLeft,
+  Document,
+  Folder,
+  MoreFilled,
+  Plus,
+  Search,
+} from '@element-plus/icons-vue'
+import {
+  createFormApi,
+  createGroupApi,
+  deleteFormApi,
+  deleteGroupApi,
+  getAppApi,
+  getDirectoryApi,
+  renameFormApi,
+  renameGroupApi,
+} from '../api/apps'
+
+const route = useRoute()
+const router = useRouter()
+const loading = ref(false)
+const saving = ref(false)
+const keyword = ref('')
+const app = ref(null)
+const directory = ref({ groups: [], forms: [] })
+const currentKey = ref('')
+const treeRef = ref()
+const nameVisible = ref(false)
+const nameFormRef = ref()
+const nameForm = reactive({ name: '' })
+const nameMode = ref('create-group')
+const nameTargetId = ref(null)
+const createFormGroupId = ref(null)
+const nameRules = {
+  name: [
+    { required: true, message: '请输入名称', trigger: 'blur' },
+    { min: 1, max: 32, message: '名称最多 32 个字', trigger: 'blur' },
+  ],
+}
+
+const appId = computed(() => Number(route.params.id))
+
+const nameDialogTitle = computed(() => {
+  if (nameMode.value === 'create-group') return '新建分组'
+  if (nameMode.value === 'create-form') return '新建表单'
+  if (nameMode.value === 'rename-group') return '修改分组名'
+  return '改表单名字'
+})
+
+const filteredDirectory = computed(() => {
+  const q = keyword.value.trim().toLowerCase()
+  const groups = directory.value.groups || []
+  const rootForms = directory.value.forms || []
+  if (!q) {
+    return { groups, forms: rootForms }
+  }
+
+  const nextGroups = []
+  for (const group of groups) {
+    const groupHit = String(group.name || '').toLowerCase().includes(q)
+    const forms = groupHit
+      ? group.forms || []
+      : (group.forms || []).filter((form) =>
+          String(form.name || '').toLowerCase().includes(q),
+        )
+    if (groupHit || forms.length) {
+      nextGroups.push({ ...group, forms })
+    }
+  }
+
+  return {
+    groups: nextGroups,
+    forms: rootForms.filter((form) =>
+      String(form.name || '').toLowerCase().includes(q),
+    ),
+  }
+})
+
+const treeData = computed(() => {
+  const groups = (filteredDirectory.value.groups || []).map((group) => ({
+    key: `group:${group.id}`,
+    id: group.id,
+    name: group.name,
+    nodeType: 'group',
+    children: (group.forms || []).map(toFormNode),
+  }))
+  const forms = (filteredDirectory.value.forms || []).map(toFormNode)
+  return [...groups, ...forms]
+})
+
+function toFormNode(form) {
+  return {
+    key: `form:${form.id}`,
+    id: form.id,
+    name: form.name,
+    groupId: form.groupId ?? null,
+    nodeType: 'form',
+  }
+}
+
+function onNodeClick(data) {
+  if (data.nodeType === 'form') {
+    currentKey.value = data.key
+    treeRef.value?.setCurrentKey(data.key)
+  }
+}
+
+function onCreateCommand(command) {
+  if (command === 'group') {
+    openNameDialog('create-group')
+    return
+  }
+  openNameDialog('create-form', { groupId: null })
+}
+
+function onNodeCommand(command, data) {
+  if (command === 'create-form') {
+    openNameDialog('create-form', { groupId: data.id })
+    return
+  }
+  if (command === 'rename') {
+    openNameDialog(
+      data.nodeType === 'group' ? 'rename-group' : 'rename-form',
+      { id: data.id, name: data.name },
+    )
+    return
+  }
+  if (command === 'delete') {
+    onDelete(data)
+  }
+}
+
+function openNameDialog(mode, extra = {}) {
+  nameMode.value = mode
+  nameTargetId.value = extra.id ?? null
+  createFormGroupId.value = extra.groupId ?? null
+  nameForm.name = extra.name || ''
+  nameVisible.value = true
+}
+
+function resetNameDialog() {
+  nameForm.name = ''
+  nameTargetId.value = null
+  createFormGroupId.value = null
+  nameFormRef.value?.resetFields()
+}
+
+async function onSubmitName() {
+  await nameFormRef.value.validate()
+  saving.value = true
+  try {
+    const name = nameForm.name.trim()
+    const id = appId.value
+    if (nameMode.value === 'create-group') {
+      await createGroupApi(id, { name })
+    } else if (nameMode.value === 'create-form') {
+      await createFormApi(id, { name, groupId: createFormGroupId.value })
+    } else if (nameMode.value === 'rename-group') {
+      await renameGroupApi(id, nameTargetId.value, { name })
+    } else {
+      await renameFormApi(id, nameTargetId.value, { name })
+    }
+    nameVisible.value = false
+    await loadDirectory()
+  } catch {
+    // 错误已由 http 拦截器提示
+  } finally {
+    saving.value = false
+  }
+}
+
+async function onDelete(data) {
+  if (data.nodeType === 'group' && (data.children || []).length > 0) {
+    ElMessage.warning('请先删除分组内的表单')
+    return
+  }
+
+  const isGroup = data.nodeType === 'group'
+  try {
+    await ElMessageBox.confirm(
+      isGroup ? `确定删除分组「${data.name}」？` : `确定删除表单「${data.name}」？`,
+      isGroup ? '删除分组' : '删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    if (isGroup) {
+      await deleteGroupApi(appId.value, data.id)
+    } else {
+      await deleteFormApi(appId.value, data.id)
+      if (currentKey.value === data.key) {
+        currentKey.value = ''
+      }
+    }
+    await loadDirectory()
+  } catch {
+    // 错误已由 http 拦截器提示
+  }
+}
+
+async function loadDirectory() {
+  directory.value = (await getDirectoryApi(appId.value)) || {
+    groups: [],
+    forms: [],
+  }
+}
+
+async function loadWorkspace() {
+  if (!Number.isInteger(appId.value) || appId.value <= 0) {
+    router.replace('/')
+    return
+  }
+
+  loading.value = true
+  try {
+    app.value = await getAppApi(appId.value)
+    await loadDirectory()
+  } catch (error) {
+    if (error.response?.status !== 401) {
+      router.replace('/')
+    }
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(appId, loadWorkspace, { immediate: true })
+</script>
+
+<style scoped lang="less">
+.workspace {
+  height: 100vh;
+  background: var(--el-bg-color-page);
+}
+
+.workspace-aside {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 16px;
+  background: var(--el-bg-color);
+  border-right: 1px solid var(--el-border-color);
+  overflow: hidden;
+}
+
+.aside-head {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.aside-head :deep(.el-space__item:last-child) {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-title {
+  display: block;
+  width: 100%;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.aside-toolbar {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.aside-toolbar :deep(.el-space__item:first-child) {
+  flex: 1;
+  min-width: 0;
+}
+
+.aside-search {
+  width: 100%;
+}
+
+.aside-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.aside-tree :deep(.el-tree-node__content) {
+  width: 100%;
+}
+
+.tree-node {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.tree-node :deep(.el-space__item:nth-child(2)) {
+  flex: 1;
+  min-width: 0;
+}
+
+.tree-icon {
+  color: var(--el-text-color-secondary);
+}
+
+.tree-name {
+  display: block;
+  width: 100%;
+}
+
+.tree-more {
+  margin-left: auto;
+}
+
+.workspace-main {
+  background: var(--el-bg-color-page);
+}
+</style>

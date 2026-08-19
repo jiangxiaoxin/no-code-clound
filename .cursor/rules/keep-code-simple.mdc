@@ -1,0 +1,29 @@
+---
+description: 实现功能时保持代码简单克制，避免过度设计
+alwaysApply: true
+---
+
+# 简单克制
+
+先把功能做对、把习惯写对，再把代码写简单。不要为了“更完整”加目前用不到的抽象。
+
+## 要求
+
+- 只写当前需求需要的代码，不预留用不到的扩展点、配置项、工具函数。
+- 能用现有模块解决，就不要再拆新层；文件变大再拆，而不是提前拆。
+- 命名直接，控制流平铺；不要为对称、为“看起来专业”加包装。
+- 注释只解释非显而易见的原因，不复述代码在做什么。
+
+```js
+// ❌ BAD：当前只有登录，却先做通用策略工厂
+export function createAuthStrategy(type, options = {}) {
+  return strategies[type]?.(options) ?? defaultStrategy
+}
+
+// ✅ GOOD：只实现现在要的登录
+export async function login(username, password) {
+  return http.post('/auth/login', { username, password })
+}
+```
+
+拿不准时选更短、更直接的那一版。以后真有第二个用例，再抽公共逻辑。
