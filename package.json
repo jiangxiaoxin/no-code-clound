@@ -2,7 +2,7 @@
   "name": "no-code-cloud",
   "private": true,
   "scripts": {
-    "dev": "concurrently -n server,front -c blue,green \"npm run start:dev --prefix server\" \"npm run dev --prefix front\""
+    "dev": "concurrently -n server,front -c blue,green \"npm run dev --prefix server\" \"npm run dev --prefix front\""
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
