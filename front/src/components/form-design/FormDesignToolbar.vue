@@ -2,6 +2,7 @@
   <el-header class="design-toolbar" height="48px">
     <div class="design-toolbar-actions">
       <el-button :icon="Delete" @click="$emit('clear')">清空</el-button>
+      <el-button :icon="View" @click="$emit('preview')">预览</el-button>
       <el-button type="primary" :icon="DocumentChecked" @click="$emit('save')">
         保存
       </el-button>
@@ -10,9 +11,9 @@
 </template>
 
 <script setup>
-import { Delete, DocumentChecked } from '@element-plus/icons-vue'
+import { Delete, DocumentChecked, View } from '@element-plus/icons-vue'
 
-defineEmits(['clear', 'save'])
+defineEmits(['clear', 'save', 'preview'])
 </script>
 
 <style scoped lang="less">

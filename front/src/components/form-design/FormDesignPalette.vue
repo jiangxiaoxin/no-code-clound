@@ -5,7 +5,10 @@
         v-for="item in fieldTypes"
         :key="item.type"
         class="palette-item"
-        @click="$emit('add', item)"
+        draggable="true"
+        @click="onClick(item)"
+        @dragstart="onDragStart(item, $event)"
+        @dragend="onDragEnd"
       >
         <el-icon><component :is="item.icon" /></el-icon>
         <span>{{ item.label }}</span>
@@ -17,7 +20,28 @@
 <script setup>
 import { fieldTypes } from './fieldTypes'
 
-defineEmits(['add'])
+const emit = defineEmits(['add'])
+
+let dragging = false
+
+function onClick(item) {
+  if (dragging) {
+    return
+  }
+  emit('add', item)
+}
+
+function onDragStart(item, event) {
+  dragging = true
+  event.dataTransfer.effectAllowed = 'copy'
+  event.dataTransfer.setData('text/plain', `palette:${item.type}`)
+}
+
+function onDragEnd() {
+  requestAnimationFrame(() => {
+    dragging = false
+  })
+}
 </script>
 
 <style scoped lang="less">
@@ -39,7 +63,7 @@ defineEmits(['add'])
   align-items: center;
   gap: 8px;
   padding: 4px 8px;
-  cursor: pointer;
+  cursor: grab;
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   font-size: 12px;

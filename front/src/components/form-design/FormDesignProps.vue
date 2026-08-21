@@ -41,6 +41,12 @@
           <el-radio-button value="1">整行</el-radio-button>
         </el-radio-group>
       </el-form-item>
+      <el-form-item label="校验设置">
+        <div class="required-row">
+          <span>必填</span>
+          <el-switch v-model="field.required" />
+        </div>
+      </el-form-item>
     </el-form>
   </el-aside>
 </template>
@@ -96,5 +102,11 @@ defineEmits(['update:tab', 'update:width'])
   width: 100%;
   padding: 8px 0;
   font-size: 12px;
+}
+
+.required-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

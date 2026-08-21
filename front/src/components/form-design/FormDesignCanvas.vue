@@ -1,9 +1,14 @@
 <template>
   <el-main class="canvas">
-    <div class="canvas-paper">
+    <div
+      class="canvas-paper"
+      @dragover.prevent
+      @dragleave="onCanvasDragLeave"
+      @drop.prevent="onDropCanvas"
+    >
       <el-empty
         v-if="fields.length === 0"
-        description="从左侧选择字段添加到表单"
+        description="从左侧选择或拖动字段添加到表单"
       />
       <div v-else class="canvas-fields">
         <FormDesignCanvasField
@@ -18,7 +23,7 @@
           @remove="$emit('remove', field)"
           @dragstart="onDragStart(field, $event)"
           @dragover="onDragOver(field)"
-          @drop="onDrop(field)"
+          @drop="onDrop(field, $event)"
           @dragend="onDragEnd"
         />
       </div>
@@ -28,6 +33,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { fieldTypes } from './fieldTypes'
 import FormDesignCanvasField from './FormDesignCanvasField.vue'
 
 defineProps({
@@ -35,10 +41,18 @@ defineProps({
   selectedKey: { type: String, default: '' },
 })
 
-const emit = defineEmits(['select', 'copy', 'remove', 'reorder'])
+const emit = defineEmits(['select', 'copy', 'remove', 'reorder', 'add'])
 
 const dragKey = ref('')
 const dragOverKey = ref('')
+
+function paletteItem(data) {
+  if (!data.startsWith('palette:')) {
+    return null
+  }
+  const type = data.slice('palette:'.length)
+  return fieldTypes.find((item) => item.type === type) || null
+}
 
 function onDragStart(field, event) {
   dragKey.value = field.key
@@ -52,8 +66,29 @@ function onDragOver(field) {
   }
 }
 
-function onDrop(field) {
+function onDrop(field, event) {
+  dragOverKey.value = ''
+  const item = paletteItem(event.dataTransfer.getData('text/plain'))
+  if (item) {
+    emit('add', item, field.key)
+    return
+  }
   emit('reorder', dragKey.value, field.key)
+}
+
+function onDropCanvas(event) {
+  dragOverKey.value = ''
+  const item = paletteItem(event.dataTransfer.getData('text/plain'))
+  if (item) {
+    emit('add', item)
+  }
+}
+
+function onCanvasDragLeave(event) {
+  if (event.currentTarget.contains(event.relatedTarget)) {
+    return
+  }
+  dragOverKey.value = ''
 }
 
 function onDragEnd() {

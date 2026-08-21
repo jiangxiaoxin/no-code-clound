@@ -1,6 +1,10 @@
 <template>
   <el-container class="form-body" direction="vertical">
-    <FormDesignToolbar @clear="clearFields" @save="saveFields" />
+    <FormDesignToolbar
+      @clear="clearFields"
+      @save="saveFields"
+      @preview="previewVisible = true"
+    />
     <el-container class="form-layout">
       <FormDesignPalette @add="addField" />
       <FormDesignCanvas
@@ -10,6 +14,7 @@
         @copy="copyField"
         @remove="removeField"
         @reorder="reorderFields"
+        @add="addField"
       />
       <FormDesignProps
         v-model:tab="propTab"
@@ -18,6 +23,25 @@
       />
     </el-container>
   </el-container>
+
+  <el-dialog
+    v-model="previewVisible"
+    title="预览"
+    width="800px"
+    align-center
+    destroy-on-close
+  >
+    <el-input
+      type="textarea"
+      :rows="18"
+      readonly
+      :model-value="previewJson"
+    />
+    <template #footer>
+      <el-button @click="previewVisible = false">关闭</el-button>
+      <el-button type="primary" @click="copyPreviewJson">复制</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -29,30 +53,52 @@ import FormDesignCanvas from './form-design/FormDesignCanvas.vue'
 import FormDesignProps from './form-design/FormDesignProps.vue'
 
 const propTab = ref('field')
+const previewVisible = ref(false)
 const fields = ref([])
 const selectedKey = ref('')
-let nextKey = 1
 
 const selectedField = computed(
   () => fields.value.find((field) => field.key === selectedKey.value) || null,
 )
 
-function addField(item) {
-  const field = {
-    key: `f${nextKey++}`,
-    type: item.type,
-    title: item.label,
-    placeholder: '',
-    width: '1',
+const previewJson = computed(() => JSON.stringify(fields.value, null, 2))
+
+async function copyPreviewJson() {
+  try {
+    await navigator.clipboard.writeText(previewJson.value)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败')
   }
-  fields.value.push(field)
+}
+
+function nextKey() {
+  return crypto.randomUUID()
+}
+
+function addField(item, beforeKey) {
+  const field = {
+    key: nextKey(),
+    type: item.type,
+    component: item.component,
+    title: item.label,
+    placeholder: item.type === 'input' ? '请输入' : '',
+    width: '1',
+    required: true,
+  }
+  if (beforeKey) {
+    const index = fields.value.findIndex((entry) => entry.key === beforeKey)
+    fields.value.splice(index < 0 ? fields.value.length : index, 0, field)
+  } else {
+    fields.value.push(field)
+  }
   selectField(field)
 }
 
 function copyField(field) {
   const copied = {
     ...field,
-    key: `f${nextKey++}`,
+    key: nextKey(),
   }
   const index = fields.value.findIndex((item) => item.key === field.key)
   fields.value.splice(index + 1, 0, copied)

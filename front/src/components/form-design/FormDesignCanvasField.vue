@@ -13,7 +13,7 @@
     @click="$emit('select')"
     @dragstart="$emit('dragstart', $event)"
     @dragover.prevent="$emit('dragover')"
-    @drop.prevent="$emit('drop')"
+    @drop.prevent.stop="$emit('drop', $event)"
     @dragend="$emit('dragend')"
   >
     <div v-if="selected" class="canvas-field-actions">
@@ -22,7 +22,11 @@
         <el-button size="small" :icon="Delete" @click.stop="$emit('remove')" />
       </el-button-group>
     </div>
+    <!-- el-divider 会自己显示title，不需要再添加标题  -->
+     <!-- 其余的组件标题都显示到上面 -->
+      <!-- 左右布局需要设置合理的 label width -->
     <span v-if="field.type !== 'divider'" class="canvas-field-title">
+      <span v-if="field.required" class="canvas-field-required">*</span>
       {{ field.title }}
     </span>
     <el-input
@@ -164,6 +168,11 @@ defineEmits(['select', 'copy', 'remove', 'dragstart', 'dragover', 'drop', 'drage
 .canvas-field-title {
   display: block;
   margin-bottom: 8px;
+}
+
+.canvas-field-required {
+  margin-right: 4px;
+  color: var(--el-color-danger);
 }
 
 .canvas-full {
