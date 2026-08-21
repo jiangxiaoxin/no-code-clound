@@ -34,13 +34,16 @@
       />
       <el-tree
         v-else
+        ref="treeRef"
         class="aside-tree"
         :data="treeData"
         node-key="key"
         highlight-current
         default-expand-all
         :expand-on-click-node="true"
+        :current-node-key="currentForm?.key"
         :props="{ label: 'name', children: 'children' }"
+        @node-click="onNodeClick"
       >
         <template #default="{ data }">
           <div class="tree-node">
@@ -72,7 +75,7 @@
         </template>
       </el-tree>
     </el-aside>
-    <el-main />
+    <AppWorkspaceMain :form="currentForm" />
   </el-container>
 
   <el-dialog
@@ -108,7 +111,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -129,6 +132,7 @@ import {
   renameFormApi,
   renameGroupApi,
 } from '../api/apps'
+import AppWorkspaceMain from '../components/AppWorkspaceMain.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -137,6 +141,8 @@ const saving = ref(false)
 const keyword = ref('')
 const app = ref(null)
 const directory = ref({ groups: [], forms: [] })
+const currentForm = ref(null)
+const treeRef = ref()
 const nameVisible = ref(false)
 const nameFormRef = ref()
 const nameForm = reactive({ name: '' })
@@ -210,6 +216,14 @@ function toFormNode(form) {
   }
 }
 
+function onNodeClick(data) {
+  if (data.nodeType === 'form') {
+    currentForm.value = data
+    return
+  }
+  treeRef.value?.setCurrentKey(currentForm.value?.key ?? null)
+}
+
 function onCreateCommand(command) {
   if (command === 'group') {
     openNameDialog('create-group')
@@ -271,15 +285,18 @@ async function onSubmitName() {
         groupId: createFormGroupId.value,
       })
       nameVisible.value = false
-      router.push({
-        name: 'form-design',
-        params: { id, formId: form.id },
-      })
+      await loadDirectory()
+      currentForm.value = toFormNode(form)
+      await nextTick()
+      treeRef.value?.setCurrentKey(currentForm.value.key)
       return
     } else if (nameMode.value === 'rename-group') {
       await renameGroupApi(id, nameTargetId.value, { name })
     } else {
       await renameFormApi(id, nameTargetId.value, { name })
+      if (currentForm.value?.id === nameTargetId.value) {
+        currentForm.value = { ...currentForm.value, name }
+      }
     }
     nameVisible.value = false
     await loadDirectory()
@@ -316,6 +333,9 @@ async function onDelete(data) {
       await deleteGroupApi(appId.value, data.id)
     } else {
       await deleteFormApi(appId.value, data.id)
+      if (currentForm.value?.id === data.id) {
+        currentForm.value = null
+      }
     }
     await loadDirectory()
   } catch {
@@ -338,6 +358,7 @@ async function loadWorkspace() {
 
   loading.value = true
   try {
+    currentForm.value = null
     app.value = await getAppApi(appId.value)
     await loadDirectory()
   } catch (error) {

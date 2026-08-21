@@ -1,5 +1,15 @@
 <template>
-  <el-container class="form-body">
+  <el-container class="form-body" direction="vertical">
+    <el-header class="design-toolbar" height="48px">
+      <div class="design-toolbar-actions">
+        <el-button :icon="Delete" @click="clearFields">清空</el-button>
+        <el-button type="primary" :icon="DocumentChecked" @click="saveFields">
+          保存
+        </el-button>
+      </div>
+    </el-header>
+
+    <el-container class="form-layout">
     <el-aside class="palette" width="260px">
       <div class="palette-grid">
         <div
@@ -28,12 +38,15 @@
           @click="selectField(field)"
         >
           <div v-if="selectedKey === field.key" class="canvas-field-actions">
-            <el-button
-              text
+            <el-button-group>
+              <el-button
+              size="small"
               :icon="CopyDocument"
               @click.stop="copyField(field)"
             />
-            <el-button text :icon="Delete" @click.stop="removeField(field)" />
+            <el-button size="small"  :icon="Delete" @click.stop="removeField(field)" />
+            </el-button-group>
+            
           </div>
           <el-text v-if="field.type !== 'divider'" class="canvas-field-title">
             {{ field.title }}
@@ -135,15 +148,18 @@
       </el-form>
     </el-aside>
   </el-container>
+</el-container>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Calendar,
   CircleCheck,
   CopyDocument,
   Delete,
+  DocumentChecked,
   EditPen,
   Finished,
   Grid,
@@ -208,7 +224,21 @@ function copyField(field) {
   selectField(copied)
 }
 
-function removeField(field) {
+async function removeField(field) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${field.title}」？`,
+      '删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
   fields.value = fields.value.filter((item) => item.key !== field.key)
   if (selectedKey.value === field.key) {
     selectedKey.value = fields.value.at(-1)?.key || ''
@@ -219,10 +249,51 @@ function selectField(field) {
   selectedKey.value = field.key
   propTab.value = 'field'
 }
+
+async function clearFields() {
+  if (fields.value.length === 0) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm('确定清空当前表单字段？', '清空', {
+      confirmButtonText: '清空',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+
+  fields.value = []
+  selectedKey.value = ''
+}
+
+function saveFields() {
+  ElMessage.success('保存成功')
+}
 </script>
 
 <style scoped lang="less">
 .form-body {
+  min-height: 0;
+}
+
+.design-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 16px;
+  background: var(--el-bg-color);
+  border-bottom: 1px solid var(--el-border-color);
+}
+
+.design-toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.form-layout {
   min-height: 0;
 }
 
@@ -276,6 +347,7 @@ function selectField(field) {
   border: 1px solid var(--el-border-color);
   border-radius: 4px;
   font-size: 12px;
+  user-select: none;
 }
 
 .palette-item:hover {
@@ -289,7 +361,7 @@ function selectField(field) {
 }
 
 .canvas {
-  padding: 24px;
+  padding: 12px;
 }
 
 .canvas-paper {
