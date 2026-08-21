@@ -13,7 +13,7 @@ alwaysApply: false
 - 按钮：`<el-button>`，不要 `<button>`
 - 链接：`<el-link>`，不要 `<a>` / 仅用 `router-link` 当可见链接
 - 输入与表单：`<el-input>` / `<el-form>` / `<el-form-item>`
-- 布局：`<el-container>` / `<el-header>` / `<el-main>` / `<el-row>` / `<el-col>` / `<el-space>`
+- 布局：`<el-container>` / `<el-header>` / `<el-main>` / `<el-row>` / `<el-col>`（间距和对齐不要用 `<el-space>`，用 HTML + 样式）
 - 文本：可见文案优先 `<el-text>`
 - 反馈：`<el-message>` / 需要确认时用 `<el-message-box>`
 

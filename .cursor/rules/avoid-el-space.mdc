@@ -1,0 +1,35 @@
+---
+description: 前端间距和对齐不要用 el-space，改用普通 HTML 加样式
+globs: front/**/*.{vue,js,less,css}
+alwaysApply: false
+---
+
+# 不要用 el-space
+
+写或改 `front/` 下的 UI 时，不要用 `<el-space>` 做间距、对齐、横向/纵向排列。用普通 HTML 元素（如 `div`）加 flex 等样式实现。
+
+`el-space` 会包一层 `el-space__item`，高度、对齐、截断都不好控。按钮、输入、布局骨架仍用 Element Plus。
+
+```vue
+<!-- ❌ BAD -->
+<el-space :size="4" alignment="center">
+  <el-icon><Folder /></el-icon>
+  <el-text truncated>{{ name }}</el-text>
+</el-space>
+
+<!-- ✅ GOOD -->
+<div class="tree-node">
+  <el-icon><Folder /></el-icon>
+  <el-text truncated>{{ name }}</el-text>
+</div>
+```
+
+```css
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+```
+
+已有页面里的 `el-space` 不必专门改写；新写或改到相关布局时，换成 HTML + 样式。

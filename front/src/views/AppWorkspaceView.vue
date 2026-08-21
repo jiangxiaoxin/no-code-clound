@@ -1,19 +1,18 @@
 <template>
   <el-container class="workspace">
     <el-aside class="workspace-aside" width="280px" v-loading="loading">
-      <el-space class="aside-head" alignment="center" :size="4">
+      <div class="aside-head">
         <el-button
           :icon="ArrowLeft"
           text
           @click="router.push('/')"
         />
-        <el-text class="app-title" truncated>{{ app?.name || ' ' }}</el-text>
-      </el-space>
+        <el-text truncated>{{ app?.name || ' ' }}</el-text>
+      </div>
 
-      <el-space class="aside-toolbar" alignment="center" :size="8">
+      <div class="aside-toolbar">
         <el-input
           v-model="keyword"
-          class="aside-search"
           clearable
           placeholder="搜索分组或表单"
           :prefix-icon="Search"
@@ -27,7 +26,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-      </el-space>
+      </div>
 
       <el-empty
         v-if="!loading && treeData.length === 0"
@@ -46,39 +45,35 @@
         @node-click="onNodeClick"
       >
         <template #default="{ data }">
-          <el-space class="tree-node" :size="4" alignment="center">
-            <el-icon class="tree-icon">
+          <div class="tree-node">
+            <el-icon>
               <Folder v-if="data.nodeType === 'group'" />
               <Document v-else />
             </el-icon>
-            <el-text class="tree-name" truncated>{{ data.name }}</el-text>
+            <el-text truncated>{{ data.name }}</el-text>
             <el-dropdown
               trigger="click"
+              popper-class="tree-node-menu"
               @command="(cmd) => onNodeCommand(cmd, data)"
             >
-              <el-button
-                class="tree-more"
-                text
-                :icon="MoreFilled"
-                @click.stop
-              />
+              <el-button text :icon="MoreFilled" @click.stop />
               <template #dropdown>
                 <el-dropdown-menu v-if="data.nodeType === 'group'">
-                  <el-dropdown-item command="create-form">新建</el-dropdown-item>
-                  <el-dropdown-item command="rename">修改分组名</el-dropdown-item>
+                  <el-dropdown-item command="create-form">新建表单</el-dropdown-item>
+                  <el-dropdown-item command="rename">修改名称</el-dropdown-item>
                   <el-dropdown-item command="delete">删除分组</el-dropdown-item>
                 </el-dropdown-menu>
                 <el-dropdown-menu v-else>
-                  <el-dropdown-item command="rename">改表单名字</el-dropdown-item>
-                  <el-dropdown-item command="delete">删除</el-dropdown-item>
+                  <el-dropdown-item command="rename">修改名称</el-dropdown-item>
+                  <el-dropdown-item command="delete">删除表单</el-dropdown-item>
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-          </el-space>
+          </div>
         </template>
       </el-tree>
     </el-aside>
-    <el-main class="workspace-main" />
+    <el-main />
   </el-container>
 
   <el-dialog
@@ -163,8 +158,8 @@ const appId = computed(() => Number(route.params.id))
 const nameDialogTitle = computed(() => {
   if (nameMode.value === 'create-group') return '新建分组'
   if (nameMode.value === 'create-form') return '新建表单'
-  if (nameMode.value === 'rename-group') return '修改分组名'
-  return '改表单名字'
+  if (nameMode.value === 'rename-group') return '修改名称'
+  return '修改名称'
 })
 
 const filteredDirectory = computed(() => {
@@ -369,73 +364,59 @@ watch(appId, loadWorkspace, { immediate: true })
   overflow: hidden;
 }
 
-.aside-head {
-  width: 100%;
+.aside-head,
+.aside-toolbar {
+  display: flex;
+  align-items: center;
   margin-bottom: 12px;
 }
 
-.aside-head :deep(.el-space__item:last-child) {
-  flex: 1;
-  min-width: 0;
-}
+.aside-head {
+  gap: 4px;
 
-.app-title {
-  display: block;
-  width: 100%;
-  font-size: 16px;
-  font-weight: 600;
+  .el-text {
+    flex: 1;
+    min-width: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
 }
 
 .aside-toolbar {
-  width: 100%;
-  margin-bottom: 12px;
-}
+  gap: 8px;
 
-.aside-toolbar :deep(.el-space__item:first-child) {
-  flex: 1;
-  min-width: 0;
-}
-
-.aside-search {
-  width: 100%;
+  .el-input {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .aside-tree {
   flex: 1;
   min-height: 0;
   overflow: auto;
-}
 
-.aside-tree :deep(.el-tree-node__content) {
-  width: 100%;
+  :deep(.el-tree-node__content) {
+    width: 100%;
+    height: auto;
+  }
 }
 
 .tree-node {
+  display: flex;
   flex: 1;
-  width: 100%;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
-  padding-right: 4px;
-}
+  padding: 4px 4px 4px 0;
 
-.tree-node :deep(.el-space__item:nth-child(2)) {
-  flex: 1;
-  min-width: 0;
-}
+  > .el-icon {
+    color: var(--el-text-color-secondary);
+  }
 
-.tree-icon {
-  color: var(--el-text-color-secondary);
-}
-
-.tree-name {
-  display: block;
-  width: 100%;
-}
-
-.tree-more {
-  margin-left: auto;
-}
-
-.workspace-main {
-  background: var(--el-bg-color-page);
+  .el-text {
+    flex: 1;
+    min-width: 0;
+  }
 }
 </style>
