@@ -21,6 +21,7 @@ export class ResponseInterceptor<T> implements NestInterceptor<
     _context: ExecutionContext,
     next: CallHandler<T>,
   ): Observable<ApiResponse<T>> {
+    console.log('ResponseInterceptor 执行0000');
     return next.handle().pipe(
       map((data) => ({
         code: 0,
