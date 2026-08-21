@@ -67,6 +67,12 @@ export class ApplicationService {
     return this.toAppItem(app);
   }
 
+  async getForm(ownerId: number, appId: number, formId: number) {
+    await this.requireOwnedApp(ownerId, appId);
+    const form = await this.requireForm(appId, formId);
+    return this.toFormItem(form);
+  }
+
   async directory(ownerId: number, id: number) {
     await this.requireOwnedApp(ownerId, id);
     const groups = await this.groupRepo.find({

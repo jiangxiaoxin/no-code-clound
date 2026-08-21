@@ -32,6 +32,10 @@ export function createFormApi(appId, payload) {
   return http.post(`/apps/${appId}/forms`, payload)
 }
 
+export function getFormApi(appId, formId) {
+  return http.get(`/apps/${appId}/forms/${formId}`)
+}
+
 export function renameFormApi(appId, formId, payload) {
   return http.patch(`/apps/${appId}/forms/${formId}`, payload)
 }

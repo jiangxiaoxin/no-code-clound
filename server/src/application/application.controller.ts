@@ -81,6 +81,15 @@ export class ApplicationController {
     return this.applicationService.deleteGroup(req.user.id, id, groupId);
   }
 
+  @Get(':id/forms/:formId')
+  getForm(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Param('formId', ParseIntPipe) formId: number,
+  ) {
+    return this.applicationService.getForm(req.user.id, id, formId);
+  }
+
   @Post(':id/forms')
   @HttpCode(201)
   createForm(

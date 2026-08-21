@@ -1,0 +1,25 @@
+---
+description: 前端文案不要用 el-text，改用普通 HTML 加样式
+globs: front/**/*.{vue,js,less,css}
+alwaysApply: false
+---
+
+# 不要用 el-text
+
+写或改 `front/` 下的 UI 时，不要用 `<el-text>` 包可见文案。用普通 HTML 标签（如 `span`、`p`、`h1`）加样式实现。
+
+按钮、输入、布局骨架仍用 Element Plus。
+
+```vue
+<!-- ❌ BAD -->
+<el-text size="large" tag="b">No-Code Cloud</el-text>
+<el-text type="info">{{ userStore.user?.username }}</el-text>
+<el-text truncated>{{ name }}</el-text>
+
+<!-- ✅ GOOD -->
+<b class="app-title">No-Code Cloud</b>
+<span class="username">{{ userStore.user?.username }}</span>
+<span class="name">{{ name }}</span>
+```
+
+已有页面里的 `el-text` 不必专门改写；新写或改到相关文案时，换成 HTML + 样式。

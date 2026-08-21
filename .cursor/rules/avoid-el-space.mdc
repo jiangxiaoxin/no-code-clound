@@ -14,13 +14,13 @@ alwaysApply: false
 <!-- ❌ BAD -->
 <el-space :size="4" alignment="center">
   <el-icon><Folder /></el-icon>
-  <el-text truncated>{{ name }}</el-text>
+  <span>{{ name }}</span>
 </el-space>
 
 <!-- ✅ GOOD -->
 <div class="tree-node">
   <el-icon><Folder /></el-icon>
-  <el-text truncated>{{ name }}</el-text>
+  <span>{{ name }}</span>
 </div>
 ```
 

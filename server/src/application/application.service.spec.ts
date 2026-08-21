@@ -144,6 +144,33 @@ describe('ApplicationService', () => {
     });
   });
 
+  describe('getForm', () => {
+    it('returns id+name+groupId for owned form', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+      });
+
+      await expect(service.getForm(1, 8, 10)).resolves.toEqual({
+        id: 10,
+        name: '入职登记',
+        groupId: 2,
+      });
+    });
+
+    it('throws 404 when form is missing', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue(null);
+
+      await expect(service.getForm(1, 8, 10)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+  });
+
   describe('directory', () => {
     it('nests forms under groups and lists ungrouped forms separately', async () => {
       repo.findOne.mockResolvedValue(ownedApp);

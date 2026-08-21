@@ -18,12 +18,12 @@ alwaysApply: false
 const title = '登录'
 </script>
 <template>
-  <el-text>{{ title }}</el-text>
+  <span>{{ title }}</span>
 </template>
 
 <!-- ✅ GOOD -->
 <template>
-  <el-text>{{ title }}</el-text>
+  <span>{{ title }}</span>
 </template>
 
 <script setup>

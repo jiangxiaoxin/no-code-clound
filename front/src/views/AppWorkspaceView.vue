@@ -34,7 +34,6 @@
       />
       <el-tree
         v-else
-        ref="treeRef"
         class="aside-tree"
         :data="treeData"
         node-key="key"
@@ -42,7 +41,6 @@
         default-expand-all
         :expand-on-click-node="true"
         :props="{ label: 'name', children: 'children' }"
-        @node-click="onNodeClick"
       >
         <template #default="{ data }">
           <div class="tree-node">
@@ -64,6 +62,7 @@
                   <el-dropdown-item command="delete">删除分组</el-dropdown-item>
                 </el-dropdown-menu>
                 <el-dropdown-menu v-else>
+                  <el-dropdown-item command="edit">编辑表单</el-dropdown-item>
                   <el-dropdown-item command="rename">修改名称</el-dropdown-item>
                   <el-dropdown-item command="delete">删除表单</el-dropdown-item>
                 </el-dropdown-menu>
@@ -138,8 +137,6 @@ const saving = ref(false)
 const keyword = ref('')
 const app = ref(null)
 const directory = ref({ groups: [], forms: [] })
-const currentKey = ref('')
-const treeRef = ref()
 const nameVisible = ref(false)
 const nameFormRef = ref()
 const nameForm = reactive({ name: '' })
@@ -213,13 +210,6 @@ function toFormNode(form) {
   }
 }
 
-function onNodeClick(data) {
-  if (data.nodeType === 'form') {
-    currentKey.value = data.key
-    treeRef.value?.setCurrentKey(data.key)
-  }
-}
-
 function onCreateCommand(command) {
   if (command === 'group') {
     openNameDialog('create-group')
@@ -231,6 +221,13 @@ function onCreateCommand(command) {
 function onNodeCommand(command, data) {
   if (command === 'create-form') {
     openNameDialog('create-form', { groupId: data.id })
+    return
+  }
+  if (command === 'edit') {
+    router.push({
+      name: 'form-design',
+      params: { id: appId.value, formId: data.id },
+    })
     return
   }
   if (command === 'rename') {
@@ -269,7 +266,16 @@ async function onSubmitName() {
     if (nameMode.value === 'create-group') {
       await createGroupApi(id, { name })
     } else if (nameMode.value === 'create-form') {
-      await createFormApi(id, { name, groupId: createFormGroupId.value })
+      const form = await createFormApi(id, {
+        name,
+        groupId: createFormGroupId.value,
+      })
+      nameVisible.value = false
+      router.push({
+        name: 'form-design',
+        params: { id, formId: form.id },
+      })
+      return
     } else if (nameMode.value === 'rename-group') {
       await renameGroupApi(id, nameTargetId.value, { name })
     } else {
@@ -310,9 +316,6 @@ async function onDelete(data) {
       await deleteGroupApi(appId.value, data.id)
     } else {
       await deleteFormApi(appId.value, data.id)
-      if (currentKey.value === data.key) {
-        currentKey.value = ''
-      }
     }
     await loadDirectory()
   } catch {

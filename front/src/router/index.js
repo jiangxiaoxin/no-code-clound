@@ -26,6 +26,11 @@ export const router = createRouter({
       name: 'app-workspace',
       component: () => import('../views/AppWorkspaceView.vue'),
     },
+    {
+      path: '/apps/:id/forms/:formId',
+      name: 'form-design',
+      component: () => import('../views/FormDesignView.vue'),
+    },
   ],
 })
 

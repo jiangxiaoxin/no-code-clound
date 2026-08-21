@@ -1,15 +1,6 @@
 <template>
   <el-container class="home" direction="vertical">
-    <el-header class="home-bar">
-      <el-text size="large" tag="b">No-Code Cloud</el-text>
-      <el-space :size="16" alignment="center">
-        <el-space :size="8" alignment="center">
-          <el-avatar :size="22" :icon="User" class="user-avatar" />
-          <el-text type="info">{{ userStore.user?.username }}</el-text>
-        </el-space>
-        <el-button @click="onLogout">退出</el-button>
-      </el-space>
-    </el-header>
+    <AppHeader />
     <el-main class="home-body" v-loading="loading">
       <el-row class="home-toolbar" justify="space-between" align="middle">
         <el-col :xs="24" :md="8">
@@ -90,14 +81,12 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, User } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { Plus, Search } from '@element-plus/icons-vue'
+import AppHeader from '../components/AppHeader.vue'
 import { createAppApi, listAppsApi } from '../api/apps'
-import { logoutApi } from '../api/auth'
-import { useUserStore } from '../stores/user'
 
 const router = useRouter()
-const userStore = useUserStore()
 const keyword = ref('')
 const loading = ref(false)
 const apps = ref([])
@@ -164,27 +153,6 @@ async function onCreate() {
   }
 }
 
-async function onLogout() {
-  try {
-    await ElMessageBox.confirm('确定退出登录？', '退出', {
-      confirmButtonText: '退出',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-
-  try {
-    await logoutApi()
-  } catch {
-    // 错误已由 http 拦截器提示
-  } finally {
-    userStore.logout()
-    router.push('/login')
-  }
-}
-
 onMounted(loadApps)
 </script>
 
@@ -192,14 +160,6 @@ onMounted(loadApps)
 .home {
   min-height: 100vh;
   background: var(--el-bg-color-page);
-}
-
-.home-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color);
 }
 
 .home-body {
@@ -290,10 +250,5 @@ onMounted(loadApps)
   line-height: 1.4;
   color: var(--el-text-color-primary);
   font-weight: bold;
-}
-
-.user-avatar {
-  background-color: var(--el-color-primary);
-  color: #fff;
 }
 </style>
