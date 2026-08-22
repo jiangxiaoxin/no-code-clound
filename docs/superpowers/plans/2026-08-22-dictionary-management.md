@@ -934,7 +934,7 @@ export function listDictionaryItemsByCodesApi(appId, codes) {
 - 列：名称、编码、状态（启用/停用 tag）、项数量 `itemCount`、操作（编辑 / 启用或停用 / 删除）。
 - `appId` 来自 `route.params.id`。
 - 编辑：先 `getDictionaryApi` 再打开表单（需要完整 `items`）。
-- 停用确认文案：`停用后，本应用表单设计将无法再选择该字典，已引用该字典的表单可能显示为空。确定停用「${name}」？`
+- 停用确认文案：`停用后，已引用本字典的功能可能发生错误。确定停用吗？`
 - 启用确认：`确定启用「${name}」？`
 - 删除确认：`删除后不可恢复，本应用已引用该字典的表单可能显示为空。确定删除「${name}」？`
 - 启停走 `updateDictionaryApi(appId, id, { status })`，不要因为引用失败拦截（后端也不会 409）。

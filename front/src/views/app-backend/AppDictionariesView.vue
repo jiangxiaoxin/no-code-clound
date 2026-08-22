@@ -130,7 +130,7 @@ async function toggleStatus(row) {
   try {
     await ElMessageBox.confirm(
       next === 'disabled'
-        ? `停用后，本应用表单设计将无法再选择该字典，已引用该字典的表单可能显示为空。确定停用「${row.name}」？`
+        ? '停用后，已引用本字典的功能可能发生错误。确定停用吗？'
         : `确定启用「${row.name}」？`,
       '确认',
       { type: 'warning' },
