@@ -86,6 +86,12 @@ function addField(item, beforeKey) {
     width: '1',
     required: true,
     description: '',
+    ...(item.type === 'number'
+      ? { rangeEnabled: false, min: undefined, max: undefined, precision: 0 }
+      : {}),
+    ...(item.type === 'input' || item.type === 'textarea'
+      ? { maxLength: undefined }
+      : {}),
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)

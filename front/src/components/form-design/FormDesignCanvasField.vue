@@ -24,7 +24,7 @@
     </div>
     <!-- el-divider 会自己显示title，不需要再添加标题  -->
      <!-- 其余的组件标题都显示到上面 -->
-      <!-- 左右布局需要设置合理的 label width -->
+      <!-- 左右布局需要设置合理的 label width ，暂时不支持-->
     <span v-if="field.type !== 'divider'" class="canvas-field-title">
       <span v-if="field.required" class="canvas-field-required">*</span>
       <span class="canvas-field-title-text">{{ field.title }}</span>
@@ -39,8 +39,19 @@
       </el-tooltip>
     </span>
     <el-input
-      v-if="field.type === 'input' || field.type === 'number'"
+      v-if="field.type === 'input'"
       disabled
+      :placeholder="field.placeholder"
+      :maxlength="field.maxLength || undefined"
+    />
+    <el-input-number
+      v-else-if="field.type === 'number'"
+      disabled
+      class="canvas-full"
+      :controls="false"
+      :precision="field.precision"
+      :min="field.rangeEnabled ? field.min : undefined"
+      :max="field.rangeEnabled ? field.max : undefined"
       :placeholder="field.placeholder"
     />
     <el-input
@@ -49,6 +60,7 @@
       disabled
       :rows="3"
       :placeholder="field.placeholder"
+      :maxlength="field.maxLength || undefined"
     />
     <el-radio-group v-else-if="field.type === 'radio'" disabled>
       <el-radio value="1">选项一</el-radio>

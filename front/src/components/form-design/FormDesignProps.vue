@@ -1,25 +1,14 @@
 <template>
   <el-aside class="props" width="320px">
     <div class="props-tabs">
-      <span
-        class="props-tab"
-        :class="{ 'is-active': tab === 'field' }"
-        @click="$emit('update:tab', 'field')"
-      >
+      <span class="props-tab" :class="{ 'is-active': tab === 'field' }" @click="$emit('update:tab', 'field')">
         字段属性
       </span>
-      <span
-        class="props-tab"
-        :class="{ 'is-active': tab === 'form' }"
-        @click="$emit('update:tab', 'form')"
-      >
+      <span class="props-tab" :class="{ 'is-active': tab === 'form' }" @click="$emit('update:tab', 'form')">
         表单属性
       </span>
     </div>
-    <el-empty
-      v-if="tab === 'field' && !field"
-      description="请选择字段"
-    />
+    <el-empty v-if="tab === 'field' && !field" description="请选择字段" />
     <el-form v-else-if="tab === 'field'" label-position="top">
       <el-form-item label="字段标题">
         <el-input v-model="field.title" maxlength="32" />
@@ -28,27 +17,58 @@
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
       <el-form-item label="字段说明">
-        <el-input
-          v-model="field.description"
-          type="textarea"
-          :rows="3"
-          maxlength="200"
-          show-word-limit
-          placeholder="填写后，标题右侧会显示说明"
-        />
+        <el-input v-model="field.description" type="textarea" :rows="3" maxlength="200" show-word-limit
+          placeholder="填写后，标题右侧会显示说明" />
       </el-form-item>
       <el-form-item label="校验设置">
-        <div class="required-row">
-          <span>必填</span>
-          <el-switch v-model="field.required" />
+        <div>
+          <div class="required-row">
+            <span>必填</span>
+            <el-switch v-model="field.required" />
+          </div>
+          <div v-if="field.type === 'input' || field.type === 'textarea'" class="required-row">
+            <span>最大文本长度：</span>
+            <el-input-number
+              v-model="field.maxLength"
+              class="max-length-input"
+              :min="0"
+              :precision="0"
+              :step="1"
+              step-strictly
+              :controls="false"
+              size="small"
+              placeholder="最大长度"
+            />
+            <span>字符</span>
+          </div>
+          <div v-if="field.type === 'number'" class="required-row">
+            <span>数值范围</span>
+            <el-switch v-model="field.rangeEnabled" />
+          </div>
+          <div v-if="field.type === 'number' && field.rangeEnabled" class="range-inputs">
+            <el-input-number v-model="field.min" :controls="false" placeholder="最小值" size="small"/>
+            <span>~</span>
+            <el-input-number v-model="field.max" :controls="false" placeholder="最大值" size="small"/>
+          </div>
+        </div>
+      </el-form-item>
+      <el-form-item v-if="field.type === 'number'" label="格式">
+        <div class="precision-row">
+          <span>保持</span>
+          <el-input-number
+            v-model="field.precision"
+            :min="0"
+            :precision="0"
+            :step="1"
+            step-strictly
+            :controls="false"
+            size="small"
+          />
+          <span>位小数</span>
         </div>
       </el-form-item>
       <el-form-item label="字段宽度">
-        <el-radio-group
-          class="width-options"
-          :model-value="field.width"
-          @change="$emit('update:width', $event)"
-        >
+        <el-radio-group class="width-options" :model-value="field.width" @change="$emit('update:width', $event)">
           <el-radio-button value="1/4">1/4</el-radio-button>
           <el-radio-button value="1/3">1/3</el-radio-button>
           <el-radio-button value="1/2">1/2</el-radio-button>
@@ -57,7 +77,7 @@
           <el-radio-button value="1">整行</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      
+
     </el-form>
   </el-aside>
 </template>
@@ -116,6 +136,32 @@ defineEmits(['update:tab', 'update:width'])
 }
 
 .required-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.required-row+.required-row {
+  margin-top: 12px;
+}
+
+.max-length-input {
+  width: 96px;
+}
+
+.range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.range-inputs .el-form-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.precision-row {
   display: flex;
   align-items: center;
   gap: 8px;

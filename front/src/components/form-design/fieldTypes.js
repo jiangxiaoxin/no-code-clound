@@ -19,7 +19,7 @@ import {
 export const fieldTypes = [
   { type: 'input', label: '单行文本', icon: EditPen, component: 'el-input' },
   { type: 'textarea', label: '多行文本', icon: Notebook, component: 'el-input' },
-  { type: 'number', label: '数字', icon: Odometer, component: 'el-input' },
+  { type: 'number', label: '数字', icon: Odometer, component: 'el-input-number' },
   { type: 'date', label: '日期时间', icon: Calendar, component: 'el-date-picker' },
   { type: 'radio', label: '单选框', icon: CircleCheck, component: 'el-radio-group' },
   { type: 'checkbox', label: '复选框', icon: Finished, component: 'el-checkbox-group' },
