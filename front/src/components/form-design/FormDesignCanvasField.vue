@@ -74,7 +74,22 @@
       v-else-if="field.type === 'date'"
       disabled
       class="canvas-full"
+      :type="field.format || 'date'"
+      :placeholder="field.placeholder || '请选择'"
+    />
+    <el-time-picker
+      v-else-if="field.type === 'time'"
+      disabled
+      class="canvas-full"
+      :format="field.format || 'HH:mm:ss'"
+      :placeholder="field.placeholder || '请选择'"
+    />
+    <el-date-picker
+      v-else-if="field.type === 'datetime'"
+      disabled
+      class="canvas-full"
       type="datetime"
+      :format="field.format || 'YYYY-MM-DD HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
     />
     <el-select

@@ -67,6 +67,25 @@
           <span>位小数</span>
         </div>
       </el-form-item>
+      <el-form-item v-else-if="field.type === 'date'" label="格式">
+        <el-radio-group v-model="field.format">
+          <el-radio-button value="year">年</el-radio-button>
+          <el-radio-button value="month">年月</el-radio-button>
+          <el-radio-button value="date">年月日</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item v-else-if="field.type === 'time'" label="格式">
+        <el-radio-group v-model="field.format">
+          <el-radio-button value="HH:mm">时分</el-radio-button>
+          <el-radio-button value="HH:mm:ss">时分秒</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item v-else-if="field.type === 'datetime'" label="格式">
+        <el-radio-group v-model="field.format">
+          <el-radio-button value="YYYY-MM-DD HH:mm">年月日时分</el-radio-button>
+          <el-radio-button value="YYYY-MM-DD HH:mm:ss">年月日时分秒</el-radio-button>
+        </el-radio-group>
+      </el-form-item>
       <el-form-item label="字段宽度">
         <el-radio-group class="width-options" :model-value="field.width" @change="$emit('update:width', $event)">
           <el-radio-button value="1/4">1/4</el-radio-button>

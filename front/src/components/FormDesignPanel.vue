@@ -82,11 +82,14 @@ function addField(item, beforeKey) {
     type: item.type,
     component: item.component,
     title: item.label,
-    placeholder: item.type === 'input' ? '请输入' : '',
+    placeholder: item.placeholder || '',
     width: '1',
-    required: true,
+    required: false,
     description: '',
     ...(item.type === 'number' ? { rangeEnabled: false, precision: 0 } : {}),
+    ...(item.type === 'date' ? { format: 'date' } : {}),
+    ...(item.type === 'time' ? { format: 'HH:mm:ss' } : {}),
+    ...(item.type === 'datetime' ? { format: 'YYYY-MM-DD HH:mm:ss' } : {}),
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)
