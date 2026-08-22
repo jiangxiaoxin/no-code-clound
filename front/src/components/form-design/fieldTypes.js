@@ -37,6 +37,22 @@ export const fieldTypes = [
   { type: 'relate', label: '关联数据', icon: Link, component: 'RelateData', placeholder: '请选择' },
 ]
 
+export const formatOptions = {
+  date: [
+    { value: 'year', label: '年（2026）' },
+    { value: 'month', label: '年月（2026-08）' },
+    { value: 'date', label: '年月日（2026-08-22）' },
+  ],
+  time: [
+    { value: 'HH:mm', label: '时分（16:26）' },
+    { value: 'HH:mm:ss', label: '时分秒（16:26:30）' },
+  ],
+  datetime: [
+    { value: 'YYYY-MM-DD HH:mm', label: '年月日时分（2026-08-22 16:26）' },
+    { value: 'YYYY-MM-DD HH:mm:ss', label: '年月日时分秒（2026-08-22 16:26:30）' },
+  ],
+}
+
 export const widthClass = {
   1: 'is-w-full',
   '1/2': 'is-w-half',
