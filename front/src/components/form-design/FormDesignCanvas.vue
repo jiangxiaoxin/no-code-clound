@@ -15,6 +15,7 @@
           v-for="field in fields"
           :key="field.key"
           :field="field"
+          :items="dictItemsByCode[field.dictCode] || []"
           :selected="selectedKey === field.key"
           :dragging="dragKey === field.key"
           :drag-over="dragOverKey === field.key"
@@ -39,6 +40,7 @@ import FormDesignCanvasField from './FormDesignCanvasField.vue'
 defineProps({
   fields: { type: Array, required: true },
   selectedKey: { type: String, default: '' },
+  dictItemsByCode: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['select', 'copy', 'remove', 'reorder', 'add'])

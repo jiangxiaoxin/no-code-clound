@@ -22,6 +22,21 @@ export const router = createRouter({
       component: () => import('../views/AppWorkspaceView.vue'),
     },
     {
+      path: '/apps/:id/backend',
+      component: () => import('../layouts/AppBackendLayout.vue'),
+      redirect: (to) => ({
+        name: 'app-dictionaries',
+        params: { id: to.params.id },
+      }),
+      children: [
+        {
+          path: 'dictionaries',
+          name: 'app-dictionaries',
+          component: () => import('../views/app-backend/AppDictionariesView.vue'),
+        },
+      ],
+    },
+    {
       path: '/apps/:id/forms/:formId',
       name: 'form-design',
       component: () => import('../views/FormDesignView.vue'),

@@ -10,6 +10,7 @@
       <FormDesignCanvas
         :fields="fields"
         :selected-key="selectedKey"
+        :dict-items-by-code="dictItemsByCode"
         @select="selectField"
         @copy="copyField"
         @remove="removeField"
@@ -19,6 +20,7 @@
       <FormDesignProps
         v-model:tab="propTab"
         :field="selectedField"
+        :app-id="appId"
         @update:width="setFieldWidth"
       />
     </el-container>
@@ -45,23 +47,66 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import FormDesignToolbar from './form-design/FormDesignToolbar.vue'
 import FormDesignPalette from './form-design/FormDesignPalette.vue'
 import FormDesignCanvas from './form-design/FormDesignCanvas.vue'
 import FormDesignProps from './form-design/FormDesignProps.vue'
+import { listDictionaryItemsByCodesApi } from '../api/apps'
+
+const props = defineProps({
+  appId: { type: Number, required: true },
+})
 
 const propTab = ref('field')
 const previewVisible = ref(false)
 const fields = ref([])
 const selectedKey = ref('')
+const dictItemsByCode = ref({})
 
 const selectedField = computed(
   () => fields.value.find((field) => field.key === selectedKey.value) || null,
 )
 
 const previewJson = computed(() => JSON.stringify(fields.value, null, 2))
+
+const dictCodes = computed(() => {
+  const codes = []
+  const seen = new Set()
+  for (const field of fields.value) {
+    const usesDict =
+      (field.type === 'radio' || field.type === 'checkbox' || field.type === 'select') &&
+      (field.optionSource || 'dictionary') === 'dictionary' &&
+      field.dictCode
+    if (!usesDict || seen.has(field.dictCode)) {
+      continue
+    }
+    seen.add(field.dictCode)
+    codes.push(field.dictCode)
+  }
+  return codes
+})
+
+watch(
+  [() => props.appId, dictCodes],
+  async () => {
+    const codes = dictCodes.value
+    if (!codes.length) {
+      dictItemsByCode.value = {}
+      return
+    }
+    try {
+      const rows = (await listDictionaryItemsByCodesApi(props.appId, codes)) || []
+      dictItemsByCode.value = Object.fromEntries(
+        rows.map((row) => [row.code, row.items || []]),
+      )
+    } catch {
+      dictItemsByCode.value = {}
+    }
+  },
+  { immediate: true },
+)
 
 async function copyPreviewJson() {
   try {
@@ -90,6 +135,10 @@ function addField(item, beforeKey) {
     ...(item.type === 'date' ? { format: 'date' } : {}),
     ...(item.type === 'time' ? { format: 'HH:mm:ss' } : {}),
     ...(item.type === 'datetime' ? { format: 'YYYY-MM-DD HH:mm:ss' } : {}),
+    ...(item.type === 'radio' || item.type === 'checkbox'
+      ? { optionSource: 'dictionary', dictCode: '' }
+      : {}),
+    ...(item.type === 'select' ? { optionSource: 'dictionary', dictCode: '' } : {}),
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)
@@ -131,7 +180,21 @@ async function removeField(field) {
   }
 }
 
+function ensureOptionSource(field) {
+  if (field.type === 'radio' || field.type === 'checkbox') {
+    if (!field.optionSource) field.optionSource = 'dictionary'
+    if (field.dictCode == null) field.dictCode = ''
+  }
+  if (field.type === 'select') {
+    if (!field.optionSource) field.optionSource = 'dictionary'
+    if (field.optionSource === 'dictionary' && field.dictCode == null) {
+      field.dictCode = ''
+    }
+  }
+}
+
 function selectField(field) {
+  ensureOptionSource(field)
   selectedKey.value = field.key
   propTab.value = 'field'
 }

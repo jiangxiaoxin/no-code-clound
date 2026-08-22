@@ -63,12 +63,14 @@
       :maxlength="field.maxLength || undefined"
     />
     <el-radio-group v-else-if="field.type === 'radio'" disabled>
-      <el-radio value="1">选项一</el-radio>
-      <el-radio value="2">选项二</el-radio>
+      <el-radio v-for="item in items" :key="item.value" :value="item.value">
+        {{ item.label }}
+      </el-radio>
     </el-radio-group>
     <el-checkbox-group v-else-if="field.type === 'checkbox'" disabled>
-      <el-checkbox value="1">选项一</el-checkbox>
-      <el-checkbox value="2">选项二</el-checkbox>
+      <el-checkbox v-for="item in items" :key="item.value" :value="item.value">
+        {{ item.label }}
+      </el-checkbox>
     </el-checkbox-group>
     <el-date-picker
       v-else-if="field.type === 'date'"
@@ -93,8 +95,20 @@
       :placeholder="field.placeholder || '请选择'"
     />
     <el-select
+      v-else-if="field.type === 'select'"
+      disabled
+      class="canvas-full"
+      :placeholder="field.placeholder"
+    >
+      <el-option
+        v-for="item in items"
+        :key="item.value"
+        :label="item.label"
+        :value="item.value"
+      />
+    </el-select>
+    <el-select
       v-else-if="
-        field.type === 'select' ||
         field.type === 'member' ||
         field.type === 'dept' ||
         field.type === 'data' ||
@@ -133,6 +147,7 @@ import { widthClass } from './fieldTypes'
 
 defineProps({
   field: { type: Object, required: true },
+  items: { type: Array, default: () => [] },
   selected: { type: Boolean, default: false },
   dragging: { type: Boolean, default: false },
   dragOver: { type: Boolean, default: false },

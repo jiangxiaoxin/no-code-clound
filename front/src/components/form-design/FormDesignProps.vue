@@ -13,7 +13,7 @@
       <el-form-item label="字段标题">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
-      <el-form-item label="提示文字">
+      <el-form-item label="占位文字">
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
       <el-form-item label="字段说明">
@@ -77,6 +77,34 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item v-if="field.type === 'radio' || field.type === 'checkbox'" label="选项字典">
+        <el-select v-model="field.dictCode" clearable placeholder="请选择字典">
+          <el-option
+            v-for="item in dictionaries"
+            :key="item.code"
+            :label="item.name"
+            :value="item.code"
+          />
+        </el-select>
+      </el-form-item>
+      <template v-else-if="field.type === 'select'">
+        <el-form-item label="数据源">
+          <el-radio-group v-model="field.optionSource" @change="onOptionSourceChange">
+            <el-radio value="dictionary">字典</el-radio>
+            <el-radio value="table_data">其他表数据</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="field.optionSource === 'dictionary'" label="选项字典">
+          <el-select v-model="field.dictCode" clearable placeholder="请选择字典">
+            <el-option
+              v-for="item in dictionaries"
+              :key="item.code"
+              :label="item.name"
+              :value="item.code"
+            />
+          </el-select>
+        </el-form-item>
+      </template>
       <el-form-item label="字段宽度">
         <el-radio-group class="width-options" :model-value="field.width" @change="$emit('update:width', $event)">
           <el-radio-button value="1/4">1/4</el-radio-button>
@@ -93,14 +121,44 @@
 </template>
 
 <script setup>
+import { ref, watch } from 'vue'
 import { formatOptions } from './fieldTypes'
+import { listDictionaryOptionsApi } from '../../api/apps'
 
-defineProps({
+const props = defineProps({
   tab: { type: String, required: true },
   field: { type: Object, default: null },
+  appId: { type: Number, required: true },
 })
 
 defineEmits(['update:tab', 'update:width'])
+
+const dictionaries = ref([])
+
+async function loadOptions() {
+  if (!props.appId) {
+    dictionaries.value = []
+    return
+  }
+  try {
+    dictionaries.value = (await listDictionaryOptionsApi(props.appId)) || []
+  } catch {
+    dictionaries.value = []
+  }
+}
+
+function onOptionSourceChange(value) {
+  if (!props.field) {
+    return
+  }
+  if (value === 'table_data') {
+    delete props.field.dictCode
+  } else if (props.field.dictCode == null) {
+    props.field.dictCode = ''
+  }
+}
+
+watch(() => props.appId, loadOptions, { immediate: true })
 </script>
 
 <style scoped lang="less">

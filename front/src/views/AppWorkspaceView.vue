@@ -74,6 +74,9 @@
           </div>
         </template>
       </el-tree>
+      <div class="aside-footer">
+        <button type="button" class="aside-backend" @click="goBackend">应用后台</button>
+      </div>
     </el-aside>
     <AppWorkspaceMain :form="currentForm" />
   </el-container>
@@ -157,6 +160,10 @@ const nameRules = {
 }
 
 const appId = computed(() => Number(route.params.id))
+
+function goBackend() {
+  router.push({ name: 'app-dictionaries', params: { id: appId.value } })
+}
 
 const nameDialogTitle = computed(() => {
   if (nameMode.value === 'create-group') return '新建分组'
@@ -442,5 +449,28 @@ watch(appId, loadWorkspace, { immediate: true })
     flex: 1;
     min-width: 0;
   }
+}
+
+.aside-footer {
+  flex-shrink: 0;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--el-border-color);
+}
+
+.aside-backend {
+  width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--el-text-color-regular);
+  text-align: left;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.aside-backend:hover {
+  color: var(--el-color-primary);
+  background: var(--el-fill-color-light);
 }
 </style>

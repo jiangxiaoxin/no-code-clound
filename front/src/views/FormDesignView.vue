@@ -24,7 +24,7 @@
       <div class="form-bar-side" />
     </el-header>
 
-    <FormDesignPanel v-if="page === 'design'" />
+    <FormDesignPanel v-if="page === 'design'" :app-id="appId" />
     <FormPublishPanel v-else />
   </el-container>
 </template>

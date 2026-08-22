@@ -43,3 +43,35 @@ export function renameFormApi(appId, formId, payload) {
 export function deleteFormApi(appId, formId) {
   return http.delete(`/apps/${appId}/forms/${formId}`)
 }
+
+export function listDictionariesApi(appId, params) {
+  return http.get(`/apps/${appId}/dictionaries`, { params })
+}
+
+export function getDictionaryApi(appId, id) {
+  return http.get(`/apps/${appId}/dictionaries/${id}`)
+}
+
+export function createDictionaryApi(appId, payload) {
+  return http.post(`/apps/${appId}/dictionaries`, payload)
+}
+
+export function updateDictionaryApi(appId, id, payload) {
+  return http.patch(`/apps/${appId}/dictionaries/${id}`, payload)
+}
+
+export function deleteDictionaryApi(appId, id) {
+  return http.delete(`/apps/${appId}/dictionaries/${id}`)
+}
+
+export function listDictionaryOptionsApi(appId) {
+  return http.get(`/apps/${appId}/dictionaries/options`)
+}
+
+export function listDictionaryItemsByCodeApi(appId, code) {
+  return http.get(`/apps/${appId}/dictionaries/by-code/${encodeURIComponent(code)}/items`)
+}
+
+export function listDictionaryItemsByCodesApi(appId, codes) {
+  return http.post(`/apps/${appId}/dictionaries/items-by-codes`, { codes })
+}
