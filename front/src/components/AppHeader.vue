@@ -1,6 +1,6 @@
 <template>
   <el-header class="app-header">
-    <el-text size="large" tag="b">No-Code Cloud</el-text>
+    <b class="app-title">No-Code Cloud</b>
     <el-dropdown
       trigger="hover"
       placement="bottom-end"
@@ -9,12 +9,18 @@
     >
       <div class="user-entry">
         <el-avatar :size="22" :icon="User" class="user-avatar" />
-        <el-text type="info">{{ userStore.user?.username }}</el-text>
+        <span class="username">{{ userStore.user?.username }}</span>
       </div>
       <template #dropdown>
         <el-dropdown-menu>
           <el-dropdown-item command="settings" :icon="Setting">个人设置</el-dropdown-item>
-          <el-dropdown-item command="admin" :icon="Monitor">管理后台</el-dropdown-item>
+          <el-dropdown-item
+            v-if="userStore.hasPermission('admin.access')"
+            command="admin"
+            :icon="Monitor"
+          >
+            管理后台
+          </el-dropdown-item>
           <el-dropdown-item command="logout" :icon="SwitchButton" divided>退出</el-dropdown-item>
         </el-dropdown-menu>
       </template>
@@ -33,6 +39,10 @@ const router = useRouter()
 const userStore = useUserStore()
 
 function onCommand(command) {
+  if (command === 'admin') {
+    router.push('/admin/users')
+    return
+  }
   if (command === 'logout') {
     onLogout()
   }
@@ -81,6 +91,15 @@ async function onLogout() {
   padding: 4px 8px;
   border-radius: 8px;
   cursor: pointer;
+}
+
+.app-title {
+  font-size: 16px;
+}
+
+.username {
+  color: var(--el-text-color-secondary);
+  font-size: 14px;
 }
 
 .user-avatar {

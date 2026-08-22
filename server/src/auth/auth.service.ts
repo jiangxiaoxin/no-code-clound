@@ -7,7 +7,12 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { AuthPrincipal } from '../admin/permissions';
+import { UserDepartment } from '../admin/department/user-department.entity';
+import { RolePermission } from '../admin/role/role-permission.entity';
+import { Role } from '../admin/role/role.entity';
+import { UserRole } from '../admin/role/user-role.entity';
 import { User } from '../user/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -22,6 +27,14 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(RevokedToken)
     private readonly revokedRepo: Repository<RevokedToken>,
+    @InjectRepository(UserDepartment)
+    private readonly userDepartmentRepo: Repository<UserDepartment>,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepo: Repository<UserRole>,
+    @InjectRepository(Role)
+    private readonly roleRepo: Repository<Role>,
+    @InjectRepository(RolePermission)
+    private readonly rolePermissionRepo: Repository<RolePermission>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -43,7 +56,13 @@ export class AuthService {
     const password = await bcrypt.hash(dto.password, 10);
     try {
       const user = await this.userRepo.save(
-        this.userRepo.create({ username, email, password }),
+        this.userRepo.create({
+          username,
+          email,
+          password,
+          displayName: username,
+          status: 'active',
+        }),
       );
       return { id: user.id, username: user.username, email: user.email };
     } catch (e) {
@@ -56,11 +75,14 @@ export class AuthService {
 
   async login(dto: LoginDto): Promise<{
     accessToken: string;
-    user: { id: number; username: string; email: string };
+    user: AuthPrincipal;
   }> {
     const user = await this.findByAccount(dto.username);
     if (!user) {
       throw new UnauthorizedException(LOGIN_FAILED);
+    }
+    if (user.status === 'disabled') {
+      throw new UnauthorizedException('账号已停用');
     }
 
     const matched = await bcrypt.compare(dto.password, user.password);
@@ -75,7 +97,56 @@ export class AuthService {
     });
     return {
       accessToken,
-      user: { id: user.id, username: user.username, email: user.email },
+      user: await this.getPrincipal(user.id),
+    };
+  }
+
+  async getPrincipal(userId: number): Promise<AuthPrincipal> {
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+    if (user.status === 'disabled') {
+      throw new UnauthorizedException('账号已停用');
+    }
+
+    const userDepts = await this.userDepartmentRepo.find({ where: { userId } });
+    const departmentIds = [
+      ...new Set(userDepts.map((row) => row.departmentId)),
+    ].sort((a, b) => a - b);
+
+    const userRoles = await this.userRoleRepo.find({ where: { userId } });
+    const roleIds = userRoles.map((row) => row.roleId);
+    const roles =
+      roleIds.length === 0
+        ? []
+        : await this.roleRepo.find({
+            where: { id: In(roleIds), status: 'active' },
+          });
+    const roleCodes = [...new Set(roles.map((role) => role.code))].sort();
+
+    const permissions =
+      roles.length === 0
+        ? []
+        : [
+            ...new Set(
+              (
+                await this.rolePermissionRepo.find({
+                  where: { roleId: In(roles.map((role) => role.id)) },
+                })
+              ).map((row) => row.permission),
+            ),
+          ].sort();
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName,
+      status: 'active',
+      departmentIds,
+      roleCodes,
+      permissions,
     };
   }
 

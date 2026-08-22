@@ -7,26 +7,27 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity('user')
-@Index('uk_user_email', ['email'], { unique: true })
-export class User {
+@Entity('role')
+@Index('uk_role_name', ['name'], { unique: true })
+@Index('uk_role_code', ['code'], { unique: true })
+export class Role {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'varchar', length: 32, unique: true })
-  username: string;
-
-  @Column({ type: 'varchar', length: 255 })
-  email: string;
-
-  @Column({ type: 'varchar', length: 255 })
-  password: string;
+  @Column({ type: 'varchar', length: 32 })
+  name: string;
 
   @Column({ type: 'varchar', length: 64 })
-  displayName: string;
+  code: string;
+
+  @Column({ type: 'varchar', length: 255, default: '' })
+  description: string;
 
   @Column({ type: 'varchar', length: 16, default: 'active' })
   status: 'active' | 'disabled';
+
+  @Column({ type: 'boolean', default: false })
+  builtIn: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

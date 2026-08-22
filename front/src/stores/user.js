@@ -29,5 +29,9 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  return { accessToken, user, setSession, logout, restore }
+  function hasPermission(permission) {
+    return Boolean(user.value?.permissions?.includes(permission))
+  }
+
+  return { accessToken, user, setSession, logout, restore, hasPermission }
 })

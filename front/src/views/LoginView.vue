@@ -5,8 +5,8 @@
     </el-col>
     <el-col :xs="24" :md="10" class="auth-panel">
       <div class="auth-card">
-        <el-text class="auth-kicker" tag="p">No-Code Cloud</el-text>
-        <el-text class="auth-title" tag="h1">登录</el-text>
+        <p class="auth-kicker">No-Code Cloud</p>
+        <h1 class="auth-title">登录</h1>
         <el-form
           ref="formRef"
           class="auth-form"
@@ -40,12 +40,7 @@
             </el-button>
           </el-form-item>
         </el-form>
-        <el-text class="auth-switch" tag="p">
-          还没有账号？
-          <el-link type="primary" @click="onRegister">
-            去注册
-          </el-link>
-        </el-text>
+        <p class="auth-switch">请找管理员分配账号</p>
       </div>
     </el-col>
   </el-row>
@@ -88,10 +83,6 @@ const rules = {
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少 6 位', trigger: 'blur' },
   ],
-}
-
-function onRegister() {
-  ElMessage.info('请找管理员分配账号')
 }
 
 async function onSubmit() {

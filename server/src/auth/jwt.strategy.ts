@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Request } from 'express';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { AuthPrincipal } from '../admin/permissions';
 import { AuthService } from './auth.service';
 
 @Injectable()
@@ -22,20 +23,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(
     req: Request,
     payload: { sub: number; username: string; email?: string },
-  ): Promise<{
-    id: number;
-    username: string;
-    email?: string;
-  }> {
+  ): Promise<AuthPrincipal> {
     const token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
     // 没有token 或者token 已经标记退出，失效了，抛出异常
     if (!token || (await this.authService.isRevoked(token))) {
       throw new UnauthorizedException();
     }
-    return {
-      id: payload.sub,
-      username: payload.username,
-      email: payload.email,
-    };
+    return this.authService.getPrincipal(payload.sub);
   }
 }

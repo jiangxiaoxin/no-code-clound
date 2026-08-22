@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useUserStore } from '../stores/user'
 
 export const router = createRouter({
@@ -8,12 +9,6 @@ export const router = createRouter({
       path: '/login',
       name: 'login',
       component: () => import('../views/LoginView.vue'),
-      meta: { guestOnly: true },
-    },
-    {
-      path: '/register',
-      name: 'register',
-      component: () => import('../views/RegisterView.vue'),
       meta: { guestOnly: true },
     },
     {
@@ -31,6 +26,32 @@ export const router = createRouter({
       name: 'form-design',
       component: () => import('../views/FormDesignView.vue'),
     },
+    {
+      path: '/admin',
+      component: () => import('../layouts/AdminLayout.vue'),
+      redirect: '/admin/users',
+      meta: { permission: 'admin.access' },
+      children: [
+        {
+          path: 'users',
+          name: 'admin-users',
+          component: () => import('../views/admin/AdminUsersView.vue'),
+          meta: { permission: 'admin.access' },
+        },
+        {
+          path: 'departments',
+          name: 'admin-departments',
+          component: () => import('../views/admin/AdminDepartmentsView.vue'),
+          meta: { permission: 'admin.access' },
+        },
+        {
+          path: 'roles',
+          name: 'admin-roles',
+          component: () => import('../views/admin/AdminRolesView.vue'),
+          meta: { permission: 'admin.access' },
+        },
+      ],
+    },
   ],
 })
 
@@ -43,6 +64,11 @@ router.beforeEach((to) => {
   }
 
   if (loggedIn && to.meta.guestOnly) {
+    return { path: '/' }
+  }
+
+  if (to.meta.permission && !userStore.hasPermission(to.meta.permission)) {
+    ElMessage.warning('无权访问管理后台')
     return { path: '/' }
   }
 

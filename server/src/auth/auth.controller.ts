@@ -9,9 +9,9 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { AuthPrincipal } from '../admin/permissions';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RolesGuard } from './roles.guard';
 import { Roles } from 'src/common/decorator/roles.decorator';
@@ -21,12 +21,6 @@ import { Roles } from 'src/common/decorator/roles.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
-  @Post('register')
-  @HttpCode(201)
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
-  }
-
   @Post('login')
   @HttpCode(200)
   login(@Body() dto: LoginDto) {
@@ -35,9 +29,7 @@ export class AuthController {
 
   @Get('profile')
   @UseGuards(JwtAuthGuard)
-  profile(
-    @Req() req: { user: { id: number; username: string; email?: string } },
-  ) {
+  profile(@Req() req: { user: AuthPrincipal }) {
     return req.user;
   }
 

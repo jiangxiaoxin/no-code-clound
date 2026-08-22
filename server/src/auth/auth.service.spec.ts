@@ -4,6 +4,10 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
+import { UserDepartment } from '../admin/department/user-department.entity';
+import { RolePermission } from '../admin/role/role-permission.entity';
+import { Role } from '../admin/role/role.entity';
+import { UserRole } from '../admin/role/user-role.entity';
 import { User } from '../user/user.entity';
 import { AuthService } from './auth.service';
 import { RevokedToken } from './revoked-token.entity';
@@ -24,6 +28,18 @@ describe('AuthService', () => {
     create: jest.fn(),
     save: jest.fn(),
   };
+  const userDepartmentRepo = {
+    find: jest.fn(),
+  };
+  const userRoleRepo = {
+    find: jest.fn(),
+  };
+  const roleRepo = {
+    find: jest.fn(),
+  };
+  const rolePermissionRepo = {
+    find: jest.fn(),
+  };
 
   const registerDto = {
     email: 'alice@example.com',
@@ -33,11 +49,19 @@ describe('AuthService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    userDepartmentRepo.find.mockResolvedValue([]);
+    userRoleRepo.find.mockResolvedValue([]);
+    roleRepo.find.mockResolvedValue([]);
+    rolePermissionRepo.find.mockResolvedValue([]);
     const module = await Test.createTestingModule({
       providers: [
         AuthService,
         { provide: getRepositoryToken(User), useValue: repo },
         { provide: getRepositoryToken(RevokedToken), useValue: revokedRepo },
+        { provide: getRepositoryToken(UserDepartment), useValue: userDepartmentRepo },
+        { provide: getRepositoryToken(UserRole), useValue: userRoleRepo },
+        { provide: getRepositoryToken(Role), useValue: roleRepo },
+        { provide: getRepositoryToken(RolePermission), useValue: rolePermissionRepo },
         { provide: JwtService, useValue: jwtService },
       ],
     }).compile();
@@ -144,6 +168,8 @@ describe('AuthService', () => {
         id: 1,
         username: 'alice',
         email: 'alice@example.com',
+        displayName: 'alice',
+        status: 'active',
         password,
       });
       jwtService.sign.mockReturnValue('token-abc');
@@ -153,9 +179,13 @@ describe('AuthService', () => {
         password: 'secret1',
       });
 
-      expect(result).toEqual({
-        accessToken: 'token-abc',
-        user: { id: 1, username: 'alice', email: 'alice@example.com' },
+      expect(result.accessToken).toBe('token-abc');
+      expect(result.user).toMatchObject({
+        id: 1,
+        username: 'alice',
+        email: 'alice@example.com',
+        displayName: 'alice',
+        status: 'active',
       });
     });
 
@@ -165,6 +195,8 @@ describe('AuthService', () => {
         id: 1,
         username: 'alice',
         email: 'alice@example.com',
+        displayName: 'alice',
+        status: 'active',
         password,
       });
       jwtService.sign.mockReturnValue('token-abc');
@@ -178,7 +210,7 @@ describe('AuthService', () => {
         where: { email: 'alice@example.com' },
       });
       expect(result.accessToken).toBe('token-abc');
-      expect(result.user).toEqual({
+      expect(result.user).toMatchObject({
         id: 1,
         username: 'alice',
         email: 'alice@example.com',
@@ -202,12 +234,33 @@ describe('AuthService', () => {
       }
     });
 
+    it('throws 401 with 账号已停用 when user is disabled', async () => {
+      repo.findOne.mockResolvedValue({
+        id: 1,
+        username: 'alice',
+        email: 'alice@example.com',
+        displayName: 'alice',
+        status: 'disabled',
+        password: await bcrypt.hash('secret1', 10),
+      });
+
+      try {
+        await service.login({ username: 'alice', password: 'secret1' });
+        throw new Error('expected unauthorized');
+      } catch (e) {
+        expect(e).toBeInstanceOf(UnauthorizedException);
+        expect((e as UnauthorizedException).message).toBe('账号已停用');
+      }
+    });
+
     it('throws 401 when password mismatches', async () => {
       const password = await bcrypt.hash('other-pass', 10);
       repo.findOne.mockResolvedValue({
         id: 1,
         username: 'alice',
         email: 'alice@example.com',
+        displayName: 'alice',
+        status: 'active',
         password,
       });
 
@@ -252,6 +305,83 @@ describe('AuthService', () => {
       await service.logout('jwt-token');
 
       expect(revokedRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getPrincipal', () => {
+    const activeUser = {
+      id: 1,
+      username: 'alice',
+      email: 'alice@example.com',
+      displayName: '张三',
+      status: 'active' as const,
+    };
+
+    it('returns departments, enabled role codes and unique sorted permissions', async () => {
+      repo.findOne.mockResolvedValue(activeUser);
+      userDepartmentRepo.find.mockResolvedValue([
+        { userId: 1, departmentId: 3 },
+        { userId: 1, departmentId: 1 },
+      ]);
+      userRoleRepo.find.mockResolvedValue([
+        { userId: 1, roleId: 2 },
+        { userId: 1, roleId: 4 },
+      ]);
+      roleRepo.find.mockResolvedValue([
+        { id: 2, code: 'user_admin', status: 'active' },
+        { id: 4, code: 'dept_admin', status: 'active' },
+      ]);
+      rolePermissionRepo.find.mockResolvedValue([
+        { roleId: 2, permission: 'users.update' },
+        { roleId: 2, permission: 'users.read' },
+        { roleId: 4, permission: 'users.read' },
+        { roleId: 4, permission: 'departments.read' },
+      ]);
+
+      await expect(service.getPrincipal(1)).resolves.toEqual({
+        id: 1,
+        username: 'alice',
+        email: 'alice@example.com',
+        displayName: '张三',
+        status: 'active',
+        departmentIds: [1, 3],
+        roleCodes: ['dept_admin', 'user_admin'],
+        permissions: ['departments.read', 'users.read', 'users.update'],
+      });
+    });
+
+    it('does not grant permissions from disabled roles', async () => {
+      repo.findOne.mockResolvedValue(activeUser);
+      userRoleRepo.find.mockResolvedValue([
+        { userId: 1, roleId: 2 },
+        { userId: 1, roleId: 5 },
+      ]);
+      roleRepo.find.mockResolvedValue([
+        { id: 2, code: 'user_admin', status: 'active' },
+      ]);
+      rolePermissionRepo.find.mockResolvedValue([
+        { roleId: 2, permission: 'users.read' },
+      ]);
+
+      const result = await service.getPrincipal(1);
+      expect(result.roleCodes).toEqual(['user_admin']);
+      expect(result.permissions).toEqual(['users.read']);
+    });
+
+    it('throws UnauthorizedException when user is disabled', async () => {
+      repo.findOne.mockResolvedValue({ ...activeUser, status: 'disabled' });
+
+      await expect(service.getPrincipal(1)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
+    });
+
+    it('throws UnauthorizedException when user is missing', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(service.getPrincipal(99)).rejects.toBeInstanceOf(
+        UnauthorizedException,
+      );
     });
   });
 

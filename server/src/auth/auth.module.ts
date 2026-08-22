@@ -3,16 +3,28 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { UserDepartment } from '../admin/department/user-department.entity';
+import { RolePermission } from '../admin/role/role-permission.entity';
+import { Role } from '../admin/role/role.entity';
+import { UserRole } from '../admin/role/user-role.entity';
 import { User } from '../user/user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { JwtStrategy } from './jwt.strategy';
+import { PermissionsGuard } from './permissions.guard';
 import { RevokedToken } from './revoked-token.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RevokedToken]),
+    TypeOrmModule.forFeature([
+      User,
+      RevokedToken,
+      UserDepartment,
+      UserRole,
+      Role,
+      RolePermission,
+    ]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       inject: [ConfigService],
@@ -26,7 +38,7 @@ import { RevokedToken } from './revoked-token.entity';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard],
-  exports: [AuthService, JwtAuthGuard], 
+  providers: [AuthService, JwtStrategy, JwtAuthGuard, PermissionsGuard],
+  exports: [AuthService, JwtAuthGuard, PermissionsGuard],
 })
 export class AuthModule {}
