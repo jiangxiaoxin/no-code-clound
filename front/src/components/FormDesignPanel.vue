@@ -85,6 +85,7 @@ function addField(item, beforeKey) {
     placeholder: item.type === 'input' ? '请输入' : '',
     width: '1',
     required: true,
+    description: '',
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)

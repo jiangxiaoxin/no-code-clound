@@ -27,7 +27,16 @@
       <!-- 左右布局需要设置合理的 label width -->
     <span v-if="field.type !== 'divider'" class="canvas-field-title">
       <span v-if="field.required" class="canvas-field-required">*</span>
-      {{ field.title }}
+      <span class="canvas-field-title-text">{{ field.title }}</span>
+      <el-tooltip
+        v-if="field.description?.trim()"
+        :content="field.description"
+        placement="top"
+      >
+        <el-icon class="canvas-field-info" @click.stop>
+          <InfoFilled />
+        </el-icon>
+      </el-tooltip>
     </span>
     <el-input
       v-if="field.type === 'input' || field.type === 'number'"
@@ -92,7 +101,7 @@
 </template>
 
 <script setup>
-import { CopyDocument, Delete, Plus, Upload } from '@element-plus/icons-vue'
+import { CopyDocument, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { widthClass } from './fieldTypes'
 
 defineProps({
@@ -110,7 +119,7 @@ defineEmits(['select', 'copy', 'remove', 'dragstart', 'dragover', 'drop', 'drage
   position: relative;
   box-sizing: border-box;
   min-width: 0;
-  padding: 16px 12px;
+  padding: 6px 12px;
   cursor: grab;
   border: 1px solid transparent;
   border-radius: 4px;
@@ -166,13 +175,24 @@ defineEmits(['select', 'copy', 'remove', 'dragstart', 'dragover', 'drop', 'drage
 }
 
 .canvas-field-title {
-  display: block;
+  display: flex;
+  align-items: center;
   margin-bottom: 8px;
+}
+
+.canvas-field-title-text {
+  min-width: 0;
 }
 
 .canvas-field-required {
   margin-right: 4px;
   color: var(--el-color-danger);
+}
+
+.canvas-field-info {
+  margin-left: 8px;
+  color: var(--el-text-color-secondary);
+  cursor: help;
 }
 
 .canvas-full {

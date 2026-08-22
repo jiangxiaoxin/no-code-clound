@@ -27,6 +27,22 @@
       <el-form-item label="提示文字">
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
+      <el-form-item label="字段说明">
+        <el-input
+          v-model="field.description"
+          type="textarea"
+          :rows="3"
+          maxlength="200"
+          show-word-limit
+          placeholder="填写后，标题右侧会显示说明"
+        />
+      </el-form-item>
+      <el-form-item label="校验设置">
+        <div class="required-row">
+          <span>必填</span>
+          <el-switch v-model="field.required" />
+        </div>
+      </el-form-item>
       <el-form-item label="字段宽度">
         <el-radio-group
           class="width-options"
@@ -41,12 +57,7 @@
           <el-radio-button value="1">整行</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      <el-form-item label="校验设置">
-        <div class="required-row">
-          <span>必填</span>
-          <el-switch v-model="field.required" />
-        </div>
-      </el-form-item>
+      
     </el-form>
   </el-aside>
 </template>
