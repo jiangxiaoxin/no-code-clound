@@ -53,7 +53,7 @@
         </div>
       </el-form-item>
       <el-form-item v-if="field.type === 'number'" label="格式">
-        <div class="precision-row">
+        <div class="required-row">
           <span>保持</span>
           <el-input-number
             v-model="field.precision"
@@ -154,16 +154,5 @@ defineEmits(['update:tab', 'update:width'])
   align-items: center;
   gap: 12px;
   margin-top: 12px;
-}
-
-.range-inputs .el-form-item {
-  flex: 1;
-  min-width: 0;
-}
-
-.precision-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 </style>
