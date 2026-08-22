@@ -42,7 +42,7 @@
         </el-form>
         <el-text class="auth-switch" tag="p">
           还没有账号？
-          <el-link type="primary"  @click="router.push('/register')">
+          <el-link type="primary" @click="onRegister">
             去注册
           </el-link>
         </el-text>
@@ -88,6 +88,10 @@ const rules = {
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少 6 位', trigger: 'blur' },
   ],
+}
+
+function onRegister() {
+  ElMessage.info('请找管理员分配账号')
 }
 
 async function onSubmit() {
