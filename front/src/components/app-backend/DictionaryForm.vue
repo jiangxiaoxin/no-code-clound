@@ -67,7 +67,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <el-button class="add-item" @click="addItem" type="primary" size="small">添加选项</el-button>
+          <el-button class="add-item" type="primary" size="small" @click="addItem">添加选项</el-button>
         </div>
       </el-form-item>
     </el-form>
