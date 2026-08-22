@@ -18,6 +18,7 @@ describe('DictionaryService', () => {
   };
   const dictRepo = {
     find: jest.fn(),
+    findAndCount: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
@@ -201,24 +202,29 @@ describe('DictionaryService', () => {
   describe('list', () => {
     it('filters by application, keyword, status and includes itemCount', async () => {
       appRepo.findOne.mockResolvedValue(ownedApp);
-      dictRepo.find.mockResolvedValue([
-        {
-          id: 1,
-          applicationId: 8,
-          name: '请假类型',
-          code: 'leave_type',
-          description: '',
-          status: 'active',
-        },
+      dictRepo.findAndCount.mockResolvedValue([
+        [
+          {
+            id: 1,
+            applicationId: 8,
+            name: '请假类型',
+            code: 'leave_type',
+            description: '',
+            status: 'active',
+          },
+        ],
+        1,
       ]);
       itemRepo.count.mockResolvedValue(3);
 
       const result = await service.list(1, 8, {
         keyword: '请假',
         status: 'active',
+        page: 2,
+        pageSize: 10,
       });
 
-      expect(dictRepo.find).toHaveBeenCalledWith({
+      expect(dictRepo.findAndCount).toHaveBeenCalledWith({
         where: [
           {
             applicationId: 8,
@@ -232,21 +238,40 @@ describe('DictionaryService', () => {
           },
         ],
         order: { createdAt: 'DESC' },
+        skip: 10,
+        take: 10,
       });
       expect(itemRepo.count).toHaveBeenCalledWith({
         where: { dictionaryId: 1 },
       });
-      expect(result).toEqual([
-        {
-          id: 1,
-          applicationId: 8,
-          name: '请假类型',
-          code: 'leave_type',
-          description: '',
-          status: 'active',
-          itemCount: 3,
-        },
-      ]);
+      expect(result).toEqual({
+        items: [
+          {
+            id: 1,
+            applicationId: 8,
+            name: '请假类型',
+            code: 'leave_type',
+            description: '',
+            status: 'active',
+            itemCount: 3,
+          },
+        ],
+        total: 1,
+        page: 2,
+        pageSize: 10,
+      });
+    });
+
+    it('defaults to page 1 and pageSize 10', async () => {
+      appRepo.findOne.mockResolvedValue(ownedApp);
+      dictRepo.findAndCount.mockResolvedValue([[], 0]);
+
+      const result = await service.list(1, 8, {});
+
+      expect(dictRepo.findAndCount).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 0, take: 10 }),
+      );
+      expect(result).toMatchObject({ items: [], total: 0, page: 1, pageSize: 10 });
     });
   });
 

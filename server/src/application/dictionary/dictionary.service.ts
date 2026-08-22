@@ -59,11 +59,18 @@ export class DictionaryService {
     ownerId: number,
     appId: number,
     query: ListDictionaryDto,
-  ): Promise<DictionaryListItem[]> {
+  ): Promise<{
+    items: DictionaryListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     await this.requireOwnedApp(ownerId, appId);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 10;
     const keyword = query.keyword?.trim();
     const status = query.status;
-    const rows = await this.dictRepo.find({
+    const [rows, total] = await this.dictRepo.findAndCount({
       where: keyword
         ? [
             {
@@ -79,15 +86,22 @@ export class DictionaryService {
           ]
         : { applicationId: appId, ...(status ? { status } : {}) },
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
-    return Promise.all(
-      rows.map(async (row) =>
-        this.toListItem(
-          row,
-          await this.itemRepo.count({ where: { dictionaryId: row.id } }),
+    return {
+      items: await Promise.all(
+        rows.map(async (row) =>
+          this.toListItem(
+            row,
+            await this.itemRepo.count({ where: { dictionaryId: row.id } }),
+          ),
         ),
       ),
-    );
+      total,
+      page,
+      pageSize,
+    };
   }
 
   async getOne(

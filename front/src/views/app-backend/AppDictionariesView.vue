@@ -10,14 +10,15 @@
         v-model="keyword"
         clearable
         placeholder="搜索名称或编码"
-        @clear="loadDictionaries"
-        @keyup.enter="loadDictionaries"
+        @clear="reloadFirstPage"
+        @keyup.enter="reloadFirstPage"
       />
-      <el-select v-model="status" clearable placeholder="状态" @change="loadDictionaries">
+      <el-select v-model="status" clearable placeholder="状态" @change="reloadFirstPage">
         <el-option label="启用" value="active" />
         <el-option label="停用" value="disabled" />
       </el-select>
-      <el-button type="primary" :icon="Search" @click="loadDictionaries">查询</el-button>
+      <el-button type="primary" :icon="Search" @click="reloadFirstPage">查询</el-button>
+      <el-button class="filter-reset" :icon="RefreshLeft" @click="resetFilters">重置</el-button>
     </div>
 
     <div class="table-wrap">
@@ -44,6 +45,19 @@
       </el-table>
     </div>
 
+    <div class="pager">
+      <el-pagination
+        background
+        layout="total, sizes, prev, pager, next"
+        :current-page="page"
+        :page-size="pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        :total="total"
+        @current-change="onPageChange"
+        @size-change="onPageSizeChange"
+      />
+    </div>
+
     <DictionaryForm
       v-model:visible="formVisible"
       :dictionary="editing"
@@ -57,7 +71,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import { RefreshLeft, Search } from '@element-plus/icons-vue'
 import DictionaryForm from '../../components/app-backend/DictionaryForm.vue'
 import {
   createDictionaryApi,
@@ -72,6 +86,9 @@ const appId = computed(() => Number(route.params.id))
 const loading = ref(false)
 const saving = ref(false)
 const dictionaries = ref([])
+const total = ref(0)
+const page = ref(1)
+const pageSize = ref(10)
 const keyword = ref('')
 const status = ref('')
 const formVisible = ref(false)
@@ -80,16 +97,45 @@ const editing = ref(null)
 async function loadDictionaries() {
   loading.value = true
   try {
-    dictionaries.value =
-      (await listDictionariesApi(appId.value, {
-        keyword: keyword.value || undefined,
-        status: status.value || undefined,
-      })) || []
+    const result = await listDictionariesApi(appId.value, {
+      page: page.value,
+      pageSize: pageSize.value,
+      keyword: keyword.value || undefined,
+      status: status.value || undefined,
+    })
+    dictionaries.value = result?.items || []
+    total.value = result?.total || 0
   } catch {
     // 错误已由 http 拦截器提示
   } finally {
     loading.value = false
   }
+}
+
+function reloadFirstPage() {
+  page.value = 1
+  loadDictionaries()
+}
+
+function onPageChange(next) {
+  if (page.value === next) {
+    return
+  }
+  page.value = next
+  loadDictionaries()
+}
+
+function onPageSizeChange(size) {
+  pageSize.value = size
+  page.value = 1
+  loadDictionaries()
+}
+
+function resetFilters() {
+  keyword.value = ''
+  status.value = ''
+  page.value = 1
+  loadDictionaries()
 }
 
 function openCreate() {
@@ -158,10 +204,21 @@ async function onDelete(row) {
   }
 }
 
-watch(appId, loadDictionaries)
+watch(appId, () => {
+  page.value = 1
+  loadDictionaries()
+})
 onMounted(loadDictionaries)
 </script>
 
 <style scoped lang="less">
 @import '../../styles/admin-page.less';
+
+.filter-reset.el-button {
+  margin-left: 0;
+}
+
+.pager {
+  justify-content: center;
+}
 </style>
