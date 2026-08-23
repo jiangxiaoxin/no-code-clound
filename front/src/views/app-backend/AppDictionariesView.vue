@@ -6,13 +6,8 @@
     </div>
 
     <div class="filters">
-      <el-input
-        v-model="keyword"
-        clearable
-        placeholder="搜索名称或编码"
-        @clear="reloadFirstPage"
-        @keyup.enter="reloadFirstPage"
-      />
+      <el-input v-model="keyword" clearable placeholder="搜索名称或编码" @clear="reloadFirstPage"
+        @keyup.enter="reloadFirstPage" />
       <el-select v-model="status" clearable placeholder="状态" @change="reloadFirstPage">
         <el-option label="启用" value="active" />
         <el-option label="停用" value="disabled" />
@@ -22,38 +17,37 @@
     </div>
 
     <div class="table-wrap">
-      <div class="pane">
-        <el-table
-          v-loading="loading"
-          :data="dictionaries"
-          border
-          stripe
-          height="100%"
-          row-key="id"
-          highlight-current-row
-          :current-row-key="selectedId"
-          @row-click="onSelectDictionary"
-        >
-          <el-table-column prop="name" label="名称" />
-          <el-table-column prop="code" label="编码"  />
-          <el-table-column label="状态" >
-            <template #default="{ row }">
-              <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
-                {{ row.status === 'active' ? '启用' : '停用' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="itemCount" label="项数量"  />
-          <el-table-column label="操作"  fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" @click.stop="openEdit(row)">编辑</el-button>
-              <el-button link type="primary" @click.stop="toggleStatus(row)">
-                {{ row.status === 'active' ? '停用' : '启用' }}
-              </el-button>
-              <el-button link type="danger" @click.stop="onDelete(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+      <div class="pane pane-dicts">
+        <div class="pane-table">
+          <el-table v-loading="loading" :data="dictionaries" border stripe height="100%" row-key="id"
+            highlight-current-row :current-row-key="selectedId" @row-click="onSelectDictionary" size="small">
+            <el-table-column type="index" width="55" label="序号" />
+            <el-table-column prop="name" label="名称" />
+            <el-table-column prop="code" label="编码" />
+            <el-table-column label="状态">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
+                  {{ row.status === 'active' ? '启用' : '停用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="itemCount" label="项数量" />
+            <el-table-column label="操作" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" @click.stop="openEdit(row)">编辑</el-button>
+                <el-button link type="primary" @click.stop="toggleStatus(row)">
+                  {{ row.status === 'active' ? '停用' : '启用' }}
+                </el-button>
+                <el-button link type="danger" @click.stop="onDelete(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+        <div class="pager">
+          <el-pagination background layout="total, sizes, prev, pager, next" :current-page="page" :page-size="pageSize"
+            :page-sizes="[10, 20, 50, 100]" :total="total" @current-change="onPageChange"
+            @size-change="onPageSizeChange" size="small" />
+        </div>
       </div>
 
       <div class="pane pane-items">
@@ -61,7 +55,7 @@
           <div class="items-head">
             <span class="items-title">字典项 · {{ selectedName }}</span>
             <div class="items-actions">
-              <el-button size="small" @click="addItem">添加选项</el-button>
+              <el-button size="small" @click="addItem" type="primary">添加选项</el-button>
               <el-button type="primary" size="small" :loading="itemsSaving" @click="saveItems">
                 保存
               </el-button>
@@ -69,6 +63,7 @@
           </div>
           <div class="pane-table" v-loading="itemsLoading">
             <el-table :data="items" border stripe size="small" height="100%">
+              <el-table-column type="index" width="55" label="序号" />
               <el-table-column label="名称">
                 <template #default="{ row }">
                   <el-input v-model="row.label" size="small" maxlength="64" placeholder="请输入名称" />
@@ -79,18 +74,13 @@
                   <el-input v-model="row.value" size="small" maxlength="64" placeholder="请输入值" />
                 </template>
               </el-table-column>
-              <el-table-column label="排序" >
+              <el-table-column label="排序">
                 <template #default="{ row }">
-                  <el-input-number
-                    v-model="row.sortOrder"
-                    class="sort-input"
-                    size="small"
-                    :controls="false"
-                    :precision="0"
-                  />
+                  <el-input-number v-model="row.sortOrder" class="sort-input" size="small" :controls="false"
+                    :precision="0" />
                 </template>
               </el-table-column>
-              <el-table-column label="状态" >
+              <el-table-column label="状态">
                 <template #default="{ row }">
                   <el-select v-model="row.status" size="small">
                     <el-option label="启用" value="active" />
@@ -98,7 +88,7 @@
                   </el-select>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" >
+              <el-table-column label="操作">
                 <template #default="{ $index }">
                   <el-button link type="danger" size="small" @click="items.splice($index, 1)">
                     删除
@@ -112,25 +102,7 @@
       </div>
     </div>
 
-    <div class="pager">
-      <el-pagination
-        background
-        layout="total, sizes, prev, pager, next"
-        :current-page="page"
-        :page-size="pageSize"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="total"
-        @current-change="onPageChange"
-        @size-change="onPageSizeChange"
-      />
-    </div>
-
-    <DictionaryForm
-      v-model:visible="formVisible"
-      :dictionary="editing"
-      :saving="saving"
-      @submit="onSubmit"
-    />
+    <DictionaryForm v-model:visible="formVisible" :dictionary="editing" :saving="saving" @submit="onSubmit" />
   </div>
 </template>
 
@@ -422,6 +394,7 @@ onMounted(loadDictionaries)
   min-height: 0;
 }
 
+.pane-dicts,
 .pane-items {
   display: flex;
   flex-direction: column;
