@@ -39,7 +39,7 @@
         :data="treeData"
         node-key="key"
         highlight-current
-        default-expand-all
+        :default-expand-all="false"
         :expand-on-click-node="true"
         :current-node-key="currentForm?.key"
         :props="{ label: 'name', children: 'children' }"
@@ -75,7 +75,7 @@
         </template>
       </el-tree>
       <div class="aside-footer">
-        <button type="button" class="aside-backend" @click="goBackend">应用后台</button>
+        <el-button class="aside-backend" text :icon="Setting" @click="goBackend">应用后台</el-button>
       </div>
     </el-aside>
     <AppWorkspaceMain :form="currentForm" />
@@ -124,6 +124,7 @@ import {
   MoreFilled,
   Plus,
   Search,
+  Setting,
 } from '@element-plus/icons-vue'
 import {
   createFormApi,
@@ -460,17 +461,6 @@ watch(appId, loadWorkspace, { immediate: true })
 
 .aside-backend {
   width: 100%;
-  padding: 8px 12px;
-  border: 0;
-  background: transparent;
-  color: var(--el-text-color-regular);
-  text-align: left;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.aside-backend:hover {
-  color: var(--el-color-primary);
-  background: var(--el-fill-color-light);
+  justify-content: flex-start;
 }
 </style>
