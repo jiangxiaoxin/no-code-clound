@@ -9,6 +9,18 @@
       </span>
     </div>
     <el-empty v-if="tab === 'field' && !field" description="请选择字段" />
+    <el-form v-else-if="tab === 'form'" label-position="top">
+      <el-form-item label="表单布局">
+        <el-select :model-value="columns" @change="$emit('update:columns', $event)">
+          <el-option
+            v-for="item in formColumnOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+      </el-form-item>
+    </el-form>
     <el-form v-else-if="tab === 'field'" label-position="top">
       <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
@@ -133,7 +145,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { formatOptions } from './fieldTypes'
+import { formatOptions, formColumnOptions } from './fieldTypes'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
 import { listDictionaryOptionsApi } from '../../api/apps'
 
@@ -142,9 +154,10 @@ const props = defineProps({
   field: { type: Object, default: null },
   appId: { type: Number, required: true },
   formId: { type: Number, required: true },
+  columns: { type: Number, default: 1 },
 })
 
-defineEmits(['update:tab', 'update:width'])
+defineEmits(['update:tab', 'update:width', 'update:columns'])
 
 const dictionaries = ref([])
 

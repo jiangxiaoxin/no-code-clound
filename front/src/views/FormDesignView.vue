@@ -29,6 +29,7 @@
       :app-id="appId"
       :form-id="formId"
       :initial-fields="Array.isArray(form.fields) ? form.fields : []"
+      :initial-columns="form.columns"
     />
     <FormPublishPanel v-else-if="!loading && page === 'publish'" />
   </el-container>

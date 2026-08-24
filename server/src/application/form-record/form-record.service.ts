@@ -6,6 +6,7 @@ import { Application } from '../application.entity';
 import { coerceRecordData, mergeRecordData } from './form-record.coerce';
 import { buildRecordQuery, RecordQueryBody } from './form-record.query';
 import { FormRecordDoc, FormRecordStore } from './form-record.store';
+import { parseFormSchema } from '../form-schema';
 import { FormField } from './form-record.types';
 
 export type FormRecordView = {
@@ -123,7 +124,7 @@ export class FormRecordService {
   }
 
   private readFields(form: AppForm): FormField[] | null {
-    return Array.isArray(form.fields) ? (form.fields as FormField[]) : null;
+    return parseFormSchema(form.fields).fields;
   }
 
   private toView(doc: FormRecordDoc): FormRecordView {

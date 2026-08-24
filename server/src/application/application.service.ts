@@ -13,7 +13,7 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
 import { FormRecordStore } from './form-record/form-record.store';
-import { FormField } from './form-record/form-record.types';
+import { parseFormSchema, serializeFormSchema } from './form-schema';
 
 const OPTION_FIELD_TYPES = new Set([
   'input',
@@ -97,15 +97,22 @@ export class ApplicationService {
     appId: number,
     formId: number,
     fields: unknown,
+    columns?: number,
   ) {
     if (!Array.isArray(fields)) {
       throw new BadRequestException('请提交字段列表');
     }
     await this.requireOwnedApp(ownerId, appId);
     const form = await this.requireForm(appId, formId);
-    form.fields = fields as Record<string, unknown>[];
+    form.fields = serializeFormSchema(
+      fields as Record<string, unknown>[],
+      columns,
+    ) as AppForm['fields'];
     const saved = await this.formRepo.save(form);
-    await this.formRecordStore.syncIndexes(formId, saved.fields as FormField[]);
+    await this.formRecordStore.syncIndexes(
+      formId,
+      parseFormSchema(saved.fields).fields,
+    );
     return this.toFormDetail(saved);
   }
 
@@ -135,7 +142,7 @@ export class ApplicationService {
       if (exclude != null && form.id === exclude) {
         continue;
       }
-      const fields = this.toOptionFields(form.fields);
+      const fields = this.toOptionFields(parseFormSchema(form.fields).fields);
       if (!fields.length) {
         continue;
       }
@@ -314,9 +321,11 @@ export class ApplicationService {
   }
 
   private toFormDetail(row: AppForm) {
+    const schema = parseFormSchema(row.fields);
     return {
       ...this.toFormItem(row),
-      fields: Array.isArray(row.fields) ? row.fields : null,
+      fields: schema.fields,
+      columns: schema.columns,
     };
   }
 

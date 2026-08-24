@@ -19,6 +19,7 @@
       />
       <FormDesignProps
         v-model:tab="propTab"
+        v-model:columns="columns"
         :field="selectedField"
         :app-id="appId"
         :form-id="formId"
@@ -50,16 +51,18 @@ import FormDesignPalette from './form-design/FormDesignPalette.vue'
 import FormDesignCanvas from './form-design/FormDesignCanvas.vue'
 import FormDesignProps from './form-design/FormDesignProps.vue'
 import { listDictionaryItemsByCodesApi, saveFormFieldsApi } from '../api/apps'
-import { isSelectType } from './form-design/fieldTypes'
+import { defaultWidthByColumns, isSelectType } from './form-design/fieldTypes'
 
 const props = defineProps({
   appId: { type: Number, required: true },
   formId: { type: Number, required: true },
   initialFields: { type: Array, default: null },
+  initialColumns: { type: Number, default: 1 },
 })
 
 const propTab = ref('field')
 const previewVisible = ref(false)
+const columns = ref(1)
 const fields = ref([])
 const selectedKey = ref('')
 const dictItemsByCode = ref({})
@@ -127,7 +130,7 @@ function addField(item, beforeKey) {
     component: item.component,
     title: item.label,
     placeholder: item.placeholder || '',
-    width: '1',
+    width: item.type === 'divider' ? '1' : defaultWidthByColumns(columns.value),
     required: false,
     description: '',
     ...(item.type === 'number' ? { rangeEnabled: false, precision: 0 } : {}),
@@ -238,7 +241,10 @@ async function clearFields() {
 
 async function saveFields() {
   try {
-    await saveFormFieldsApi(props.appId, props.formId, { fields: fields.value })
+    await saveFormFieldsApi(props.appId, props.formId, {
+      fields: fields.value,
+      columns: columns.value,
+    })
     ElMessage.success('保存成功')
   } catch {
     return
@@ -258,9 +264,15 @@ function cloneFields(value) {
 }
 
 watch(
-  () => props.initialFields,
-  (value) => {
-    fields.value = cloneFields(value)
+  () => [props.initialFields, props.initialColumns],
+  () => {
+    fields.value = cloneFields(props.initialFields)
+    columns.value =
+      props.initialColumns === 2 ||
+      props.initialColumns === 3 ||
+      props.initialColumns === 4
+        ? props.initialColumns
+        : 1
     selectedKey.value = ''
   },
   { immediate: true },

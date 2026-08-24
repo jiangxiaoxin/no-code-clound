@@ -166,6 +166,7 @@ describe('ApplicationService', () => {
         name: '入职登记',
         groupId: 2,
         fields: null,
+        columns: 1,
       });
     });
 
@@ -184,6 +185,29 @@ describe('ApplicationService', () => {
         name: '入职登记',
         groupId: 2,
         fields: [{ key: 'a1', type: 'input', title: '姓名' }],
+        columns: 1,
+      });
+    });
+
+    it('returns columns from wrapped schema', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+        fields: {
+          columns: 3,
+          fields: [{ key: 'a1', type: 'input', title: '姓名' }],
+        },
+      });
+
+      await expect(service.getForm(1, 8, 10)).resolves.toEqual({
+        id: 10,
+        name: '入职登记',
+        groupId: 2,
+        fields: [{ key: 'a1', type: 'input', title: '姓名' }],
+        columns: 3,
       });
     });
 
@@ -466,6 +490,7 @@ describe('ApplicationService', () => {
         name: '入职登记',
         groupId: 2,
         fields,
+        columns: 1,
       });
       expect(formRepo.save).toHaveBeenCalled();
       expect(formRecordStore.syncIndexes).toHaveBeenCalledWith(10, fields);
@@ -488,7 +513,36 @@ describe('ApplicationService', () => {
         name: '入职登记',
         groupId: null,
         fields: [],
+        columns: 1,
       });
+    });
+
+    it('wraps schema when columns is not 1', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+        fields: null,
+      });
+      formRepo.save.mockImplementation(async (row: AppForm) => row);
+      formRecordStore.syncIndexes.mockResolvedValue(undefined);
+      const fields = [{ key: 'a1', type: 'input', title: '姓名' }];
+
+      await expect(service.saveFields(1, 8, 10, fields, 2)).resolves.toEqual({
+        id: 10,
+        name: '入职登记',
+        groupId: 2,
+        fields,
+        columns: 2,
+      });
+      expect(formRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          fields: { columns: 2, fields },
+        }),
+      );
+      expect(formRecordStore.syncIndexes).toHaveBeenCalledWith(10, fields);
     });
 
     it('throws 400 when fields is not an array', async () => {
@@ -512,12 +566,15 @@ describe('ApplicationService', () => {
           name: '客户',
           applicationId: 8,
           createdAt: new Date('2026-08-24T02:00:00.000Z'),
-          fields: [
-            { key: 'n1', title: '客户名称', type: 'input' },
-            { key: 'd1', title: '分割', type: 'divider' },
-            { key: 'm1', title: '负责人', type: 'member' },
-            { key: 'x1', type: 'number' },
-          ],
+          fields: {
+            columns: 2,
+            fields: [
+              { key: 'n1', title: '客户名称', type: 'input' },
+              { key: 'd1', title: '分割', type: 'divider' },
+              { key: 'm1', title: '负责人', type: 'member' },
+              { key: 'x1', type: 'number' },
+            ],
+          },
         },
         {
           id: 11,

@@ -63,6 +63,20 @@ export const widthClass = {
   '3/4': 'is-w-three-quarters',
 }
 
+export const formColumnOptions = [
+  { value: 1, label: '单列' },
+  { value: 2, label: '双列' },
+  { value: 3, label: '三列' },
+  { value: 4, label: '四列' },
+]
+
+export function defaultWidthByColumns(columns) {
+  if (columns === 2) return '1/2'
+  if (columns === 3) return '1/3'
+  if (columns === 4) return '1/4'
+  return '1'
+}
+
 export function fieldTypeLabel(type) {
   return fieldTypes.find((item) => item.type === type)?.label || type
 }

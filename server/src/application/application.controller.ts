@@ -119,6 +119,7 @@ export class ApplicationController {
       id,
       formId,
       dto.fields,
+      dto.columns,
     );
   }
 
