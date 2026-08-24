@@ -416,6 +416,25 @@ describe('ApplicationService', () => {
       );
     });
 
+    it('still drops the mongo collection after TypeORM clears entity id', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      const form = {
+        id: 10 as number | undefined,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+      };
+      formRepo.findOne.mockResolvedValue(form);
+      formRepo.remove.mockImplementation(async (row: { id?: number }) => {
+        delete row.id;
+        return row;
+      });
+
+      await service.deleteForm(1, 8, 10);
+
+      expect(formRecordStore.dropFormCollection).toHaveBeenCalledWith(10);
+    });
+
     it('keeps form deleted when drop fails', async () => {
       repo.findOne.mockResolvedValue(ownedApp);
       formRepo.findOne.mockResolvedValue({

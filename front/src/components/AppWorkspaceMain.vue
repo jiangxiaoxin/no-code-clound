@@ -153,6 +153,8 @@ const records = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+// 切换表单时作废进行中的请求，避免把上一张表的字段/记录写进来
+const loadSession = ref(0)
 
 const tableFields = computed(() => fields.value.filter(isFillable))
 
@@ -198,6 +200,7 @@ function formatTime(value) {
 }
 
 async function loadSchema() {
+  const session = loadSession.value
   if (!props.form?.id || !props.appId) {
     fields.value = []
     resetValues()
@@ -206,17 +209,22 @@ async function loadSchema() {
   schemaLoading.value = true
   try {
     const detail = await getFormApi(props.appId, props.form.id)
+    if (session !== loadSession.value) return
     fields.value = Array.isArray(detail?.fields) ? detail.fields : []
     resetValues()
   } catch {
+    if (session !== loadSession.value) return
     fields.value = []
     resetValues()
   } finally {
-    schemaLoading.value = false
+    if (session === loadSession.value) {
+      schemaLoading.value = false
+    }
   }
 }
 
 async function loadDictItems() {
+  const session = loadSession.value
   const codes = dictCodes.value
   if (!codes.length || !props.appId) {
     dictItemsByCode.value = {}
@@ -224,15 +232,18 @@ async function loadDictItems() {
   }
   try {
     const rows = (await listDictionaryItemsByCodesApi(props.appId, codes)) || []
+    if (session !== loadSession.value) return
     dictItemsByCode.value = Object.fromEntries(
       rows.map((row) => [row.code, row.items || []]),
     )
   } catch {
+    if (session !== loadSession.value) return
     dictItemsByCode.value = {}
   }
 }
 
 async function loadRecords() {
+  const session = loadSession.value
   if (!props.form?.id || !props.appId) {
     records.value = []
     total.value = 0
@@ -244,13 +255,17 @@ async function loadRecords() {
       page: page.value,
       pageSize: pageSize.value,
     })
+    if (session !== loadSession.value) return
     records.value = result?.items || []
     total.value = result?.total || 0
   } catch {
+    if (session !== loadSession.value) return
     records.value = []
     total.value = 0
   } finally {
-    listLoading.value = false
+    if (session === loadSession.value) {
+      listLoading.value = false
+    }
   }
 }
 
@@ -295,8 +310,11 @@ function onPageSizeChange(next) {
 watch(
   () => [props.appId, props.form?.id],
   () => {
+    loadSession.value += 1
     tab.value = 'create'
     page.value = 1
+    records.value = []
+    total.value = 0
     loadSchema()
   },
   { immediate: true },
