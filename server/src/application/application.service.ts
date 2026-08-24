@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -11,6 +12,7 @@ import { Application } from './application.entity';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
+import { FormRecordStore } from './form-record/form-record.store';
 
 const ICON_COLORS = [
   '#E8A317',
@@ -23,6 +25,8 @@ const ICON_COLORS = [
 
 @Injectable()
 export class ApplicationService {
+  private readonly logger = new Logger(ApplicationService.name);
+
   constructor(
     @InjectRepository(Application)
     private readonly appRepo: Repository<Application>,
@@ -30,6 +34,7 @@ export class ApplicationService {
     private readonly groupRepo: Repository<AppGroup>,
     @InjectRepository(AppForm)
     private readonly formRepo: Repository<AppForm>,
+    private readonly formRecordStore: FormRecordStore,
   ) {}
 
   async list(ownerId: number): Promise<{ id: number; name: string; icon: string }[]> {
@@ -184,6 +189,14 @@ export class ApplicationService {
     await this.requireOwnedApp(ownerId, appId);
     const form = await this.requireForm(appId, formId);
     await this.formRepo.remove(form);
+    try {
+      await this.formRecordStore.dropFormCollection(form.id);
+    } catch (err) {
+      this.logger.error(
+        `drop form collection failed formId=${form.id}`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
   }
 
   private async requireOwnedApp(ownerId: number, id: number) {

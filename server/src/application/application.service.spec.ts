@@ -5,6 +5,7 @@ import { AppForm } from './app-form.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
 import { ApplicationService } from './application.service';
+import { FormRecordStore } from './form-record/form-record.store';
 
 describe('ApplicationService', () => {
   let service: ApplicationService;
@@ -30,6 +31,10 @@ describe('ApplicationService', () => {
     count: jest.fn(),
   };
 
+  const formRecordStore = {
+    dropFormCollection: jest.fn(),
+  };
+
   const ownedApp = {
     id: 8,
     name: '进销存',
@@ -45,6 +50,7 @@ describe('ApplicationService', () => {
         { provide: getRepositoryToken(Application), useValue: repo },
         { provide: getRepositoryToken(AppGroup), useValue: groupRepo },
         { provide: getRepositoryToken(AppForm), useValue: formRepo },
+        { provide: FormRecordStore, useValue: formRecordStore },
       ],
     }).compile();
     service = module.get(ApplicationService);
@@ -384,6 +390,26 @@ describe('ApplicationService', () => {
       await service.deleteForm(1, 8, 10);
 
       expect(formRepo.remove).toHaveBeenCalled();
+      expect(formRecordStore.dropFormCollection).toHaveBeenCalledWith(10);
+      expect(formRepo.remove.mock.invocationCallOrder[0]).toBeLessThan(
+        formRecordStore.dropFormCollection.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('keeps form deleted when drop fails', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+      });
+      formRecordStore.dropFormCollection.mockRejectedValue(
+        new Error('mongo down'),
+      );
+
+      await expect(service.deleteForm(1, 8, 10)).resolves.toBeUndefined();
+      expect(formRepo.remove).toHaveBeenCalled();
     });
 
     it('throws 404 when form is missing', async () => {
@@ -397,6 +423,7 @@ describe('ApplicationService', () => {
         expect(e).toBeInstanceOf(NotFoundException);
         expect((e as NotFoundException).message).toBe('表单不存在');
       }
+      expect(formRecordStore.dropFormCollection).not.toHaveBeenCalled();
     });
   });
 });

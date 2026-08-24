@@ -23,6 +23,9 @@ export class AppForm {
   @Column({ type: 'varchar', length: 32 })
   name: string;
 
+  @Column({ type: 'json', nullable: true })
+  fields: Record<string, unknown>[] | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

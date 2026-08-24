@@ -10,6 +10,9 @@ import { DictionaryController } from './dictionary/dictionary.controller';
 import { DictionaryItem } from './dictionary/dictionary-item.entity';
 import { Dictionary } from './dictionary/dictionary.entity';
 import { DictionaryService } from './dictionary/dictionary.service';
+import { FormRecordController } from './form-record/form-record.controller';
+import { FormRecordService } from './form-record/form-record.service';
+import { FormRecordStore } from './form-record/form-record.store';
 
 @Module({
   imports: [
@@ -22,7 +25,16 @@ import { DictionaryService } from './dictionary/dictionary.service';
     ]),
     AuthModule,
   ],
-  controllers: [ApplicationController, DictionaryController],
-  providers: [ApplicationService, DictionaryService],
+  controllers: [
+    ApplicationController,
+    DictionaryController,
+    FormRecordController,
+  ],
+  providers: [
+    ApplicationService,
+    DictionaryService,
+    FormRecordStore,
+    FormRecordService,
+  ],
 })
 export class ApplicationModule {}

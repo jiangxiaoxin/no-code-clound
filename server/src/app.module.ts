@@ -6,10 +6,12 @@ import { AppService } from './app.service';
 import { AdminModule } from './admin/admin.module';
 import { ApplicationModule } from './application/application.module';
 import { AuthModule } from './auth/auth.module';
+import { MongoModule } from './mongo/mongo.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    MongoModule,
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
