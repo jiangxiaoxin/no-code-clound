@@ -13,6 +13,36 @@ export function isFillable(field) {
   return Boolean(field?.key) && !SKIP_TYPES.has(field.type)
 }
 
+export function emptyValue(field) {
+  if (field.type === 'checkbox' || field.type === 'select-multiple') {
+    return []
+  }
+  return undefined
+}
+
+export function emptyRecordValues(fields) {
+  const next = {}
+  for (const field of fields) {
+    if (isFillable(field)) {
+      next[field.key] = emptyValue(field)
+    }
+  }
+  return next
+}
+
+export function cloneRecordValues(fields, data) {
+  const next = {}
+  for (const field of fields) {
+    if (!isFillable(field)) {
+      continue
+    }
+    const value = data?.[field.key]
+    next[field.key] =
+      value == null ? emptyValue(field) : Array.isArray(value) ? [...value] : value
+  }
+  return next
+}
+
 export function isEmptyValue(field, value) {
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     return !Array.isArray(value) || value.length === 0
