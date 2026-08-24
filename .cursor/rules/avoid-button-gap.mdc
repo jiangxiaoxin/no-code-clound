@@ -1,0 +1,11 @@
+---
+description: Element Plus 按钮容器不重复设置 gap 间距
+globs: front/**/*.{vue,js,less,css}
+alwaysApply: true
+---
+
+# Element Plus 按钮间距
+
+Element Plus（Vue 组件库）中的相邻 `el-button` 已经自带 `margin-left`，用于按钮之间的分隔。
+
+当一个容器内排列多个 `el-button` 时，不要再给该容器添加 `gap` 属性，避免按钮间距被重复计算。除非布局有明确的特殊需求，否则保持使用 Element Plus 默认的按钮间距。
