@@ -62,6 +62,12 @@
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
     />
+    <div
+      v-else-if="(field.type === 'radio' || field.type === 'checkbox') && !field.dictCode"
+      class="canvas-field-hint"
+    >
+      请配置选项字典
+    </div>
     <el-radio-group v-else-if="field.type === 'radio'" disabled>
       <el-radio v-for="item in items" :key="item.value" :value="item.value">
         {{ item.label }}
@@ -235,6 +241,12 @@ defineEmits(['select', 'copy', 'remove', 'dragstart', 'dragover', 'drop', 'drage
   margin-left: 8px;
   color: var(--el-text-color-secondary);
   cursor: help;
+}
+
+.canvas-field-hint {
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
+  line-height: 32px;
 }
 
 .canvas-full {

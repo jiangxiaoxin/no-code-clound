@@ -1,8 +1,9 @@
 <template>
   <el-header class="design-toolbar" height="48px">
     <div class="design-toolbar-actions">
-      <el-button :icon="Delete" @click="$emit('clear')">清空</el-button>
-      <el-button :icon="View" @click="$emit('preview')">预览</el-button>
+      <el-button :icon="View" @click="$emit('preview')" type="info">画布配置</el-button>
+      <el-button :icon="Delete" @click="$emit('clear')" type="danger">清空</el-button>
+      
       <el-button type="primary" :icon="DocumentChecked" @click="$emit('save')">
         保存
       </el-button>

@@ -10,9 +10,10 @@
     </div>
     <el-empty v-if="tab === 'field' && !field" description="请选择字段" />
     <el-form v-else-if="tab === 'field'" label-position="top">
-      <el-form-item label="字段标题">
+      <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
+      <template v-if="field.type !== 'divider'">
       <el-form-item label="占位文字">
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
@@ -115,6 +116,7 @@
           <el-radio-button value="1">整行</el-radio-button>
         </el-radio-group>
       </el-form-item>
+      </template>
 
     </el-form>
   </el-aside>

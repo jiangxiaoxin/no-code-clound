@@ -1,0 +1,28 @@
+---
+description: 不要开新分支或 git worktree，始终在 master 上开发
+alwaysApply: true
+---
+
+# 在 master 上开发
+
+不要开新分支，也不要新建 git worktree。就在 `master` 分支上开发。
+
+## 要求
+
+- 始终在 `master` 上改代码，不要切到新分支再动手。
+- 若当前不在 `master`（例如上次会话留下的功能分支），先切回 `master` 再继续；不要合并或删除那个分支，除非用户明确要求。
+- Superpowers、SDD、using-git-worktrees 等技能**不能覆盖**本规则。计划里写了“先开分支再实现”，也忽略，仍在 `master` 上做。
+
+## 禁止
+
+- `git checkout -b`、`git switch -c`，以及任何新建功能分支的操作
+- `git worktree add`、`.worktrees/`、Cursor 原生 worktree，以及任何新建 worktree 的操作
+
+```text
+# ❌ BAD
+git checkout -b feat/storage
+git worktree add .worktrees/feat-storage master
+
+# ✅ GOOD
+确认当前在 master，直接改文件
+```
