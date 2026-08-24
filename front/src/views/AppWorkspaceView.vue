@@ -81,6 +81,8 @@
     <AppWorkspaceMain :app-id="appId" :form="currentForm" />
   </el-container>
 
+  <router-view />
+
   <el-dialog
     v-model="nameVisible"
     :title="nameDialogTitle"
@@ -161,6 +163,10 @@ const nameRules = {
 }
 
 const appId = computed(() => Number(route.params.id))
+const formId = computed(() => {
+  const n = Number(route.params.formId)
+  return Number.isInteger(n) && n > 0 ? n : null
+})
 
 function goBackend() {
   router.push({ name: 'app-dictionaries', params: { id: appId.value } })
@@ -224,9 +230,60 @@ function toFormNode(form) {
   }
 }
 
+function findFormNode(id) {
+  for (const form of directory.value.forms || []) {
+    if (form.id === id) {
+      return toFormNode(form)
+    }
+  }
+  for (const group of directory.value.groups || []) {
+    for (const form of group.forms || []) {
+      if (form.id === id) {
+        return toFormNode(form)
+      }
+    }
+  }
+  return null
+}
+
+function syncTreeCurrent(formNode) {
+  nextTick(() => {
+    if (formNode?.groupId != null) {
+      treeRef.value?.getNode(`group:${formNode.groupId}`)?.expand()
+    }
+    treeRef.value?.setCurrentKey(formNode?.key ?? null)
+  })
+}
+
+function applyFormFromRoute() {
+  if (!formId.value) {
+    currentForm.value = null
+    syncTreeCurrent(null)
+    return
+  }
+  const node = findFormNode(formId.value)
+  if (!node) {
+    currentForm.value = null
+    router.replace({ name: 'app-workspace', params: { id: appId.value } })
+    return
+  }
+  currentForm.value = node
+  syncTreeCurrent(node)
+}
+
 function onNodeClick(data) {
   if (data.nodeType === 'form') {
-    currentForm.value = data
+    if (formId.value === data.id) {
+      return
+    }
+    // 模拟路由跳转
+    // 虽然是进了新路由，但新路由配置render 为null，所以并不会因为路由跳转了而显示新内容
+    // 右侧的表单功能区域依然由组件实现，通过props传入参数
+    // 刷新后由本组件从route 上取参数还原选择
+    router.push({
+      name: 'app-workspace-form',
+      params: { id: appId.value, formId: data.id },
+    })
     return
   }
   treeRef.value?.setCurrentKey(currentForm.value?.key ?? null)
@@ -294,20 +351,19 @@ async function onSubmitName() {
       })
       nameVisible.value = false
       await loadDirectory()
-      currentForm.value = toFormNode(form)
-      await nextTick()
-      treeRef.value?.setCurrentKey(currentForm.value.key)
+      router.push({
+        name: 'app-workspace-form',
+        params: { id, formId: form.id },
+      })
       return
     } else if (nameMode.value === 'rename-group') {
       await renameGroupApi(id, nameTargetId.value, { name })
     } else {
       await renameFormApi(id, nameTargetId.value, { name })
-      if (currentForm.value?.id === nameTargetId.value) {
-        currentForm.value = { ...currentForm.value, name }
-      }
     }
     nameVisible.value = false
     await loadDirectory()
+    applyFormFromRoute()
   } catch {
     // 错误已由 http 拦截器提示
   } finally {
@@ -341,11 +397,9 @@ async function onDelete(data) {
       await deleteGroupApi(appId.value, data.id)
     } else {
       await deleteFormApi(appId.value, data.id)
-      if (currentForm.value?.id === data.id) {
-        currentForm.value = null
-      }
     }
     await loadDirectory()
+    applyFormFromRoute()
   } catch {
     // 错误已由 http 拦截器提示
   }
@@ -366,9 +420,9 @@ async function loadWorkspace() {
 
   loading.value = true
   try {
-    currentForm.value = null
     app.value = await getAppApi(appId.value)
     await loadDirectory()
+    applyFormFromRoute()
   } catch (error) {
     if (error.response?.status !== 401) {
       router.replace('/')
@@ -379,6 +433,13 @@ async function loadWorkspace() {
 }
 
 watch(appId, loadWorkspace, { immediate: true })
+
+watch(formId, () => {
+  if (loading.value) {
+    return
+  }
+  applyFormFromRoute()
+})
 </script>
 
 <style scoped lang="less">

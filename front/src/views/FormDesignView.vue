@@ -53,7 +53,10 @@ const appId = computed(() => Number(route.params.id))
 const formId = computed(() => Number(route.params.formId))
 
 function goBack() {
-  router.push({ name: 'app-workspace', params: { id: appId.value } })
+  router.push({
+    name: 'app-workspace-form',
+    params: { id: appId.value, formId: formId.value },
+  })
 }
 
 async function loadForm() {

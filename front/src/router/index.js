@@ -17,9 +17,25 @@ export const router = createRouter({
       component: () => import('../views/HomeView.vue'),
     },
     {
+      path: '/apps/:id/forms/:formId/design',
+      name: 'form-design',
+      component: () => import('../views/FormDesignView.vue'),
+    },
+    {
       path: '/apps/:id',
-      name: 'app-workspace',
       component: () => import('../views/AppWorkspaceView.vue'),
+      children: [
+        {
+          path: '',
+          name: 'app-workspace',
+          component: { render: () => null },
+        },
+        {
+          path: 'forms/:formId',
+          name: 'app-workspace-form',
+          component: { render: () => null },
+        },
+      ],
     },
     {
       path: '/apps/:id/backend',
@@ -35,11 +51,6 @@ export const router = createRouter({
           component: () => import('../views/app-backend/AppDictionariesView.vue'),
         },
       ],
-    },
-    {
-      path: '/apps/:id/forms/:formId',
-      name: 'form-design',
-      component: () => import('../views/FormDesignView.vue'),
     },
     {
       path: '/admin',
