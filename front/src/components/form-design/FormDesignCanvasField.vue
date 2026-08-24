@@ -41,23 +41,26 @@
     <el-input
       v-if="field.type === 'input'"
       disabled
+      class="canvas-item"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
     />
     <el-input-number
       v-else-if="field.type === 'number'"
       disabled
-      class="canvas-full"
+      class="canvas-item"
       :controls="false"
       :precision="field.precision"
       :min="field.rangeEnabled ? field.min : undefined"
       :max="field.rangeEnabled ? field.max : undefined"
       :placeholder="field.placeholder"
+      align="left"
     />
     <el-input
       v-else-if="field.type === 'textarea'"
       type="textarea"
       disabled
+      class="canvas-item"
       :rows="3"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
@@ -68,12 +71,12 @@
     >
       请配置选项字典
     </div>
-    <el-radio-group v-else-if="field.type === 'radio'" disabled>
+    <el-radio-group v-else-if="field.type === 'radio'" disabled class="canvas-item">
       <el-radio v-for="item in items" :key="item.value" :value="item.value">
         {{ item.label }}
       </el-radio>
     </el-radio-group>
-    <el-checkbox-group v-else-if="field.type === 'checkbox'" disabled>
+    <el-checkbox-group v-else-if="field.type === 'checkbox'" disabled class="canvas-item">
       <el-checkbox v-for="item in items" :key="item.value" :value="item.value">
         {{ item.label }}
       </el-checkbox>
@@ -81,21 +84,21 @@
     <el-date-picker
       v-else-if="field.type === 'date'"
       disabled
-      class="canvas-full"
+      class="canvas-item"
       :type="field.format || 'date'"
       :placeholder="field.placeholder || '请选择'"
     />
     <el-time-picker
       v-else-if="field.type === 'time'"
       disabled
-      class="canvas-full"
+      class="canvas-item"
       :format="field.format || 'HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
     />
     <el-date-picker
       v-else-if="field.type === 'datetime'"
       disabled
-      class="canvas-full"
+      class="canvas-item"
       type="datetime"
       :format="field.format || 'YYYY-MM-DD HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
@@ -109,7 +112,7 @@
     <el-select
       v-else-if="field.type === 'select' || field.type === 'select-multiple'"
       disabled
-      class="canvas-full"
+      class="canvas-item"
       :multiple="field.type === 'select-multiple'"
       :placeholder="field.placeholder"
     >
@@ -128,7 +131,7 @@
         field.type === 'relate'
       "
       disabled
-      class="canvas-full"
+      class="canvas-item"
       :placeholder="field.placeholder"
     />
     <el-divider v-else-if="field.type === 'divider'">
@@ -137,6 +140,7 @@
     <el-upload
       v-else-if="field.type === 'image'"
       disabled
+      class="canvas-item"
       list-type="picture-card"
       :auto-upload="false"
     >
@@ -145,6 +149,7 @@
     <el-upload
       v-else-if="field.type === 'file'"
       disabled
+      class="canvas-item"
       :auto-upload="false"
       :show-file-list="false"
     >
@@ -269,11 +274,18 @@ const needsOptionSourceHint = computed(() => {
   line-height: 32px;
 }
 
-.canvas-full {
+:deep(.canvas-item) {
   width: 100%;
+  max-width: 354px;
+}
+
+:deep(.canvas-item.el-date-editor) {
+  --el-date-editor-width: 100%;
 }
 
 .canvas-subform {
+  width: 100%;
+  max-width: 354px;
   min-height: 88px;
   border: 1px dashed var(--el-border-color);
   border-radius: 4px;

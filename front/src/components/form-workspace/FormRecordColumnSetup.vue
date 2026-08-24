@@ -54,6 +54,7 @@
           :controls="false"
           size="small"
           @change="col.minWidth = normalizeColWidth($event)"
+          align="left"
         />
         <el-select
           v-model="col.fixed"

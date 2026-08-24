@@ -50,6 +50,7 @@
               step-strictly
               :controls="false"
               size="small"
+              align="left"
               placeholder="最大长度"
             />
             <span>字符</span>
@@ -59,9 +60,9 @@
             <el-switch v-model="field.rangeEnabled" />
           </div>
           <div v-if="field.type === 'number' && field.rangeEnabled" class="range-inputs">
-            <el-input-number v-model="field.min" :controls="false" placeholder="最小值" size="small"/>
+            <el-input-number v-model="field.min" :controls="false" placeholder="最小值" size="small" align="left"/>
             <span>~</span>
-            <el-input-number v-model="field.max" :controls="false" placeholder="最大值" size="small"/>
+            <el-input-number v-model="field.max" :controls="false" placeholder="最大值" size="small" align="left"/>
           </div>
         </div>
       </el-form-item>
@@ -76,6 +77,7 @@
             step-strictly
             :controls="false"
             size="small"
+            align="left"
           />
           <span>位小数</span>
         </div>

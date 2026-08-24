@@ -48,7 +48,7 @@
       />
     </div>
 
-    <FormRecordDetailDialog
+    <FormRecordDetailDrawer
       v-model="detailVisible"
       :record="detailRecord"
       :fields="fields"
@@ -57,7 +57,7 @@
       :form-id="form?.id"
       @saved="onDetailSaved"
     />
-    <FormRecordCreateDialog
+    <FormRecordCreateDrawer
       v-model="createVisible"
       :fields="fields"
       :values="values"
@@ -88,8 +88,8 @@ import {
 import { isSelectType as isSelectField } from './form-design/fieldTypes'
 import FormRecordCreateTab from './form-workspace/FormRecordCreateTab.vue'
 import FormRecordList from './form-workspace/FormRecordList.vue'
-import FormRecordCreateDialog from './form-workspace/FormRecordCreateDialog.vue'
-import FormRecordDetailDialog from './form-workspace/FormRecordDetailDialog.vue'
+import FormRecordCreateDrawer from './form-workspace/FormRecordCreateDrawer.vue'
+import FormRecordDetailDrawer from './form-workspace/FormRecordDetailDrawer.vue'
 
 const props = defineProps({
   appId: { type: Number, required: true },

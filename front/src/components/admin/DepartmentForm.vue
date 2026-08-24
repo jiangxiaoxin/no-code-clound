@@ -29,7 +29,7 @@
         />
       </el-form-item>
       <el-form-item label="排序" prop="sortOrder">
-        <el-input-number v-model="form.sortOrder" :controls="false" :precision="0" placeholder="请输入排序"/>
+        <el-input-number v-model="form.sortOrder" :controls="false" :precision="0" placeholder="请输入排序" align="left"/>
       </el-form-item>
     </el-form>
     <template #footer>

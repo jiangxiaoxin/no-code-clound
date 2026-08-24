@@ -48,6 +48,7 @@
                   :controls="false"
                   :precision="0"
                   size="small"
+                  align="left"
                 />
               </template>
             </el-table-column>

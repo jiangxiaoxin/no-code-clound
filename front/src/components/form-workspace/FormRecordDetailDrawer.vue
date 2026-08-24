@@ -1,14 +1,14 @@
 <template>
-  <el-dialog
+  <el-drawer
     :model-value="modelValue"
     title="数据详情"
-    width="800px"
-    align-center
+    direction="rtl"
+    size="800px"
     destroy-on-close
     @update:model-value="$emit('update:modelValue', $event)"
     @closed="resetDetail"
   >
-    <div v-if="record" class="fill-dialog-body">
+    <div v-if="record" class="fill-drawer-body">
       <FormFillGrid
         :fields="fields"
         :values="detailValues"
@@ -34,7 +34,7 @@
         </div>
       </div>
     </template>
-  </el-dialog>
+  </el-drawer>
 </template>
 
 <script setup>

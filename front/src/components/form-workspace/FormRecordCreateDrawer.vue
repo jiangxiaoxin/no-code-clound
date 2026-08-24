@@ -1,9 +1,9 @@
 <template>
-  <el-dialog
+  <el-drawer
     :model-value="modelValue"
     title="新增"
-    width="800px"
-    align-center
+    direction="rtl"
+    size="800px"
     destroy-on-close
     @update:model-value="$emit('update:modelValue', $event)"
     @closed="$emit('closed')"
@@ -12,7 +12,7 @@
       v-if="!schemaLoading && fields.length === 0"
       description="请先保存表单设计"
     />
-    <div v-else class="fill-dialog-body">
+    <div v-else class="fill-drawer-body">
       <FormFillGrid
         :fields="fields"
         :values="values"
@@ -23,7 +23,7 @@
       <el-button @click="$emit('update:modelValue', false)">取消</el-button>
       <el-button type="primary" :loading="saving" @click="$emit('save')">保存</el-button>
     </template>
-  </el-dialog>
+  </el-drawer>
 </template>
 
 <script setup>

@@ -24,6 +24,7 @@
     <el-input-number
       v-else-if="field.type === 'number'"
       class="fill-full"
+      align="left"
       :model-value="modelValue"
       :disabled="disabled"
       :controls="false"
@@ -182,7 +183,7 @@ const needsOptionSourceHint = computed(() => {
 .fill-field {
   box-sizing: border-box;
   min-width: 0;
-  padding: 6px 12px;
+  max-width: 354px;
 }
 
 .fill-field.is-w-full {
@@ -213,6 +214,8 @@ const needsOptionSourceHint = computed(() => {
   display: flex;
   align-items: center;
   margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 .fill-field-required {

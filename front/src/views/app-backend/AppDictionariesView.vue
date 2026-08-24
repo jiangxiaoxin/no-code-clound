@@ -77,7 +77,7 @@
               <el-table-column label="排序">
                 <template #default="{ row }">
                   <el-input-number v-model="row.sortOrder" class="sort-input" size="small" :controls="false"
-                    :precision="0" />
+                    :precision="0" align="left" />
                 </template>
               </el-table-column>
               <el-table-column label="状态">
