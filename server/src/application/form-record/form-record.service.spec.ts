@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ObjectId } from 'mongodb';
@@ -17,6 +17,7 @@ describe('FormRecordService', () => {
     replaceData: jest.fn(),
     deleteById: jest.fn(),
     query: jest.fn(),
+    existsByDataValue: jest.fn(),
   };
   const ownedApp = { id: 8, ownerId: 1 };
   const form = {
@@ -102,6 +103,49 @@ describe('FormRecordService', () => {
       data: { name: '张三' },
     });
     expect(result).not.toHaveProperty('_id');
+  });
+
+  it('rejects create when a unique input value already exists', async () => {
+    appRepo.findOne.mockResolvedValue(ownedApp);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [{ key: 'name', type: 'input', title: '姓名', unique: true }],
+    });
+    store.existsByDataValue.mockResolvedValue(true);
+
+    await expect(service.create(1, 8, 12, { name: '张三' })).rejects.toEqual(
+      expect.objectContaining({
+        constructor: ConflictException,
+        message: '[姓名]不允许重复值',
+      }),
+    );
+    expect(store.existsByDataValue).toHaveBeenCalledWith(
+      12,
+      'name',
+      '张三',
+      undefined,
+    );
+    expect(store.insert).not.toHaveBeenCalled();
+  });
+
+  it('allows update when unique value belongs to the same record', async () => {
+    appRepo.findOne.mockResolvedValue(ownedApp);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [{ key: 'name', type: 'input', title: '姓名', unique: true }],
+    });
+    store.findById.mockResolvedValue(doc);
+    store.existsByDataValue.mockResolvedValue(false);
+    store.replaceData.mockResolvedValue({ ...doc, data: { name: '张三' } });
+
+    await service.update(1, 8, 12, doc._id.toHexString(), { name: '张三' });
+
+    expect(store.existsByDataValue).toHaveBeenCalledWith(
+      12,
+      'name',
+      '张三',
+      doc._id.toHexString(),
+    );
   });
 
   it('throws when record id is missing', async () => {

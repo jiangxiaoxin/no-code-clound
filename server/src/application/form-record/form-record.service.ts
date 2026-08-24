@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppForm } from '../app-form.entity';
@@ -37,7 +37,8 @@ export class FormRecordService {
   ): Promise<FormRecordView> {
     const form = await this.requireForm(ownerId, appId, formId);
     const fields = this.readFields(form);
-    const coerced = coerceRecordData(fields, data);
+    const coerced = coerceRecordData(fields, data); // 强制转换
+    await this.assertUniqueFields(formId, fields, coerced);
     const now = new Date();
     const inserted = await this.store.insert({
       appId,
@@ -91,11 +92,9 @@ export class FormRecordService {
     const form = await this.requireForm(ownerId, appId, formId);
     const existing = await this.store.findById(formId, recordId);
     if (!existing) throw new NotFoundException('记录不存在');
-    const merged = mergeRecordData(
-      existing.data ?? {},
-      data,
-      this.readFields(form),
-    );
+    const fields = this.readFields(form);
+    const merged = mergeRecordData(existing.data ?? {}, data, fields);
+    await this.assertUniqueFields(formId, fields, merged, recordId);
     const doc = await this.store.replaceData(formId, recordId, merged);
     if (!doc) throw new NotFoundException('记录不存在');
     return this.toView(doc);
@@ -111,6 +110,35 @@ export class FormRecordService {
     const deleted = await this.store.deleteById(formId, recordId);
     if (!deleted) throw new NotFoundException('记录不存在');
     return { ok: true };
+  }
+
+  private async assertUniqueFields(
+    formId: number,
+    fields: FormField[] | null,
+    data: Record<string, unknown>,
+    excludeRecordId?: string,
+  ) {
+    for (const field of fields ?? []) {
+      if (field.type !== 'input' || !field.unique) {
+        continue;
+      }
+      // 目前进对[单行文本]进行重复值检测
+      const value = data[field.key];
+      if (typeof value !== 'string' || value === '') {
+        continue;
+      }
+      const exists = await this.store.existsByDataValue(
+        formId,
+        field.key,
+        value,
+        excludeRecordId,
+      );
+      if (exists) {
+        throw new ConflictException(
+          `[${field.title || '未命名'}]不允许重复值`,
+        );
+      }
+    }
   }
 
   private async requireForm(ownerId: number, appId: number, formId: number) {

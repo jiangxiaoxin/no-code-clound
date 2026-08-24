@@ -86,6 +86,27 @@ export class FormRecordStore {
     return this.col(formId).findOne({ _id: objectId });
   }
 
+  async existsByDataValue(
+    formId: number,
+    fieldKey: string,
+    value: unknown,
+    excludeId?: string,
+  ): Promise<boolean> {
+    const filter: Record<string, unknown> = {
+      [`data.${fieldKey}`]: value,
+    };
+    if (excludeId) {
+      const objectId = this.parseId(excludeId);
+      if (objectId) {
+        filter._id = { $ne: objectId };
+      }
+    }
+    const found = await this.col(formId).findOne(filter, {
+      projection: { _id: 1 },
+    });
+    return Boolean(found);
+  }
+
   async replaceData(
     formId: number,
     id: string,

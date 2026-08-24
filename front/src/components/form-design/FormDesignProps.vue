@@ -39,6 +39,10 @@
             <span>必填</span>
             <el-switch v-model="field.required" />
           </div>
+          <div v-if="field.type === 'input'" class="required-row">
+            <span>不允许重复值</span>
+            <el-switch v-model="field.unique" />
+          </div>
           <div v-if="field.type === 'input' || field.type === 'textarea'" class="required-row">
             <span>最大文本长度：</span>
             <el-input-number

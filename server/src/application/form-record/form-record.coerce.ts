@@ -73,6 +73,12 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
   }
 }
 
+/**
+ * 
+ * @param fields 
+ * @param input 
+ * @returns 对数据进行强制整理后返回整理后的数据
+ */
 export function coerceRecordData(
   fields: FormField[] | null | undefined,
   input: unknown,

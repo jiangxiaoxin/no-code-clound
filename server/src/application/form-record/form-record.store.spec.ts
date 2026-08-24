@@ -61,4 +61,32 @@ describe('FormRecordStore', () => {
     );
     await expect(store.dropFormCollection(12)).resolves.toBeUndefined();
   });
+
+  it('looks up an existing data value and can exclude a record id', async () => {
+    collection.findOne.mockResolvedValue({ _id: 'x' });
+    await expect(
+      store.existsByDataValue(12, 'name', '张三'),
+    ).resolves.toBe(true);
+    expect(collection.findOne).toHaveBeenCalledWith(
+      { 'data.name': '张三' },
+      { projection: { _id: 1 } },
+    );
+
+    collection.findOne.mockResolvedValue(null);
+    await expect(
+      store.existsByDataValue(
+        12,
+        'name',
+        '张三',
+        '64b64c4c4c4c4c4c4c4c4c4c',
+      ),
+    ).resolves.toBe(false);
+    expect(collection.findOne).toHaveBeenLastCalledWith(
+      {
+        'data.name': '张三',
+        _id: { $ne: expect.any(Object) },
+      },
+      { projection: { _id: 1 } },
+    );
+  });
 });
