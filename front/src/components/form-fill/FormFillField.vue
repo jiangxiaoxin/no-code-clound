@@ -16,6 +16,7 @@
     <el-input
       v-if="field.type === 'input'"
       :model-value="modelValue"
+      :disabled="disabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
       @update:model-value="$emit('update:modelValue', $event)"
@@ -24,6 +25,7 @@
       v-else-if="field.type === 'number'"
       class="fill-full"
       :model-value="modelValue"
+      :disabled="disabled"
       :controls="false"
       :precision="field.precision"
       :min="field.rangeEnabled ? field.min : undefined"
@@ -36,6 +38,7 @@
       type="textarea"
       :rows="3"
       :model-value="modelValue"
+      :disabled="disabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
       @update:model-value="$emit('update:modelValue', $event)"
@@ -49,6 +52,7 @@
     <el-radio-group
       v-else-if="field.type === 'radio'"
       :model-value="modelValue"
+      :disabled="disabled"
       @update:model-value="$emit('update:modelValue', $event)"
     >
       <el-radio v-for="item in items" :key="item.value" :value="item.value">
@@ -58,6 +62,7 @@
     <el-checkbox-group
       v-else-if="field.type === 'checkbox'"
       :model-value="modelValue"
+      :disabled="disabled"
       @update:model-value="$emit('update:modelValue', $event)"
     >
       <el-checkbox v-for="item in items" :key="item.value" :value="item.value">
@@ -68,6 +73,7 @@
       v-else-if="field.type === 'date'"
       class="fill-full"
       :model-value="modelValue"
+      :disabled="disabled"
       :type="field.format || 'date'"
       :placeholder="field.placeholder || '请选择'"
       @update:model-value="$emit('update:modelValue', $event)"
@@ -76,6 +82,7 @@
       v-else-if="field.type === 'time'"
       class="fill-full"
       :model-value="modelValue"
+      :disabled="disabled"
       :format="field.format || 'HH:mm:ss'"
       :value-format="field.format || 'HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
@@ -86,6 +93,7 @@
       class="fill-full"
       type="datetime"
       :model-value="modelValue"
+      :disabled="disabled"
       :format="field.format || 'YYYY-MM-DD HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
       @update:model-value="$emit('update:modelValue', $event)"
@@ -98,6 +106,7 @@
       class="fill-full"
       :multiple="field.type === 'select-multiple'"
       :model-value="modelValue"
+      :disabled="disabled"
       :placeholder="field.placeholder"
       @update:model-value="$emit('update:modelValue', $event)"
     >
@@ -151,6 +160,7 @@ const props = defineProps({
   field: { type: Object, required: true },
   items: { type: Array, default: () => [] },
   modelValue: { default: undefined },
+  disabled: { type: Boolean, default: false },
 })
 
 defineEmits(['update:modelValue'])

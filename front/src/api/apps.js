@@ -92,6 +92,10 @@ export function queryFormRecordsApi(appId, formId, payload) {
   return http.post(`/apps/${appId}/forms/${formId}/records/query`, payload)
 }
 
+export function updateFormRecordApi(appId, formId, recordId, data) {
+  return http.patch(`/apps/${appId}/forms/${formId}/records/${recordId}`, { data })
+}
+
 export function deleteFormRecordApi(appId, formId, recordId) {
   return http.delete(`/apps/${appId}/forms/${formId}/records/${recordId}`)
 }

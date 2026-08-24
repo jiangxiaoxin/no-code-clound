@@ -146,6 +146,7 @@
               height="100%"
               size="small"
               row-key="id"
+              @row-click="onRecordRowClick"
               @selection-change="selectedRecords = $event"
             >
               <el-table-column type="selection" width="42" fixed="left" />
@@ -185,6 +186,47 @@
         </template>
       </div>
     </div>
+
+    <el-dialog
+      v-model="detailVisible"
+      title="数据详情"
+      width="800px"
+      align-center
+      destroy-on-close
+      @closed="resetDetail"
+    >
+      <div v-if="detailRecord" class="record-detail-body">
+        <div class="fill-grid">
+          <FormFillField
+            v-for="field in fields"
+            :key="field.key"
+            :field="field"
+            :items="dictItemsByCode[field.dictCode] || []"
+            :model-value="detailValues[field.key]"
+            :disabled="!detailEditing"
+            @update:model-value="detailValues[field.key] = $event"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="record-detail-footer">
+          <div>
+            <el-button v-if="!detailEditing" type="primary" @click="startDetailEdit">
+              编辑
+            </el-button>
+          </div>
+          <div class="record-detail-footer-right">
+            <template v-if="detailEditing">
+              <el-button @click="cancelDetailEdit">取消</el-button>
+              <el-button type="primary" :loading="detailSaving" @click="saveDetail">
+                保存
+              </el-button>
+            </template>
+            <el-button v-else @click="detailVisible = false">关闭</el-button>
+          </div>
+        </div>
+      </template>
+    </el-dialog>
 
     <el-dialog
       v-model="createVisible"
@@ -229,6 +271,7 @@ import {
   getFormApi,
   listDictionaryItemsByCodesApi,
   queryFormRecordsApi,
+  updateFormRecordApi,
 } from '../api/apps'
 import FormFillField from './form-fill/FormFillField.vue'
 import {
@@ -276,6 +319,12 @@ const columnPrefs = ref([])
 const dragColumnIndex = ref(-1)
 const dragOverIndex = ref(-1)
 const createVisible = ref(false)
+const detailVisible = ref(false)
+const detailEditing = ref(false)
+const detailSaving = ref(false)
+const detailRecord = ref(null)
+const detailValues = reactive({})
+const detailSnapshot = ref({})
 
 const tableFields = computed(() => fields.value.filter(isFillable))
 
@@ -457,6 +506,87 @@ function formatTime(value) {
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
 }
 
+function cloneValues(data) {
+  const next = {}
+  for (const field of fields.value) {
+    if (!isFillable(field)) {
+      continue
+    }
+    const value = data?.[field.key]
+    next[field.key] =
+      value == null ? emptyValue(field) : Array.isArray(value) ? [...value] : value
+  }
+  return next
+}
+
+function applyDetailValues(data) {
+  for (const key of Object.keys(detailValues)) {
+    delete detailValues[key]
+  }
+  Object.assign(detailValues, cloneValues(data))
+  detailSnapshot.value = cloneValues(data)
+}
+
+function onRecordRowClick(row, _column, event) {
+  if (event?.target?.closest('.el-table-column--selection')) {
+    return
+  }
+  detailRecord.value = row
+  detailEditing.value = false
+  applyDetailValues(row.data)
+  detailVisible.value = true
+}
+
+function startDetailEdit() {
+  detailEditing.value = true
+}
+
+function cancelDetailEdit() {
+  applyDetailValues(detailSnapshot.value)
+  detailEditing.value = false
+}
+
+function resetDetail() {
+  detailEditing.value = false
+  detailRecord.value = null
+  detailSnapshot.value = {}
+  for (const key of Object.keys(detailValues)) {
+    delete detailValues[key]
+  }
+}
+
+async function saveDetail() {
+  const message = validateRequired(fields.value, detailValues)
+  if (message) {
+    ElMessage.warning(message)
+    return
+  }
+  if (!detailRecord.value?.id || !props.form?.id) {
+    return
+  }
+  detailSaving.value = true
+  try {
+    const updated = await updateFormRecordApi(
+      props.appId,
+      props.form.id,
+      detailRecord.value.id,
+      buildRecordData(fields.value, detailValues),
+    )
+    detailRecord.value = updated
+    const index = records.value.findIndex((item) => item.id === updated.id)
+    if (index >= 0) {
+      records.value[index] = updated
+    }
+    applyDetailValues(updated.data)
+    detailEditing.value = false
+    ElMessage.success('保存成功')
+  } catch {
+    return
+  } finally {
+    detailSaving.value = false
+  }
+}
+
 async function loadSchema() {
   if (!props.form?.id || !props.appId) {
     fields.value = []
@@ -599,6 +729,8 @@ watch(
     tab.value = 'create'
     page.value = 1
     createVisible.value = false
+    detailVisible.value = false
+    resetDetail()
     selectedRecords.value = []
     columnPrefs.value = []
     loadSchema()
@@ -818,6 +950,21 @@ watch(tab, (value) => {
 .create-dialog-body {
   max-height: 60vh;
   overflow: auto;
+}
+
+.record-detail-body {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.record-detail-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.record-detail-footer-right {
+  display: flex;
 }
 
 .fill-scroll {
