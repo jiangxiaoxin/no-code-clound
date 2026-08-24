@@ -44,6 +44,14 @@ export function deleteFormApi(appId, formId) {
   return http.delete(`/apps/${appId}/forms/${formId}`)
 }
 
+export function saveFormFieldsApi(appId, formId, payload) {
+  return http.put(`/apps/${appId}/forms/${formId}/fields`, payload)
+}
+
+export function listFormFieldsApi(appId, params) {
+  return http.get(`/apps/${appId}/form-fields`, { params })
+}
+
 export function listDictionariesApi(appId, params) {
   return http.get(`/apps/${appId}/dictionaries`, { params })
 }
@@ -74,4 +82,12 @@ export function listDictionaryItemsByCodeApi(appId, code) {
 
 export function listDictionaryItemsByCodesApi(appId, codes) {
   return http.post(`/apps/${appId}/dictionaries/items-by-codes`, { codes })
+}
+
+export function createFormRecordApi(appId, formId, data) {
+  return http.post(`/apps/${appId}/forms/${formId}/records`, { data })
+}
+
+export function queryFormRecordsApi(appId, formId, payload) {
+  return http.post(`/apps/${appId}/forms/${formId}/records/query`, payload)
 }

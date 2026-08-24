@@ -21,6 +21,7 @@
         v-model:tab="propTab"
         :field="selectedField"
         :app-id="appId"
+        :form-id="formId"
         @update:width="setFieldWidth"
       />
     </el-container>
@@ -33,12 +34,7 @@
     align-center
     destroy-on-close
   >
-    <el-input
-      type="textarea"
-      :rows="18"
-      readonly
-      :model-value="previewJson"
-    />
+    <div class="preview-json">{{ previewJson }}</div>
     <template #footer>
       <el-button @click="previewVisible = false">关闭</el-button>
       <el-button type="primary" @click="copyPreviewJson">复制</el-button>
@@ -47,16 +43,19 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, toRaw, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import FormDesignToolbar from './form-design/FormDesignToolbar.vue'
 import FormDesignPalette from './form-design/FormDesignPalette.vue'
 import FormDesignCanvas from './form-design/FormDesignCanvas.vue'
 import FormDesignProps from './form-design/FormDesignProps.vue'
-import { listDictionaryItemsByCodesApi } from '../api/apps'
+import { listDictionaryItemsByCodesApi, saveFormFieldsApi } from '../api/apps'
+import { isSelectType } from './form-design/fieldTypes'
 
 const props = defineProps({
   appId: { type: Number, required: true },
+  formId: { type: Number, required: true },
+  initialFields: { type: Array, default: null },
 })
 
 const propTab = ref('field')
@@ -76,7 +75,7 @@ const dictCodes = computed(() => {
   const seen = new Set()
   for (const field of fields.value) {
     const usesDict =
-      (field.type === 'radio' || field.type === 'checkbox' || field.type === 'select') &&
+      (field.type === 'radio' || field.type === 'checkbox' || isSelectType(field.type)) &&
       (field.optionSource || 'dictionary') === 'dictionary' &&
       field.dictCode
     if (!usesDict || seen.has(field.dictCode)) {
@@ -138,7 +137,9 @@ function addField(item, beforeKey) {
     ...(item.type === 'radio' || item.type === 'checkbox'
       ? { optionSource: 'dictionary', dictCode: '' }
       : {}),
-    ...(item.type === 'select' ? { optionSource: 'dictionary', dictCode: '' } : {}),
+    ...(item.type === 'select' || item.type === 'select-multiple'
+      ? { optionSource: 'dictionary', dictCode: '' }
+      : {}),
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)
@@ -185,7 +186,7 @@ function ensureOptionSource(field) {
     if (!field.optionSource) field.optionSource = 'dictionary'
     if (field.dictCode == null) field.dictCode = ''
   }
-  if (field.type === 'select') {
+  if (isSelectType(field.type)) {
     if (!field.optionSource) field.optionSource = 'dictionary'
     if (field.optionSource === 'dictionary' && field.dictCode == null) {
       field.dictCode = ''
@@ -235,9 +236,35 @@ async function clearFields() {
   selectedKey.value = ''
 }
 
-function saveFields() {
-  ElMessage.success('保存成功')
+async function saveFields() {
+  try {
+    await saveFormFieldsApi(props.appId, props.formId, { fields: fields.value })
+    ElMessage.success('保存成功')
+  } catch {
+    return
+  }
 }
+
+function cloneFields(value) {
+  const raw = toRaw(value)
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  try {
+    return JSON.parse(JSON.stringify(raw))
+  } catch {
+    return raw.map((item) => ({ ...toRaw(item) }))
+  }
+}
+
+watch(
+  () => props.initialFields,
+  (value) => {
+    fields.value = cloneFields(value)
+    selectedKey.value = ''
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped lang="less">
@@ -247,5 +274,19 @@ function saveFields() {
 
 .form-layout {
   min-height: 0;
+}
+
+.preview-json {
+  max-height: 420px;
+  overflow: auto;
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-light);
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
 }
 </style>

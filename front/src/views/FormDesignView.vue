@@ -24,8 +24,13 @@
       <div class="form-bar-side" />
     </el-header>
 
-    <FormDesignPanel v-if="page === 'design'" :app-id="appId" />
-    <FormPublishPanel v-else />
+    <FormDesignPanel
+      v-if="!loading && page === 'design' && form"
+      :app-id="appId"
+      :form-id="formId"
+      :initial-fields="Array.isArray(form.fields) ? form.fields : []"
+    />
+    <FormPublishPanel v-else-if="!loading && page === 'publish'" />
   </el-container>
 </template>
 

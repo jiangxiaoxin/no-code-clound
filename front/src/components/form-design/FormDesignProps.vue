@@ -88,7 +88,7 @@
           />
         </el-select>
       </el-form-item>
-      <template v-else-if="field.type === 'select'">
+      <template v-else-if="field.type === 'select' || field.type === 'select-multiple'">
         <el-form-item label="数据源">
           <el-radio-group v-model="field.optionSource" @change="onOptionSourceChange">
             <el-radio value="dictionary">字典</el-radio>
@@ -104,6 +104,15 @@
               :value="item.code"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item v-else-if="field.optionSource === 'table_data'" label="表字段">
+          <FormFieldSourcePicker
+            :app-id="appId"
+            :form-id="formId"
+            :source-form-id="field.sourceFormId"
+            :source-field-key="field.sourceFieldKey"
+            @select="onSourceFieldSelect"
+          />
         </el-form-item>
       </template>
       <el-form-item label="字段宽度">
@@ -125,12 +134,14 @@
 <script setup>
 import { ref, watch } from 'vue'
 import { formatOptions } from './fieldTypes'
+import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
 import { listDictionaryOptionsApi } from '../../api/apps'
 
 const props = defineProps({
   tab: { type: String, required: true },
   field: { type: Object, default: null },
   appId: { type: Number, required: true },
+  formId: { type: Number, required: true },
 })
 
 defineEmits(['update:tab', 'update:width'])
@@ -155,9 +166,21 @@ function onOptionSourceChange(value) {
   }
   if (value === 'table_data') {
     delete props.field.dictCode
-  } else if (props.field.dictCode == null) {
-    props.field.dictCode = ''
+  } else {
+    delete props.field.sourceFormId
+    delete props.field.sourceFieldKey
+    if (props.field.dictCode == null) {
+      props.field.dictCode = ''
+    }
   }
+}
+
+function onSourceFieldSelect({ formId, fieldKey }) {
+  if (!props.field) {
+    return
+  }
+  props.field.sourceFormId = formId
+  props.field.sourceFieldKey = fieldKey
 }
 
 watch(() => props.appId, loadOptions, { immediate: true })

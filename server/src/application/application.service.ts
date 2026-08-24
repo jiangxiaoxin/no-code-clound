@@ -13,6 +13,20 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
 import { FormRecordStore } from './form-record/form-record.store';
+import { FormField } from './form-record/form-record.types';
+
+const OPTION_FIELD_TYPES = new Set([
+  'input',
+  'textarea',
+  'number',
+  'date',
+  'time',
+  'datetime',
+  'radio',
+  'checkbox',
+  'select',
+  'select-multiple',
+]);
 
 const ICON_COLORS = [
   '#E8A317',
@@ -75,7 +89,59 @@ export class ApplicationService {
   async getForm(ownerId: number, appId: number, formId: number) {
     await this.requireOwnedApp(ownerId, appId);
     const form = await this.requireForm(appId, formId);
-    return this.toFormItem(form);
+    return this.toFormDetail(form);
+  }
+
+  async saveFields(
+    ownerId: number,
+    appId: number,
+    formId: number,
+    fields: unknown,
+  ) {
+    if (!Array.isArray(fields)) {
+      throw new BadRequestException('请提交字段列表');
+    }
+    await this.requireOwnedApp(ownerId, appId);
+    const form = await this.requireForm(appId, formId);
+    form.fields = fields as Record<string, unknown>[];
+    const saved = await this.formRepo.save(form);
+    await this.formRecordStore.syncIndexes(formId, saved.fields as FormField[]);
+    return this.toFormDetail(saved);
+  }
+
+  async listFormFields(
+    ownerId: number,
+    appId: number,
+    excludeFormId?: number,
+  ): Promise<
+    { id: number; name: string; fields: { key: string; title: string; type: string }[] }[]
+  > {
+    await this.requireOwnedApp(ownerId, appId);
+    const forms = await this.formRepo.find({
+      where: { applicationId: appId },
+      order: { createdAt: 'DESC' },
+    });
+    const exclude =
+      Number.isInteger(excludeFormId) && (excludeFormId as number) > 0
+        ? excludeFormId
+        : undefined;
+
+    const result: {
+      id: number;
+      name: string;
+      fields: { key: string; title: string; type: string }[];
+    }[] = [];
+    for (const form of forms) {
+      if (exclude != null && form.id === exclude) {
+        continue;
+      }
+      const fields = this.toOptionFields(form.fields);
+      if (!fields.length) {
+        continue;
+      }
+      result.push({ id: form.id, name: form.name, fields });
+    }
+    return result;
   }
 
   async directory(ownerId: number, id: number) {
@@ -245,6 +311,38 @@ export class ApplicationService {
     groupId: number | null;
   } {
     return { id: row.id, name: row.name, groupId: row.groupId };
+  }
+
+  private toFormDetail(row: AppForm) {
+    return {
+      ...this.toFormItem(row),
+      fields: Array.isArray(row.fields) ? row.fields : null,
+    };
+  }
+
+  private toOptionFields(
+    raw: Record<string, unknown>[] | null,
+  ): { key: string; title: string; type: string }[] {
+    if (!Array.isArray(raw)) {
+      return [];
+    }
+    const fields: { key: string; title: string; type: string }[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') {
+        continue;
+      }
+      const type = typeof item.type === 'string' ? item.type : '';
+      const key = typeof item.key === 'string' ? item.key : '';
+      if (!key || !OPTION_FIELD_TYPES.has(type)) {
+        continue;
+      }
+      fields.push({
+        key,
+        title: typeof item.title === 'string' ? item.title : '',
+        type,
+      });
+    }
+    return fields;
   }
 
   private pickIcon(name: string): string {

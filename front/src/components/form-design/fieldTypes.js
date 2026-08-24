@@ -26,7 +26,8 @@ export const fieldTypes = [
   { type: 'datetime', label: '日期时间', icon: Calendar, component: 'el-date-picker', placeholder: '请选择' },
   { type: 'radio', label: '单选框', icon: CircleCheck, component: 'el-radio-group', placeholder: '' },
   { type: 'checkbox', label: '复选框', icon: Finished, component: 'el-checkbox-group', placeholder: '' },
-  { type: 'select', label: '下拉框', icon: SemiSelect, component: 'el-select', placeholder: '请选择' },
+  { type: 'select', label: '下拉单选框', icon: SemiSelect, component: 'el-select', placeholder: '请选择' },
+  { type: 'select-multiple', label: '下拉多选框', icon: SemiSelect, component: 'el-select', placeholder: '请选择' },
   { type: 'member', label: '成员选择', icon: User, component: 'MemberSelect', placeholder: '请选择' },
   { type: 'dept', label: '部门选择', icon: OfficeBuilding, component: 'DeptSelect', placeholder: '请选择' },
   { type: 'divider', label: '分割线', icon: Minus, component: 'el-divider', placeholder: '' },
@@ -60,4 +61,12 @@ export const widthClass = {
   '2/3': 'is-w-two-thirds',
   '1/4': 'is-w-quarter',
   '3/4': 'is-w-three-quarters',
+}
+
+export function fieldTypeLabel(type) {
+  return fieldTypes.find((item) => item.type === type)?.label || type
+}
+
+export function isSelectType(type) {
+  return type === 'select' || type === 'select-multiple'
 }

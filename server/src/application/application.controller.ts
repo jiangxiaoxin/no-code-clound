@@ -8,6 +8,8 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -15,7 +17,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApplicationService } from './application.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
+import { ListFormFieldsDto } from './dto/list-form-fields.dto';
 import { NameDto } from './dto/name.dto';
+import { SaveFormFieldsDto } from './dto/save-form-fields.dto';
 
 @Controller('apps')
 @UseGuards(JwtAuthGuard)
@@ -81,6 +85,19 @@ export class ApplicationController {
     return this.applicationService.deleteGroup(req.user.id, id, groupId);
   }
 
+  @Get(':id/form-fields')
+  listFormFields(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Query() query: ListFormFieldsDto,
+  ) {
+    return this.applicationService.listFormFields(
+      req.user.id,
+      id,
+      query.excludeFormId,
+    );
+  }
+
   @Get(':id/forms/:formId')
   getForm(
     @Req() req: { user: { id: number } },
@@ -88,6 +105,21 @@ export class ApplicationController {
     @Param('formId', ParseIntPipe) formId: number,
   ) {
     return this.applicationService.getForm(req.user.id, id, formId);
+  }
+
+  @Put(':id/forms/:formId/fields')
+  saveFields(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Param('formId', ParseIntPipe) formId: number,
+    @Body() dto: SaveFormFieldsDto,
+  ) {
+    return this.applicationService.saveFields(
+      req.user.id,
+      id,
+      formId,
+      dto.fields,
+    );
   }
 
   @Post(':id/forms')

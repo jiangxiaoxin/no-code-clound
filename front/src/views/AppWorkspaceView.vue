@@ -78,7 +78,7 @@
         <el-button class="aside-backend" text :icon="Setting" @click="goBackend">应用后台</el-button>
       </div>
     </el-aside>
-    <AppWorkspaceMain :form="currentForm" />
+    <AppWorkspaceMain :app-id="appId" :form="currentForm" />
   </el-container>
 
   <el-dialog
@@ -390,7 +390,7 @@ watch(appId, loadWorkspace, { immediate: true })
 .workspace-aside {
   display: flex;
   flex-direction: column;
-  padding: 12px 12px 16px;
+  padding: 12px 0 16px 12px;
   background: var(--el-bg-color);
   border-right: 1px solid var(--el-border-color);
   overflow: hidden;
@@ -401,6 +401,7 @@ watch(appId, loadWorkspace, { immediate: true })
   display: flex;
   align-items: center;
   margin-bottom: 12px;
+  margin-right: 6px;
 }
 
 .aside-head {

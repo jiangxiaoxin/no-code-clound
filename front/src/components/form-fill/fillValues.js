@@ -1,0 +1,111 @@
+const SKIP_TYPES = new Set([
+  'divider',
+  'image',
+  'file',
+  'subform',
+  'member',
+  'dept',
+  'data',
+  'relate',
+])
+
+export function isFillable(field) {
+  return Boolean(field?.key) && !SKIP_TYPES.has(field.type)
+}
+
+export function isEmptyValue(field, value) {
+  if (field.type === 'checkbox' || field.type === 'select-multiple') {
+    return !Array.isArray(value) || value.length === 0
+  }
+  if (field.type === 'number') {
+    return value == null || value === ''
+  }
+  return value == null || value === ''
+}
+
+function pad(n) {
+  return String(n).padStart(2, '0')
+}
+
+function asDate(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+export function serializeValue(field, value) {
+  if (isEmptyValue(field, value)) {
+    return undefined
+  }
+  if (field.type === 'date') {
+    const d = asDate(value)
+    if (!d) return undefined
+    const y = d.getFullYear()
+    const m = pad(d.getMonth() + 1)
+    const day = pad(d.getDate())
+    if (field.format === 'year') return `${y}-01-01`
+    if (field.format === 'month') return `${y}-${m}-01`
+    return `${y}-${m}-${day}`
+  }
+  if (field.type === 'datetime') {
+    const d = asDate(value)
+    return d ? d.toISOString() : undefined
+  }
+  if (field.type === 'time') {
+    if (typeof value === 'string') return value
+    const d = asDate(value)
+    if (!d) return undefined
+    const clock = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    return (field.format || 'HH:mm:ss') === 'HH:mm' ? clock.slice(0, 5) : clock
+  }
+  return value
+}
+
+export function buildRecordData(fields, values) {
+  const data = {}
+  for (const field of fields) {
+    if (!isFillable(field)) continue
+    const next = serializeValue(field, values[field.key])
+    if (next !== undefined) {
+      data[field.key] = next
+    }
+  }
+  return data
+}
+
+export function validateRequired(fields, values) {
+  for (const field of fields) {
+    if (!isFillable(field) || !field.required) continue
+    if (isEmptyValue(field, values[field.key])) {
+      return `请填写「${field.title || '未命名'}」`
+    }
+  }
+  return ''
+}
+
+export function formatCellValue(field, value, dictItemsByCode) {
+  if (value == null || value === '') return ''
+  if (field.type === 'checkbox' || field.type === 'select-multiple') {
+    const items = dictItemsByCode[field.dictCode] || []
+    const map = Object.fromEntries(items.map((item) => [item.value, item.label]))
+    return (Array.isArray(value) ? value : [value])
+      .map((item) => map[item] || item)
+      .join('、')
+  }
+  if (
+    field.type === 'radio' ||
+    field.type === 'select'
+  ) {
+    const items = dictItemsByCode[field.dictCode] || []
+    const found = items.find((item) => item.value === value)
+    return found ? found.label : String(value)
+  }
+  if (field.type === 'datetime') {
+    const d = asDate(value)
+    return d ? d.toLocaleString() : String(value)
+  }
+  if (Array.isArray(value)) return value.join('、')
+  return String(value)
+}

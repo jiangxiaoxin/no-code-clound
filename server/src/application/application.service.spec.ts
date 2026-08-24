@@ -33,6 +33,7 @@ describe('ApplicationService', () => {
 
   const formRecordStore = {
     dropFormCollection: jest.fn(),
+    syncIndexes: jest.fn(),
   };
 
   const ownedApp = {
@@ -164,6 +165,25 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: 2,
+        fields: null,
+      });
+    });
+
+    it('returns saved fields array', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+        fields: [{ key: 'a1', type: 'input', title: '姓名' }],
+      });
+
+      await expect(service.getForm(1, 8, 10)).resolves.toEqual({
+        id: 10,
+        name: '入职登记',
+        groupId: 2,
+        fields: [{ key: 'a1', type: 'input', title: '姓名' }],
       });
     });
 
@@ -424,6 +444,138 @@ describe('ApplicationService', () => {
         expect((e as NotFoundException).message).toBe('表单不存在');
       }
       expect(formRecordStore.dropFormCollection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('saveFields', () => {
+    it('saves fields then syncs indexes and returns the form', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+        fields: null,
+      });
+      formRepo.save.mockImplementation(async (row: AppForm) => row);
+      formRecordStore.syncIndexes.mockResolvedValue(undefined);
+      const fields = [{ key: 'a1', type: 'input', title: '姓名' }];
+
+      await expect(service.saveFields(1, 8, 10, fields)).resolves.toEqual({
+        id: 10,
+        name: '入职登记',
+        groupId: 2,
+        fields,
+      });
+      expect(formRepo.save).toHaveBeenCalled();
+      expect(formRecordStore.syncIndexes).toHaveBeenCalledWith(10, fields);
+    });
+
+    it('allows empty array', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: null,
+        fields: [{ key: 'a1', type: 'input' }],
+      });
+      formRepo.save.mockImplementation(async (row: AppForm) => row);
+      formRecordStore.syncIndexes.mockResolvedValue(undefined);
+
+      await expect(service.saveFields(1, 8, 10, [])).resolves.toEqual({
+        id: 10,
+        name: '入职登记',
+        groupId: null,
+        fields: [],
+      });
+    });
+
+    it('throws 400 when fields is not an array', async () => {
+      try {
+        await service.saveFields(1, 8, 10, null as unknown as unknown[]);
+        throw new Error('expected 400');
+      } catch (e) {
+        expect(e).toBeInstanceOf(BadRequestException);
+        expect((e as BadRequestException).message).toBe('请提交字段列表');
+      }
+      expect(formRepo.save).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listFormFields', () => {
+    it('returns other saved forms with option field types only', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([
+        {
+          id: 12,
+          name: '客户',
+          applicationId: 8,
+          createdAt: new Date('2026-08-24T02:00:00.000Z'),
+          fields: [
+            { key: 'n1', title: '客户名称', type: 'input' },
+            { key: 'd1', title: '分割', type: 'divider' },
+            { key: 'm1', title: '负责人', type: 'member' },
+            { key: 'x1', type: 'number' },
+          ],
+        },
+        {
+          id: 11,
+          name: '当前表',
+          applicationId: 8,
+          createdAt: new Date('2026-08-24T01:00:00.000Z'),
+          fields: [{ key: 'a1', title: '标题', type: 'input' }],
+        },
+        {
+          id: 10,
+          name: '未保存',
+          applicationId: 8,
+          createdAt: new Date('2026-08-24T00:00:00.000Z'),
+          fields: null,
+        },
+        {
+          id: 9,
+          name: '只有分割线',
+          applicationId: 8,
+          createdAt: new Date('2026-08-23T00:00:00.000Z'),
+          fields: [{ key: 'd1', title: '线', type: 'divider' }],
+        },
+      ]);
+
+      await expect(service.listFormFields(1, 8, 11)).resolves.toEqual([
+        {
+          id: 12,
+          name: '客户',
+          fields: [
+            { key: 'n1', title: '客户名称', type: 'input' },
+            { key: 'x1', title: '', type: 'number' },
+          ],
+        },
+      ]);
+      expect(formRepo.find).toHaveBeenCalledWith({
+        where: { applicationId: 8 },
+        order: { createdAt: 'DESC' },
+      });
+    });
+
+    it('does not exclude when excludeFormId is omitted', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([
+        {
+          id: 12,
+          name: '客户',
+          applicationId: 8,
+          fields: [{ key: 'n1', title: '客户名称', type: 'input' }],
+        },
+      ]);
+
+      await expect(service.listFormFields(1, 8)).resolves.toEqual([
+        {
+          id: 12,
+          name: '客户',
+          fields: [{ key: 'n1', title: '客户名称', type: 'input' }],
+        },
+      ]);
     });
   });
 });

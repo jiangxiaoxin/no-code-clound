@@ -1,117 +1,105 @@
 <template>
-  <div
-    class="canvas-field"
-    :class="[
-      widthClass[field.width] || 'is-w-full',
-      {
-        'is-selected': selected,
-        'is-dragging': dragging,
-        'is-drag-over': dragOver,
-      },
-    ]"
-    draggable="true"
-    @click="$emit('select')"
-    @dragstart="$emit('dragstart', $event)"
-    @dragover.prevent="$emit('dragover')"
-    @drop.prevent.stop="$emit('drop', $event)"
-    @dragend="$emit('dragend')"
-  >
-    <div v-if="selected" class="canvas-field-actions">
-      <el-button-group>
-        <el-button size="small" :icon="CopyDocument" @click.stop="$emit('copy')" />
-        <el-button size="small" :icon="Delete" @click.stop="$emit('remove')" />
-      </el-button-group>
-    </div>
-    <!-- el-divider 会自己显示title，不需要再添加标题  -->
-     <!-- 其余的组件标题都显示到上面 -->
-      <!-- 左右布局需要设置合理的 label width ，暂时不支持-->
-    <span v-if="field.type !== 'divider'" class="canvas-field-title">
-      <span v-if="field.required" class="canvas-field-required">*</span>
-      <span class="canvas-field-title-text">{{ field.title }}</span>
+  <div class="fill-field" :class="widthClass[field.width] || 'is-w-full'">
+    <span v-if="field.type !== 'divider'" class="fill-field-title">
+      <span v-if="field.required" class="fill-field-required">*</span>
+      <span class="fill-field-title-text">{{ field.title }}</span>
       <el-tooltip
         v-if="field.description?.trim()"
         :content="field.description"
         placement="top"
       >
-        <el-icon class="canvas-field-info" @click.stop>
+        <el-icon class="fill-field-info">
           <InfoFilled />
         </el-icon>
       </el-tooltip>
     </span>
     <el-input
       v-if="field.type === 'input'"
-      disabled
+      :model-value="modelValue"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
+      @update:model-value="$emit('update:modelValue', $event)"
     />
     <el-input-number
       v-else-if="field.type === 'number'"
-      disabled
-      class="canvas-full"
+      class="fill-full"
+      :model-value="modelValue"
       :controls="false"
       :precision="field.precision"
       :min="field.rangeEnabled ? field.min : undefined"
       :max="field.rangeEnabled ? field.max : undefined"
       :placeholder="field.placeholder"
+      @update:model-value="$emit('update:modelValue', $event)"
     />
     <el-input
       v-else-if="field.type === 'textarea'"
       type="textarea"
-      disabled
       :rows="3"
+      :model-value="modelValue"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
+      @update:model-value="$emit('update:modelValue', $event)"
     />
     <div
       v-else-if="(field.type === 'radio' || field.type === 'checkbox') && !field.dictCode"
-      class="canvas-field-hint"
+      class="fill-field-hint"
     >
       请配置选项字典
     </div>
-    <el-radio-group v-else-if="field.type === 'radio'" disabled>
+    <el-radio-group
+      v-else-if="field.type === 'radio'"
+      :model-value="modelValue"
+      @update:model-value="$emit('update:modelValue', $event)"
+    >
       <el-radio v-for="item in items" :key="item.value" :value="item.value">
         {{ item.label }}
       </el-radio>
     </el-radio-group>
-    <el-checkbox-group v-else-if="field.type === 'checkbox'" disabled>
+    <el-checkbox-group
+      v-else-if="field.type === 'checkbox'"
+      :model-value="modelValue"
+      @update:model-value="$emit('update:modelValue', $event)"
+    >
       <el-checkbox v-for="item in items" :key="item.value" :value="item.value">
         {{ item.label }}
       </el-checkbox>
     </el-checkbox-group>
     <el-date-picker
       v-else-if="field.type === 'date'"
-      disabled
-      class="canvas-full"
+      class="fill-full"
+      :model-value="modelValue"
       :type="field.format || 'date'"
       :placeholder="field.placeholder || '请选择'"
+      @update:model-value="$emit('update:modelValue', $event)"
     />
     <el-time-picker
       v-else-if="field.type === 'time'"
-      disabled
-      class="canvas-full"
+      class="fill-full"
+      :model-value="modelValue"
       :format="field.format || 'HH:mm:ss'"
+      :value-format="field.format || 'HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
+      @update:model-value="$emit('update:modelValue', $event)"
     />
     <el-date-picker
       v-else-if="field.type === 'datetime'"
-      disabled
-      class="canvas-full"
+      class="fill-full"
       type="datetime"
+      :model-value="modelValue"
       :format="field.format || 'YYYY-MM-DD HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
+      @update:model-value="$emit('update:modelValue', $event)"
     />
-    <div
-      v-else-if="needsOptionSourceHint"
-      class="canvas-field-hint"
-    >
+    <div v-else-if="needsOptionSourceHint" class="fill-field-hint">
       请配置选项来源
     </div>
     <el-select
       v-else-if="field.type === 'select' || field.type === 'select-multiple'"
-      disabled
-      class="canvas-full"
+      class="fill-full"
       :multiple="field.type === 'select-multiple'"
+      :model-value="modelValue"
       :placeholder="field.placeholder"
+      @update:model-value="$emit('update:modelValue', $event)"
     >
       <el-option
         v-for="item in items"
@@ -128,7 +116,7 @@
         field.type === 'relate'
       "
       disabled
-      class="canvas-full"
+      class="fill-full"
       :placeholder="field.placeholder"
     />
     <el-divider v-else-if="field.type === 'divider'">
@@ -150,24 +138,22 @@
     >
       <el-button disabled :icon="Upload" />
     </el-upload>
-    <div v-else-if="field.type === 'subform'" class="canvas-subform" />
+    <div v-else-if="field.type === 'subform'" class="fill-subform" />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { CopyDocument, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
-import { isSelectType, widthClass } from './fieldTypes'
+import { InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
+import { isSelectType, widthClass } from '../form-design/fieldTypes'
 
 const props = defineProps({
   field: { type: Object, required: true },
   items: { type: Array, default: () => [] },
-  selected: { type: Boolean, default: false },
-  dragging: { type: Boolean, default: false },
-  dragOver: { type: Boolean, default: false },
+  modelValue: { default: undefined },
 })
 
-defineEmits(['select', 'copy', 'remove', 'dragstart', 'dragover', 'drop', 'dragend'])
+defineEmits(['update:modelValue'])
 
 const needsOptionSourceHint = computed(() => {
   const field = props.field
@@ -183,97 +169,64 @@ const needsOptionSourceHint = computed(() => {
 </script>
 
 <style scoped lang="less">
-.canvas-field {
-  position: relative;
+.fill-field {
   box-sizing: border-box;
   min-width: 0;
   padding: 6px 12px;
-  cursor: grab;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  user-select: none;
 }
 
-.canvas-field.is-w-full {
+.fill-field.is-w-full {
   grid-column: span 12;
 }
 
-.canvas-field.is-w-half {
+.fill-field.is-w-half {
   grid-column: span 6;
 }
 
-.canvas-field.is-w-third {
+.fill-field.is-w-third {
   grid-column: span 4;
 }
 
-.canvas-field.is-w-two-thirds {
+.fill-field.is-w-two-thirds {
   grid-column: span 8;
 }
 
-.canvas-field.is-w-quarter {
+.fill-field.is-w-quarter {
   grid-column: span 3;
 }
 
-.canvas-field.is-w-three-quarters {
+.fill-field.is-w-three-quarters {
   grid-column: span 9;
 }
 
-.canvas-field:hover {
-  background: var(--el-fill-color-light);
-  border-color: var(--el-color-primary-light-5);
-}
-
-.canvas-field.is-selected {
-  background: var(--el-color-primary-light-9);
-  border-color: var(--el-color-primary);
-}
-
-.canvas-field.is-dragging {
-  opacity: 0.4;
-}
-
-.canvas-field.is-drag-over {
-  border: 1px solid var(--el-color-primary);
-}
-
-.canvas-field-actions {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-}
-
-.canvas-field-title {
+.fill-field-title {
   display: flex;
   align-items: center;
   margin-bottom: 8px;
 }
 
-.canvas-field-title-text {
-  min-width: 0;
-}
-
-.canvas-field-required {
+.fill-field-required {
   margin-right: 4px;
   color: var(--el-color-danger);
 }
 
-.canvas-field-info {
+.fill-field-info {
   margin-left: 8px;
   color: var(--el-text-color-secondary);
   cursor: help;
 }
 
-.canvas-field-hint {
+.fill-field-hint {
   color: var(--el-text-color-placeholder);
   font-size: 13px;
   line-height: 32px;
 }
 
-.canvas-full {
+.fill-full {
   width: 100%;
 }
 
-.canvas-subform {
+.fill-subform {
   min-height: 88px;
   border: 1px dashed var(--el-border-color);
   border-radius: 4px;
