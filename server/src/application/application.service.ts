@@ -263,10 +263,10 @@ export class ApplicationService {
     const form = await this.requireForm(appId, formId);
     await this.formRepo.remove(form);
     try {
-      await this.formRecordStore.dropFormCollection(form.id);
+      await this.formRecordStore.dropFormCollection(formId);
     } catch (err) {
       this.logger.error(
-        `drop form collection failed formId=${form.id}`,
+        `drop form collection failed formId=${formId}`,
         err instanceof Error ? err.stack : String(err),
       );
     }

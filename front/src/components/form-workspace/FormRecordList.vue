@@ -98,6 +98,8 @@ const selectedRecords = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+// 切换表单时作废进行中的请求，避免把上一张表的记录写进来
+const loadSession = ref(0)
 
 const tableFields = computed(() => props.fields.filter(isFillable))
 const fieldByKey = computed(() =>
@@ -125,6 +127,7 @@ function onRecordRowClick(row, _column, event) {
 }
 
 async function loadRecords() {
+  const session = loadSession.value
   if (!props.form?.id || !props.appId) {
     records.value = []
     total.value = 0
@@ -136,13 +139,17 @@ async function loadRecords() {
       page: page.value,
       pageSize: pageSize.value,
     })
+    if (session !== loadSession.value) return
     records.value = result?.items || []
     total.value = result?.total || 0
   } catch {
+    if (session !== loadSession.value) return
     records.value = []
     total.value = 0
   } finally {
-    listLoading.value = false
+    if (session === loadSession.value) {
+      listLoading.value = false
+    }
   }
 }
 
@@ -205,8 +212,11 @@ function upsertRecord(updated) {
 watch(
   () => [props.appId, props.form?.id],
   () => {
+    loadSession.value += 1
     page.value = 1
     selectedRecords.value = []
+    records.value = []
+    total.value = 0
     loadRecords()
   },
   { immediate: true },

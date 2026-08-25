@@ -67,6 +67,8 @@ const dictItemsByCode = ref({})
 const createVisible = ref(false)
 const detailVisible = ref(false)
 const detailRecord = ref(null)
+// 切换表单时作废进行中的请求，避免把上一张表的字段写进来
+const loadSession = ref(0)
 
 function resetValues() {
   for (const key of Object.keys(values)) {
@@ -93,6 +95,7 @@ const dictCodes = computed(() => {
 })
 
 async function loadSchema() {
+  const session = loadSession.value
   if (!props.appId || !props.formId) {
     form.value = null
     fields.value = []
@@ -102,19 +105,24 @@ async function loadSchema() {
   schemaLoading.value = true
   try {
     const detail = await getFormApi(props.appId, props.formId)
+    if (session !== loadSession.value) return
     form.value = detail
     fields.value = Array.isArray(detail?.fields) ? detail.fields : []
     resetValues()
   } catch {
+    if (session !== loadSession.value) return
     form.value = null
     fields.value = []
     resetValues()
   } finally {
-    schemaLoading.value = false
+    if (session === loadSession.value) {
+      schemaLoading.value = false
+    }
   }
 }
 
 async function loadDictItems() {
+  const session = loadSession.value
   const codes = dictCodes.value
   if (!codes.length || !props.appId) {
     dictItemsByCode.value = {}
@@ -122,10 +130,12 @@ async function loadDictItems() {
   }
   try {
     const rows = (await listDictionaryItemsByCodesApi(props.appId, codes)) || []
+    if (session !== loadSession.value) return
     dictItemsByCode.value = Object.fromEntries(
       rows.map((row) => [row.code, row.items || []]),
     )
   } catch {
+    if (session !== loadSession.value) return
     dictItemsByCode.value = {}
   }
 }
@@ -175,6 +185,7 @@ async function onCreate() {
 watch(
   () => [props.appId, props.formId],
   () => {
+    loadSession.value += 1
     createVisible.value = false
     detailVisible.value = false
     detailRecord.value = null
