@@ -37,6 +37,14 @@ const ICON_COLORS = [
   '#F25C54',
 ];
 
+type OptionField = {
+  key: string;
+  title: string;
+  type: string;
+  dictCode?: string;
+  optionSource?: string;
+};
+
 @Injectable()
 export class ApplicationService {
   private readonly logger = new Logger(ApplicationService.name);
@@ -120,9 +128,7 @@ export class ApplicationService {
     ownerId: number,
     appId: number,
     excludeFormId?: number,
-  ): Promise<
-    { id: number; name: string; fields: { key: string; title: string; type: string }[] }[]
-  > {
+  ): Promise<{ id: number; name: string; fields: OptionField[] }[]> {
     await this.requireOwnedApp(ownerId, appId);
     const forms = await this.formRepo.find({
       where: { applicationId: appId },
@@ -133,11 +139,7 @@ export class ApplicationService {
         ? excludeFormId
         : undefined;
 
-    const result: {
-      id: number;
-      name: string;
-      fields: { key: string; title: string; type: string }[];
-    }[] = [];
+    const result: { id: number; name: string; fields: OptionField[] }[] = [];
     for (const form of forms) {
       if (exclude != null && form.id === exclude) {
         continue;
@@ -331,11 +333,11 @@ export class ApplicationService {
 
   private toOptionFields(
     raw: Record<string, unknown>[] | null,
-  ): { key: string; title: string; type: string }[] {
+  ): OptionField[] {
     if (!Array.isArray(raw)) {
       return [];
     }
-    const fields: { key: string; title: string; type: string }[] = [];
+    const fields: OptionField[] = [];
     for (const item of raw) {
       if (!item || typeof item !== 'object') {
         continue;
@@ -345,11 +347,18 @@ export class ApplicationService {
       if (!key || !OPTION_FIELD_TYPES.has(type)) {
         continue;
       }
-      fields.push({
+      const next: OptionField = {
         key,
         title: typeof item.title === 'string' ? item.title : '',
         type,
-      });
+      };
+      if (item.dictCode != null && item.dictCode !== '') {
+        next.dictCode = String(item.dictCode);
+      }
+      if (typeof item.optionSource === 'string' && item.optionSource) {
+        next.optionSource = item.optionSource;
+      }
+      fields.push(next);
     }
     return fields;
   }

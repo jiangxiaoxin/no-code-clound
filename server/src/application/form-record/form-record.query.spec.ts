@@ -1,5 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
-import { buildRecordQuery } from './form-record.query';
+import {
+  buildRecordQuery,
+  dictCodesForFilters,
+  mapDictFilterValue,
+  rewriteDictFilterValues,
+} from './form-record.query';
 
 const fields = [
   { key: 'name', type: 'input' },
@@ -123,5 +128,66 @@ describe('buildRecordQuery', () => {
         filters: [{ key: 'age', op: 'eq', value: '18' }],
       }).filter,
     ).toEqual({ 'data.age': 18 });
+  });
+});
+
+describe('rewriteDictFilterValues', () => {
+  const dictFields = [
+    { key: 'status', type: 'radio', dictCode: '11' },
+    { key: 'name', type: 'input' },
+  ];
+  const itemsByCode = new Map([
+    [
+      '11',
+      [
+        { label: '启用', value: '1' },
+        { label: '停用', value: '2' },
+      ],
+    ],
+  ]);
+
+  it('maps dictionary labels to stored values for eq and ne', () => {
+    expect(mapDictFilterValue('启用', itemsByCode.get('11') ?? [])).toBe('1');
+    expect(mapDictFilterValue('1', itemsByCode.get('11') ?? [])).toBe('1');
+    expect(
+      rewriteDictFilterValues(
+        dictFields,
+        [
+          { key: 'status', op: 'eq', value: '启用' },
+          { key: 'status', op: 'ne', value: '停用' },
+          { key: 'name', op: 'eq', value: '青岛' },
+        ],
+        itemsByCode,
+      ),
+    ).toEqual([
+      { key: 'status', op: 'eq', value: '1' },
+      { key: 'status', op: 'ne', value: '2' },
+      { key: 'name', op: 'eq', value: '青岛' },
+    ]);
+  });
+
+  it('maps in-list labels and leaves contains unchanged', () => {
+    expect(
+      rewriteDictFilterValues(
+        dictFields,
+        [
+          { key: 'status', op: 'in', value: ['启用', '2'] },
+          { key: 'status', op: 'contains', value: '启用' },
+        ],
+        itemsByCode,
+      ),
+    ).toEqual([
+      { key: 'status', op: 'in', value: ['1', '2'] },
+      { key: 'status', op: 'contains', value: '启用' },
+    ]);
+  });
+
+  it('collects dict codes used by value filters', () => {
+    expect(
+      dictCodesForFilters(dictFields, [
+        { key: 'status', op: 'eq', value: '启用' },
+        { key: 'name', op: 'eq', value: '青岛' },
+      ]),
+    ).toEqual(['11']);
   });
 });

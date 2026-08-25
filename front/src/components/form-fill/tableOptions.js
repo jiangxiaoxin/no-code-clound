@@ -24,13 +24,26 @@ export function buildSourceQuery(optionFilters, values) {
 export function recordsToSelectItems(records, fieldKey) {
   const seen = new Set()
   const items = []
-  for (const row of records || []) {
-    const value = row?.data?.[fieldKey]
-    if (value == null || value === '' || Array.isArray(value) || seen.has(value)) {
-      continue
+  function add(value) {
+    if (value == null || value === '') {
+      return
     }
-    seen.add(value)
-    items.push({ label: String(value), value })
+    if (Array.isArray(value)) {
+      value.forEach(add)
+      return
+    }
+    if (typeof value === 'object') {
+      return
+    }
+    const next = typeof value === 'string' ? value : String(value)
+    if (seen.has(next)) {
+      return
+    }
+    seen.add(next)
+    items.push({ label: next, value: next })
+  }
+  for (const row of records || []) {
+    add(row?.data?.[fieldKey])
   }
   return items
 }

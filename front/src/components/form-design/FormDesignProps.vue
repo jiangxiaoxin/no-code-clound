@@ -144,6 +144,7 @@
       </template>
       <FormOptionFilterDialog
         v-model="filterVisible"
+        :app-id="appId"
         :option-filters="field.optionFilters"
         :source-fields="sourceFields"
         :form-fields="formFields"
@@ -254,7 +255,9 @@ async function loadSourceFields() {
     const forms =
       (await listFormFieldsApi(props.appId, { excludeFormId: props.formId })) ||
       []
-    const form = forms.find((item) => item.id === props.field.sourceFormId)
+    const form = forms.find(
+      (item) => Number(item.id) === Number(props.field.sourceFormId),
+    )
     sourceFields.value = form?.fields || []
   } catch {
     sourceFields.value = []

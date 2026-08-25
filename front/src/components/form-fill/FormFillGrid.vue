@@ -30,11 +30,16 @@ const props = defineProps({
 const tableItemsByKey = ref({})
 let loadSeq = 0
 
+function resolveSourceFormId(field) {
+  const n = Number(field.sourceFormId)
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
+
 function isTableSelect(field) {
   return (
     isSelectType(field.type) &&
     field.optionSource === 'table_data' &&
-    field.sourceFormId &&
+    resolveSourceFormId(field) &&
     field.sourceFieldKey
   )
 }
@@ -51,7 +56,7 @@ const loadKey = computed(() =>
         )
       return [
         field.key,
-        field.sourceFormId,
+        resolveSourceFormId(field),
         field.sourceFieldKey,
         field.optionFilters?.match,
         JSON.stringify(field.optionFilters?.conditions || []),
@@ -82,7 +87,7 @@ watch(
         try {
           const result = await queryFormRecordsApi(
             props.appId,
-            field.sourceFormId,
+            resolveSourceFormId(field),
             buildSourceQuery(field.optionFilters, props.values),
           )
           next[field.key] = recordsToSelectItems(

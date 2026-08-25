@@ -73,7 +73,9 @@ const displayText = computed(() => {
   if (!props.sourceFormId || !props.sourceFieldKey) {
     return ''
   }
-  const form = forms.value.find((item) => item.id === props.sourceFormId)
+  const form = forms.value.find(
+    (item) => Number(item.id) === Number(props.sourceFormId),
+  )
   const field = form?.fields.find((item) => item.key === props.sourceFieldKey)
   if (form && field) {
     return `${form.name} / ${field.title || field.key}`
@@ -104,9 +106,12 @@ const treeData = computed(() => {
 async function loadForms() {
   loadError.value = false
   try {
-    forms.value = (await listFormFieldsApi(props.appId, {
+    const rows = (await listFormFieldsApi(props.appId, {
       excludeFormId: props.formId,
     })) || []
+    forms.value = rows.filter(
+      (form) => Number(form.id) !== Number(props.formId),
+    )
   } catch {
     forms.value = []
     loadError.value = true

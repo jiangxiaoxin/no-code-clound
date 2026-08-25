@@ -3,4 +3,5 @@ export type FormField = {
   type: string;
   title?: string;
   unique?: boolean;
+  dictCode?: string;
 };

@@ -4,6 +4,7 @@
     title="添加过滤条件"
     width="720px"
     align-center
+    draggable
     destroy-on-close
     @update:model-value="$emit('update:modelValue', $event)"
     class="my-dialog"
@@ -68,6 +69,20 @@
               :value="field.key"
             />
           </el-select>
+          <el-select
+            v-else-if="dictItemsFor(item).length"
+            v-model="item.value"
+            size="small"
+            placeholder="请选择"
+            clearable
+          >
+            <el-option
+              v-for="opt in dictItemsFor(item)"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
           <el-input
             v-else
             v-model="item.value"
@@ -93,18 +108,22 @@
 </template>
 
 <script setup>
-import { reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { Delete, EditPen, Plus, Tickets } from '@element-plus/icons-vue'
+import { listDictionaryItemsByCodesApi } from '../../api/apps'
 import {
   FILTER_MATCH_OPTIONS,
   FILTER_OPS,
   cloneOptionFilters,
   emptyCondition,
+  mapDictFilterValue,
   needsFilterValue,
+  sourceFieldDictCode,
 } from './optionFilters'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
+  appId: { type: Number, default: 0 },
   optionFilters: { type: Object, default: null },
   sourceFields: { type: Array, default: () => [] },
   formFields: { type: Array, default: () => [] },
@@ -113,6 +132,51 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'confirm'])
 
 const draft = reactive(cloneOptionFilters(null))
+const dictItemsByCode = ref({})
+let loadSeq = 0
+
+function dictItemsFor(item) {
+  if (item.valueType !== 'custom') return []
+  const field = props.sourceFields.find((field) => field.key === item.key)
+  return dictItemsByCode.value[sourceFieldDictCode(field)] || []
+}
+
+function normalizeDraftValues() {
+  for (const item of draft.conditions) {
+    if (item.valueType !== 'custom') continue
+    item.value = mapDictFilterValue(item.value, dictItemsFor(item))
+  }
+}
+
+async function loadDictItems() {
+  const seq = ++loadSeq
+  const codes = []
+  const seen = new Set()
+  for (const field of props.sourceFields) {
+    const code = sourceFieldDictCode(field)
+    if (!code || seen.has(code)) continue
+    seen.add(code)
+    codes.push(code)
+  }
+  if (!props.appId || !codes.length) {
+    dictItemsByCode.value = {}
+    return
+  }
+  try {
+    const rows = (await listDictionaryItemsByCodesApi(props.appId, codes)) || []
+    if (seq !== loadSeq) return
+    const next = {}
+    for (const row of rows) {
+      next[row.code] = row.items || []
+    }
+    dictItemsByCode.value = next
+    normalizeDraftValues()
+  } catch {
+    if (seq === loadSeq) {
+      dictItemsByCode.value = {}
+    }
+  }
+}
 
 watch(
   () => props.modelValue,
@@ -123,6 +187,14 @@ watch(
     draft.conditions = next.conditions.length
       ? next.conditions
       : [emptyCondition()]
+    loadDictItems()
+  },
+)
+
+watch(
+  () => [props.appId, props.sourceFields],
+  () => {
+    if (props.modelValue) loadDictItems()
   },
 )
 

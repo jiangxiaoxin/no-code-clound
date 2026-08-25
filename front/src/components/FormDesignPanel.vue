@@ -53,6 +53,7 @@ import FormDesignCanvas from './form-design/FormDesignCanvas.vue'
 import FormDesignProps from './form-design/FormDesignProps.vue'
 import { listDictionaryItemsByCodesApi, saveFormFieldsApi } from '../api/apps'
 import { defaultWidthByColumns, isSelectType } from './form-design/fieldTypes'
+import { cloneOptionFilters } from './form-design/optionFilters'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -158,6 +159,9 @@ function copyField(field) {
   const copied = {
     ...field,
     key: nextKey(),
+  }
+  if (field.optionFilters) {
+    copied.optionFilters = cloneOptionFilters(field.optionFilters)
   }
   const index = fields.value.findIndex((item) => item.key === field.key)
   fields.value.splice(index + 1, 0, copied)

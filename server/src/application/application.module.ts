@@ -13,6 +13,7 @@ import { DictionaryService } from './dictionary/dictionary.service';
 import { FormRecordController } from './form-record/form-record.controller';
 import { FormRecordService } from './form-record/form-record.service';
 import { FormRecordStore } from './form-record/form-record.store';
+import { User } from '../user/user.entity';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FormRecordStore } from './form-record/form-record.store';
       AppForm,
       Dictionary,
       DictionaryItem,
+      User,
     ]),
     AuthModule,
   ],

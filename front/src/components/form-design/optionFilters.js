@@ -42,3 +42,16 @@ export function hasOptionFilters(raw) {
 export function needsFilterValue(op) {
   return op !== 'empty' && op !== 'nempty'
 }
+
+export function sourceFieldDictCode(field) {
+  if (!field || field.optionSource === 'table_data') return ''
+  if (field.dictCode == null || field.dictCode === '') return ''
+  return String(field.dictCode)
+}
+
+export function mapDictFilterValue(value, items) {
+  if (typeof value !== 'string' || !items?.length) return value
+  if (items.some((item) => item.value === value)) return value
+  const found = items.find((item) => item.label === value)
+  return found ? found.value : value
+}

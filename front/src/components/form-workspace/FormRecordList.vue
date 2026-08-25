@@ -45,6 +45,12 @@
               <template v-else-if="col.key === UPDATED_AT_KEY">
                 {{ formatTime(row.updatedAt) }}
               </template>
+              <template v-else-if="col.key === CREATED_BY_KEY">
+                {{ row.createdByName }}
+              </template>
+              <template v-else-if="col.key === UPDATED_BY_KEY">
+                {{ row.updatedByName }}
+              </template>
               <template v-else>
                 {{ formatCellValue(fieldByKey[col.key], row.data?.[col.key], dictItemsByCode) }}
               </template>
@@ -78,6 +84,8 @@ import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
 import {
   CREATED_AT_KEY,
   UPDATED_AT_KEY,
+  CREATED_BY_KEY,
+  UPDATED_BY_KEY,
   normalizeColWidth,
   useColumnPrefs,
 } from './columnPrefs'

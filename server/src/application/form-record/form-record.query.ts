@@ -21,6 +21,66 @@ const STRING_CONTAINS_TYPES = new Set([
   'date',
 ]);
 const RANGE_TYPES = new Set(['number', 'date', 'datetime']);
+const DICT_VALUE_OPS = new Set(['eq', 'ne', 'in']);
+
+type DictItem = { label: string; value: string };
+
+function fieldDictCode(field: FormField | undefined): string {
+  if (field?.dictCode == null || field.dictCode === '') return '';
+  return String(field.dictCode).trim();
+}
+
+export function mapDictFilterValue(
+  value: unknown,
+  items: DictItem[],
+): unknown {
+  if (typeof value !== 'string' || !items.length) return value;
+  if (items.some((item) => item.value === value)) return value;
+  const found = items.find((item) => item.label === value);
+  return found ? found.value : value;
+}
+
+export function dictCodesForFilters(
+  fields: FormField[] | null | undefined,
+  filters: RecordFilter[] | undefined,
+): string[] {
+  const codes: string[] = [];
+  const seen = new Set<string>();
+  for (const item of filters ?? []) {
+    if (!DICT_VALUE_OPS.has(item.op)) continue;
+    const code = fieldDictCode(
+      (fields ?? []).find((field) => field.key === item.key),
+    );
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    codes.push(code);
+  }
+  return codes;
+}
+
+export function rewriteDictFilterValues(
+  fields: FormField[] | null | undefined,
+  filters: RecordFilter[] | undefined,
+  itemsByCode: Map<string, DictItem[]>,
+): RecordFilter[] | undefined {
+  if (!filters) return filters;
+  return filters.map((item) => {
+    if (!DICT_VALUE_OPS.has(item.op)) return item;
+    const code = fieldDictCode(
+      (fields ?? []).find((field) => field.key === item.key),
+    );
+    if (!code) return item;
+    const items = itemsByCode.get(code) ?? [];
+    if (item.op === 'in') {
+      if (!Array.isArray(item.value)) return item;
+      return {
+        ...item,
+        value: item.value.map((value) => mapDictFilterValue(value, items)),
+      };
+    }
+    return { ...item, value: mapDictFilterValue(item.value, items) };
+  });
+}
 
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

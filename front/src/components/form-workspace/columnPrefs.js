@@ -3,6 +3,8 @@ import { useUserStore } from '../../stores/user'
 
 export const CREATED_AT_KEY = '__createdAt'
 export const UPDATED_AT_KEY = '__updatedAt'
+export const CREATED_BY_KEY = '__createdBy'
+export const UPDATED_BY_KEY = '__updatedBy'
 export const DEFAULT_COL_WIDTH = 100
 
 export function normalizeColWidth(value) {
@@ -82,8 +84,22 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
         minWidth: DEFAULT_COL_WIDTH,
       })),
       {
+        key: CREATED_BY_KEY,
+        title: '创建人',
+        visible: true,
+        fixed: '',
+        minWidth: DEFAULT_COL_WIDTH,
+      },
+      {
         key: CREATED_AT_KEY,
         title: '创建时间',
+        visible: true,
+        fixed: '',
+        minWidth: DEFAULT_COL_WIDTH,
+      },
+      {
+        key: UPDATED_BY_KEY,
+        title: '更新人',
         visible: true,
         fixed: '',
         minWidth: DEFAULT_COL_WIDTH,

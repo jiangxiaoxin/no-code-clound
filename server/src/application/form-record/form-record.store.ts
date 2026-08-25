@@ -15,6 +15,7 @@ export type FormRecordDoc = {
   formId: number;
   createdBy: number;
   createdAt: Date;
+  updatedBy: number;
   updatedAt: Date;
   data: Record<string, unknown>;
 };
@@ -112,12 +113,13 @@ export class FormRecordStore {
     formId: number,
     id: string,
     data: Record<string, unknown>,
+    updatedBy: number,
   ): Promise<FormRecordDoc | null> {
     const objectId = this.parseId(id);
     if (!objectId) return null;
     return this.col(formId).findOneAndUpdate(
       { _id: objectId },
-      { $set: { data, updatedAt: new Date() } },
+      { $set: { data, updatedBy, updatedAt: new Date() } },
       { returnDocument: 'after' },
     );
   }

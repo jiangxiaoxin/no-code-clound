@@ -592,6 +592,7 @@ describe('ApplicationService', () => {
               { key: 'd1', title: '分割', type: 'divider' },
               { key: 'm1', title: '负责人', type: 'member' },
               { key: 'x1', type: 'number' },
+              { key: 's1', title: '状态', type: 'radio', dictCode: '11' },
             ],
           },
         },
@@ -625,6 +626,7 @@ describe('ApplicationService', () => {
           fields: [
             { key: 'n1', title: '客户名称', type: 'input' },
             { key: 'x1', title: '', type: 'number' },
+            { key: 's1', title: '状态', type: 'radio', dictCode: '11' },
           ],
         },
       ]);
