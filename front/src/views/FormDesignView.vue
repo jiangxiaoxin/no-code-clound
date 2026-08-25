@@ -9,21 +9,21 @@
         <span
           class="form-tab"
           :class="{ 'is-active': page === 'design' }"
-          @click="page = 'design'"
+          @click="setPage('design')"
         >
           表单设计
         </span>
         <span
           class="form-tab"
           :class="{ 'is-active': page === 'records' }"
-          @click="page = 'records'"
+          @click="setPage('records')"
         >
           数据管理
         </span>
         <span
           class="form-tab"
           :class="{ 'is-active': page === 'publish' }"
-          @click="page = 'publish'"
+          @click="setPage('publish')"
         >
           表单发布
         </span>
@@ -61,11 +61,26 @@ import FormRecordManage from '../components/form-workspace/FormRecordManage.vue'
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
-const page = ref('design')
 const form = ref(null)
 
 const appId = computed(() => Number(route.params.id))
 const formId = computed(() => Number(route.params.formId))
+
+const PAGE_TABS = new Set(['design', 'records', 'publish'])
+const page = computed(() => {
+  const tab = route.query.tab
+  return PAGE_TABS.has(tab) ? tab : 'design'
+})
+
+function setPage(tab) {
+  const next = PAGE_TABS.has(tab) ? tab : 'design'
+  if (page.value === next) return
+  router.replace({
+    name: 'form-design',
+    params: { id: appId.value, formId: formId.value },
+    query: next === 'design' ? {} : { tab: next },
+  })
+}
 
 function goBack() {
   router.push({
@@ -94,7 +109,6 @@ async function loadForm() {
   loading.value = true
   try {
     form.value = await getFormApi(appId.value, formId.value)
-    page.value = 'design'
   } catch (error) {
     if (error.response?.status !== 401) {
       router.replace({ name: 'app-workspace', params: { id: appId.value } })
