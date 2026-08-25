@@ -37,6 +37,7 @@
       :form-id="formId"
       :initial-fields="Array.isArray(form.fields) ? form.fields : []"
       :initial-columns="form.columns"
+      @saved="onSaved"
     />
     <el-main
       v-else-if="!loading && page === 'records'"
@@ -71,6 +72,12 @@ function goBack() {
     name: 'app-workspace-form',
     params: { id: appId.value, formId: formId.value },
   })
+}
+
+function onSaved(detail) {
+  if (detail) {
+    form.value = detail
+  }
 }
 
 async function loadForm() {

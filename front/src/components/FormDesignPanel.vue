@@ -62,6 +62,8 @@ const props = defineProps({
   initialColumns: { type: Number, default: 1 },
 })
 
+const emit = defineEmits(['saved'])
+
 const propTab = ref('field')
 const previewVisible = ref(false)
 const columns = ref(1)
@@ -246,11 +248,12 @@ async function clearFields() {
 
 async function saveFields() {
   try {
-    await saveFormFieldsApi(props.appId, props.formId, {
+    const saved = await saveFormFieldsApi(props.appId, props.formId, {
       fields: fields.value,
       columns: columns.value,
     })
     ElMessage.success('保存成功')
+    emit('saved', saved)
   } catch {
     return
   }
@@ -269,7 +272,7 @@ function cloneFields(value) {
 }
 
 watch(
-  () => [props.initialFields, props.initialColumns],
+  () => [props.appId, props.formId],
   () => {
     fields.value = cloneFields(props.initialFields)
     columns.value =
