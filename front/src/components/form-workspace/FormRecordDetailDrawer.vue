@@ -10,6 +10,7 @@
   >
     <div v-if="record" class="fill-drawer-body">
       <FormFillGrid
+        :app-id="appId"
         :fields="fields"
         :values="detailValues"
         :dict-items-by-code="dictItemsByCode"

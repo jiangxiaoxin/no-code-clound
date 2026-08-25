@@ -6,6 +6,7 @@ export type RecordFilter = { key: string; op: string; value: unknown };
 export type RecordSort = { key: string; order?: string };
 export type RecordQueryBody = {
   filters?: RecordFilter[];
+  match?: 'all' | 'any';
   sort?: RecordSort;
   page?: number;
   pageSize?: number;
@@ -34,6 +35,7 @@ function resolvePath(
   fields: FormField[] | null | undefined,
 ): { path: string; type: string } {
   if (key === 'createdAt') return { path: 'createdAt', type: 'createdAt' };
+  if (key === 'updatedAt') return { path: 'updatedAt', type: 'updatedAt' };
   if (key === 'createdBy') return { path: 'createdBy', type: 'createdBy' };
   const field = (fields ?? []).find((item) => item.key === key);
   if (!field || !FILTERABLE_TYPES.has(field.type)) unsupported();
@@ -41,6 +43,10 @@ function resolvePath(
 }
 
 function asDateIfNeeded(type: string, value: unknown): unknown {
+  if (type === 'number' && typeof value === 'string' && value !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
   if (
     (type === 'datetime' || type === 'createdAt') &&
     typeof value === 'string'
@@ -50,6 +56,29 @@ function asDateIfNeeded(type: string, value: unknown): unknown {
     return date;
   }
   return value;
+}
+
+function emptyClause(path: string): Record<string, unknown> {
+  return {
+    $or: [
+      { [path]: { $exists: false } },
+      { [path]: null },
+      { [path]: '' },
+      { [path]: [] },
+    ],
+  };
+}
+
+function containsClause(
+  type: string,
+  path: string,
+  value: unknown,
+): Record<string, unknown> {
+  if (type === 'createdAt' || type === 'createdBy') unsupported();
+  if (!STRING_CONTAINS_TYPES.has(type) || typeof value !== 'string') {
+    unsupported();
+  }
+  return { [path]: { $regex: escapeRegex(value), $options: 'i' } };
 }
 
 function buildClause(
@@ -67,18 +96,30 @@ function buildClause(
     const items = value.map((item) => asDateIfNeeded(type, item));
     return { [path]: { $in: items } };
   }
-  if (op === 'contains') {
-    if (type === 'createdAt' || type === 'createdBy') unsupported();
-    if (!STRING_CONTAINS_TYPES.has(type) || typeof value !== 'string') {
-      unsupported();
-    }
-    return { [path]: { $regex: escapeRegex(value), $options: 'i' } };
+  if (op === 'contains') return containsClause(type, path, value);
+  if (op === 'ncontains') {
+    const clause = containsClause(type, path, value);
+    const regex = (clause[path] as { $regex: string; $options: string });
+    return { [path]: { $not: regex } };
   }
+  if (op === 'empty') return emptyClause(path);
+  if (op === 'nempty') return { $nor: [emptyClause(path)] };
   if (op === 'gt' || op === 'gte' || op === 'lt' || op === 'lte') {
     if (type !== 'createdAt' && !RANGE_TYPES.has(type)) unsupported();
     return { [path]: { [`$${op}`]: prepared } };
   }
   unsupported();
+}
+
+function combineClauses(
+  clauses: Record<string, unknown>[],
+  match?: string,
+): Record<string, unknown> {
+  if (match && match !== 'all' && match !== 'any') unsupported();
+  if (!clauses.length) return {};
+  if (clauses.length === 1) return clauses[0];
+  if (match === 'any') return { $or: clauses };
+  return Object.assign({}, ...clauses);
 }
 
 export function buildRecordQuery(
@@ -104,16 +145,13 @@ export function buildRecordQuery(
     throw new BadRequestException('分页大小不正确');
   }
 
-  const filter: Record<string, unknown> = {};
-  for (const item of body.filters ?? []) {
+  const clauses = (body.filters ?? []).map((item) => {
     const resolved = resolvePath(item.key, fields);
-    Object.assign(
-      filter,
-      buildClause(resolved.type, resolved.path, item.op, item.value),
-    );
-  }
+    return buildClause(resolved.type, resolved.path, item.op, item.value);
+  });
+  const filter = combineClauses(clauses, body.match);
 
-  const sortKey = body.sort?.key ?? 'createdAt';
+  const sortKey = body.sort?.key ?? 'updatedAt';
   const orderRaw = body.sort?.order ?? 'desc';
   if (orderRaw !== 'asc' && orderRaw !== 'desc') unsupported();
   const resolvedSort = resolvePath(sortKey, fields);

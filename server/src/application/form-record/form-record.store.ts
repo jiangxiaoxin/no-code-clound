@@ -37,6 +37,7 @@ export class FormRecordStore {
   async ensureSystemIndexes(formId: number): Promise<void> {
     const col = this.col(formId);
     await col.createIndex({ createdAt: -1 }, { name: 'idx_createdAt' });
+    await col.createIndex({ updatedAt: -1 }, { name: 'idx_updatedAt' });
     await col.createIndex({ createdBy: 1 }, { name: 'idx_createdBy' });
   }
 

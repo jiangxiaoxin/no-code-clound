@@ -7,6 +7,7 @@ import App from './App.vue'
 import router from './router'
 import { useUserStore } from './stores/user'
 import './style.css'
+import './styles/override-element.less'
 
 async function bootstrap() {
   const app = createApp(App)

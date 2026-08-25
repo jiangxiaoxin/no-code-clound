@@ -3,23 +3,30 @@
     <el-header class="form-bar" height="56px">
       <div class="form-bar-side">
         <el-button :icon="ArrowLeft" text @click="goBack" />
-        <el-text class="form-name" truncated>{{ form?.name || ' ' }}</el-text>
+        <span class="form-name">{{ form?.name || ' ' }}</span>
       </div>
       <div class="form-tabs">
-        <el-text
+        <span
           class="form-tab"
           :class="{ 'is-active': page === 'design' }"
           @click="page = 'design'"
         >
           表单设计
-        </el-text>
-        <el-text
+        </span>
+        <span
+          class="form-tab"
+          :class="{ 'is-active': page === 'records' }"
+          @click="page = 'records'"
+        >
+          数据管理
+        </span>
+        <span
           class="form-tab"
           :class="{ 'is-active': page === 'publish' }"
           @click="page = 'publish'"
         >
           表单发布
-        </el-text>
+        </span>
       </div>
       <div class="form-bar-side" />
     </el-header>
@@ -31,6 +38,12 @@
       :initial-fields="Array.isArray(form.fields) ? form.fields : []"
       :initial-columns="form.columns"
     />
+    <el-main
+      v-else-if="!loading && page === 'records'"
+      class="form-records"
+    >
+      <FormRecordManage :app-id="appId" :form-id="formId" />
+    </el-main>
     <FormPublishPanel v-else-if="!loading && page === 'publish'" />
   </el-container>
 </template>
@@ -42,6 +55,7 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { getFormApi } from '../api/apps'
 import FormDesignPanel from '../components/FormDesignPanel.vue'
 import FormPublishPanel from '../components/FormPublishPanel.vue'
+import FormRecordManage from '../components/form-workspace/FormRecordManage.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -109,8 +123,11 @@ watch([appId, formId], loadForm, { immediate: true })
 }
 
 .form-name {
+  overflow: hidden;
   font-size: 16px;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .form-tabs {
@@ -130,5 +147,13 @@ watch([appId, formId], loadForm, { immediate: true })
 .form-tab.is-active {
   color: var(--el-color-primary);
   border-bottom-color: var(--el-color-primary);
+}
+
+.form-records {
+  display: flex;
+  min-height: 0;
+  padding: 0;
+  flex-direction: column;
+  background: var(--el-bg-color);
 }
 </style>

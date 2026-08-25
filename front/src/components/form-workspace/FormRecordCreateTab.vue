@@ -7,6 +7,7 @@
     <template v-else>
       <div class="fill-scroll">
         <FormFillGrid
+          :app-id="appId"
           :fields="fields"
           :values="values"
           :dict-items-by-code="dictItemsByCode"
@@ -26,6 +27,7 @@
 import FormFillGrid from '../form-fill/FormFillGrid.vue'
 
 defineProps({
+  appId: { type: Number, required: true },
   fields: { type: Array, default: () => [] },
   values: { type: Object, required: true },
   dictItemsByCode: { type: Object, default: () => ({}) },

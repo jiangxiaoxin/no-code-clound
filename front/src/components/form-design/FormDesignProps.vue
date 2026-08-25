@@ -132,7 +132,23 @@
             @select="onSourceFieldSelect"
           />
         </el-form-item>
+        <el-form-item v-if="field.optionSource === 'table_data'" label="选项过滤">
+          <div
+            class="filter-trigger"
+            :class="{ 'is-placeholder': !hasOptionFilters(field.optionFilters) }"
+            @click="filterVisible = true"
+          >
+            {{ hasOptionFilters(field.optionFilters) ? '已添加过滤条件' : '添加过滤条件' }}
+          </div>
+        </el-form-item>
       </template>
+      <FormOptionFilterDialog
+        v-model="filterVisible"
+        :option-filters="field.optionFilters"
+        :source-fields="sourceFields"
+        :form-fields="formFields"
+        @confirm="onFilterConfirm"
+      />
       <el-form-item label="字段宽度">
         <el-radio-group class="width-options" :model-value="field.width" @change="$emit('update:width', $event)">
           <el-radio-button value="1/4">1/4</el-radio-button>
@@ -150,14 +166,18 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { formatOptions, formColumnOptions } from './fieldTypes'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
-import { listDictionaryOptionsApi } from '../../api/apps'
+import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
+import { hasOptionFilters } from './optionFilters'
+import { isFillable } from '../form-fill/fillValues'
+import { listDictionaryOptionsApi, listFormFieldsApi } from '../../api/apps'
 
 const props = defineProps({
   tab: { type: String, required: true },
   field: { type: Object, default: null },
+  fields: { type: Array, default: () => [] },
   appId: { type: Number, required: true },
   formId: { type: Number, required: true },
   columns: { type: Number, default: 1 },
@@ -166,6 +186,14 @@ const props = defineProps({
 defineEmits(['update:tab', 'update:width', 'update:columns'])
 
 const dictionaries = ref([])
+const sourceFields = ref([])
+const filterVisible = ref(false)
+
+const formFields = computed(() =>
+  (props.fields || []).filter(
+    (item) => isFillable(item) && item.key !== props.field?.key,
+  ),
+)
 
 async function loadOptions() {
   if (!props.appId) {
@@ -188,6 +216,7 @@ function onOptionSourceChange(value) {
   } else {
     delete props.field.sourceFormId
     delete props.field.sourceFieldKey
+    delete props.field.optionFilters
     if (props.field.dictCode == null) {
       props.field.dictCode = ''
     }
@@ -198,11 +227,52 @@ function onSourceFieldSelect({ formId, fieldKey }) {
   if (!props.field) {
     return
   }
+  if (props.field.sourceFormId !== formId) {
+    delete props.field.optionFilters
+  }
   props.field.sourceFormId = formId
   props.field.sourceFieldKey = fieldKey
 }
 
+function onFilterConfirm(next) {
+  if (!props.field) {
+    return
+  }
+  if (next) {
+    props.field.optionFilters = next
+  } else {
+    delete props.field.optionFilters
+  }
+}
+
+async function loadSourceFields() {
+  if (!props.appId || !props.field?.sourceFormId) {
+    sourceFields.value = []
+    return
+  }
+  try {
+    const forms =
+      (await listFormFieldsApi(props.appId, { excludeFormId: props.formId })) ||
+      []
+    const form = forms.find((item) => item.id === props.field.sourceFormId)
+    sourceFields.value = form?.fields || []
+  } catch {
+    sourceFields.value = []
+  }
+}
+
 watch(() => props.appId, loadOptions, { immediate: true })
+watch(
+  () => [props.appId, props.formId, props.field?.sourceFormId],
+  loadSourceFields,
+  { immediate: true },
+)
+watch(
+  () => props.field?.key,
+  () => {
+    filterVisible.value = false
+  },
+)
 </script>
 
 <style scoped lang="less">
@@ -268,5 +338,29 @@ watch(() => props.appId, loadOptions, { immediate: true })
   align-items: center;
   gap: 12px;
   margin-top: 12px;
+}
+
+.filter-trigger {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 32px;
+  color: var(--el-text-color-regular);
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+}
+
+.filter-trigger:hover {
+  border-color: var(--el-border-color-hover);
+}
+
+.filter-trigger.is-placeholder {
+  color: var(--el-text-color-placeholder);
 }
 </style>

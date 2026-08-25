@@ -1,10 +1,14 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsArray, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class QueryRecordsDto {
   @IsOptional()
   @IsArray()
   filters?: { key: string; op: string; value: unknown }[];
+
+  @IsOptional()
+  @IsIn(['all', 'any'])
+  match?: 'all' | 'any';
 
   @IsOptional()
   sort?: { key: string; order?: string };

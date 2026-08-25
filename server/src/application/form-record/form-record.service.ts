@@ -162,7 +162,7 @@ export class FormRecordService {
       formId: doc.formId,
       createdBy: doc.createdBy,
       createdAt: doc.createdAt,
-      updatedAt: doc.updatedAt,
+      updatedAt: doc.updatedAt ?? doc.createdAt,
       data: doc.data ?? {},
     };
   }

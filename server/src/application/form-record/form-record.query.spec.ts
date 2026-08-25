@@ -11,12 +11,19 @@ describe('buildRecordQuery', () => {
   it('defaults page sort and empty filter', () => {
     expect(buildRecordQuery(fields, {})).toEqual({
       filter: {},
-      sort: { createdAt: -1 },
+      sort: { updatedAt: -1 },
       skip: 0,
       limit: 20,
       page: 1,
       pageSize: 20,
     });
+  });
+
+  it('sorts by createdAt when asked', () => {
+    expect(
+      buildRecordQuery(fields, { sort: { key: 'createdAt', order: 'asc' } })
+        .sort,
+    ).toEqual({ createdAt: 1 });
   });
 
   it('maps eq to data path and contains to escaped regex', () => {
@@ -56,5 +63,65 @@ describe('buildRecordQuery', () => {
       expect(e).toBeInstanceOf(BadRequestException);
       expect((e as BadRequestException).message).toBe('分页大小不正确');
     }
+  });
+
+  it('maps ncontains empty and nempty', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'name', op: 'ncontains', value: 'a.c+' }],
+      }).filter,
+    ).toEqual({
+      'data.name': { $not: { $regex: 'a\\.c\\+', $options: 'i' } },
+    });
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'name', op: 'empty' }],
+      }).filter,
+    ).toEqual({
+      $or: [
+        { 'data.name': { $exists: false } },
+        { 'data.name': null },
+        { 'data.name': '' },
+        { 'data.name': [] },
+      ],
+    });
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'name', op: 'nempty' }],
+      }).filter,
+    ).toEqual({
+      $nor: [
+        {
+          $or: [
+            { 'data.name': { $exists: false } },
+            { 'data.name': null },
+            { 'data.name': '' },
+            { 'data.name': [] },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('combines filters with $or when match is any', () => {
+    expect(
+      buildRecordQuery(fields, {
+        match: 'any',
+        filters: [
+          { key: 'name', op: 'eq', value: '张三' },
+          { key: 'age', op: 'eq', value: 18 },
+        ],
+      }).filter,
+    ).toEqual({
+      $or: [{ 'data.name': '张三' }, { 'data.age': 18 }],
+    });
+  });
+
+  it('coerces numeric strings when filtering a number field', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'age', op: 'eq', value: '18' }],
+      }).filter,
+    ).toEqual({ 'data.age': 18 });
   });
 });

@@ -21,6 +21,7 @@
         v-model:tab="propTab"
         v-model:columns="columns"
         :field="selectedField"
+        :fields="fields"
         :app-id="appId"
         :form-id="formId"
         @update:width="setFieldWidth"

@@ -1,39 +1,53 @@
 <template>
-  <div ref="rootRef" class="source-picker">
-    <div
-      class="source-picker-trigger"
-      :class="{ 'is-open': open, 'is-placeholder': !displayText }"
-      @click="toggle"
+  <div class="source-picker">
+    <el-popover
+      v-model:visible="open"
+      placement="bottom-start"
+      :fallback-placements="['top-start', 'bottom-start']"
+      :width="popperWidth"
+      :offset="4"
+      :show-arrow="false"
+      :hide-after="0"
+      trigger="click"
+      :popper-style="{ padding: '8px' }"
+      @show="onPopoverShow"
     >
-      <span class="source-picker-value">{{ displayText || '请选择表字段' }}</span>
-      <el-icon class="source-picker-arrow"><ArrowDown /></el-icon>
-    </div>
-    <div v-if="open" class="source-picker-dropdown" @click.stop>
-      <el-input
-        v-model="keyword"
-        size="small"
-        clearable
-        placeholder="搜索表名"
-      />
-      <div v-if="loadError" class="source-picker-status">加载失败</div>
-      <div v-else-if="!treeData.length" class="source-picker-status">暂无已保存的表单</div>
-      <el-tree
-        v-else
-        class="source-picker-tree"
-        :data="treeData"
-        node-key="id"
-        :props="{ label: 'label', children: 'children' }"
-        default-expand-all
-        :expand-on-click-node="false"
-        :highlight-current="true"
-        @node-click="onNodeClick"
-      />
-    </div>
+      <template #reference>
+        <div
+          ref="triggerRef"
+          class="source-picker-trigger"
+          :class="{ 'is-open': open, 'is-placeholder': !displayText }"
+        >
+          <span class="source-picker-value">{{ displayText || '请选择表字段' }}</span>
+          <el-icon class="source-picker-arrow"><ArrowDown /></el-icon>
+        </div>
+      </template>
+      <div class="source-picker-panel">
+        <el-input
+          v-model="keyword"
+          size="small"
+          clearable
+          placeholder="搜索表名"
+        />
+        <div v-if="loadError" class="source-picker-status">加载失败</div>
+        <div v-else-if="!treeData.length" class="source-picker-status">暂无已保存的表单</div>
+        <el-tree
+          v-else
+          class="source-picker-tree"
+          :data="treeData"
+          node-key="id"
+          :props="{ label: 'label', children: 'children' }"
+          :expand-on-click-node="true"
+          :highlight-current="true"
+          @node-click="onNodeClick"
+        />
+      </div>
+    </el-popover>
   </div>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { listFormFieldsApi } from '../../api/apps'
 import { fieldTypeLabel } from './fieldTypes'
@@ -47,8 +61,9 @@ const props = defineProps({
 
 const emit = defineEmits(['select'])
 
-const rootRef = ref(null)
+const triggerRef = ref(null)
 const open = ref(false)
+const popperWidth = ref(288)
 const keyword = ref('')
 const loadError = ref(false)
 const loaded = ref(false)
@@ -100,12 +115,10 @@ async function loadForms() {
   }
 }
 
-function toggle() {
-  open.value = !open.value
-  if (open.value) {
-    keyword.value = ''
-    loadForms()
-  }
+function onPopoverShow() {
+  keyword.value = ''
+  popperWidth.value = triggerRef.value?.offsetWidth || 288
+  loadForms()
 }
 
 function onNodeClick(node) {
@@ -116,24 +129,10 @@ function onNodeClick(node) {
   open.value = false
 }
 
-function onDocumentClick(event) {
-  if (!open.value || !rootRef.value) {
-    return
-  }
-  if (!rootRef.value.contains(event.target)) {
-    open.value = false
-  }
-}
-
 onMounted(() => {
-  document.addEventListener('mousedown', onDocumentClick)
   if (props.sourceFormId) {
     loadForms()
   }
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('mousedown', onDocumentClick)
 })
 
 watch(
@@ -149,7 +148,6 @@ watch(
 
 <style scoped lang="less">
 .source-picker {
-  position: relative;
   width: 100%;
 }
 
@@ -157,9 +155,10 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  width: 100%;
   height: 32px;
   padding: 0 12px;
+  box-sizing: border-box;
   cursor: pointer;
   border: 1px solid var(--el-border-color);
   border-radius: var(--el-border-radius-base);
@@ -186,19 +185,6 @@ watch(
   color: var(--el-text-color-placeholder);
 }
 
-.source-picker-dropdown {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% + 4px);
-  right: 0;
-  left: 0;
-  padding: 8px;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
-  border-radius: var(--el-border-radius-base);
-  box-shadow: var(--el-box-shadow-light);
-}
-
 .source-picker-status {
   padding: 12px 0;
   color: var(--el-text-color-placeholder);
@@ -208,7 +194,7 @@ watch(
 
 .source-picker-tree {
   margin-top: 8px;
-  max-height: 240px;
+  height: min(240px, 40vh);
   overflow: auto;
 }
 

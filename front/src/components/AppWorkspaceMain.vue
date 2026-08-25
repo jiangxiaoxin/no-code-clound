@@ -27,6 +27,7 @@
 
       <FormRecordCreateTab
         v-show="tab === 'create'"
+        :app-id="appId"
         :fields="fields"
         :values="values"
         :dict-items-by-code="dictItemsByCode"
@@ -35,38 +36,12 @@
         @cancel="resetValues"
         @save="onSave"
       />
-      <FormRecordList
-        v-if="tab === 'list'"
-        ref="listRef"
+      <FormRecordManage
+        v-if="tab === 'list' && form"
         :app-id="appId"
-        :form="form"
-        :fields="fields"
-        :dict-items-by-code="dictItemsByCode"
-        :schema-loading="schemaLoading"
-        @create="openCreateDialog"
-        @row-click="openDetail"
+        :form-id="form.id"
       />
     </div>
-
-    <FormRecordDetailDrawer
-      v-model="detailVisible"
-      :record="detailRecord"
-      :fields="fields"
-      :dict-items-by-code="dictItemsByCode"
-      :app-id="appId"
-      :form-id="form?.id"
-      @saved="onDetailSaved"
-    />
-    <FormRecordCreateDrawer
-      v-model="createVisible"
-      :fields="fields"
-      :values="values"
-      :dict-items-by-code="dictItemsByCode"
-      :schema-loading="schemaLoading"
-      :saving="saving"
-      @save="onSave"
-      @closed="resetValues"
-    />
   </el-main>
 </template>
 
@@ -87,9 +62,7 @@ import {
 } from './form-fill/fillValues.js'
 import { isSelectType as isSelectField } from './form-design/fieldTypes'
 import FormRecordCreateTab from './form-workspace/FormRecordCreateTab.vue'
-import FormRecordList from './form-workspace/FormRecordList.vue'
-import FormRecordCreateDrawer from './form-workspace/FormRecordCreateDrawer.vue'
-import FormRecordDetailDrawer from './form-workspace/FormRecordDetailDrawer.vue'
+import FormRecordManage from './form-workspace/FormRecordManage.vue'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -97,7 +70,6 @@ const props = defineProps({
 })
 
 const router = useRouter()
-const listRef = ref(null)
 
 function goDesign() {
   if (!props.form?.id) {
@@ -115,9 +87,6 @@ const saving = ref(false)
 const fields = ref([])
 const values = reactive({})
 const dictItemsByCode = ref({})
-const createVisible = ref(false)
-const detailVisible = ref(false)
-const detailRecord = ref(null)
 
 function resetValues() {
   for (const key of Object.keys(values)) {
@@ -192,12 +161,7 @@ async function onSave() {
       buildRecordData(fields.value, values),
     )
     ElMessage.success('保存成功')
-    const fromDialog = createVisible.value
     resetValues()
-    if (fromDialog) {
-      createVisible.value = false
-      await listRef.value?.reload({ resetPage: true })
-    }
   } catch {
     return
   } finally {
@@ -205,28 +169,10 @@ async function onSave() {
   }
 }
 
-function openCreateDialog() {
-  resetValues()
-  createVisible.value = true
-}
-
-function openDetail(row) {
-  detailRecord.value = row
-  detailVisible.value = true
-}
-
-function onDetailSaved(updated) {
-  detailRecord.value = updated
-  listRef.value?.upsertRecord(updated)
-}
-
 watch(
   () => [props.appId, props.form?.id],
   () => {
     tab.value = 'create'
-    createVisible.value = false
-    detailVisible.value = false
-    detailRecord.value = null
     loadSchema()
   },
   { immediate: true },

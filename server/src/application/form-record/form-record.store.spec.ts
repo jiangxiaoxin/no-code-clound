@@ -39,6 +39,7 @@ describe('FormRecordStore', () => {
     collection.indexes.mockResolvedValue([
       { name: '_id_' },
       { name: 'idx_createdAt' },
+      { name: 'idx_updatedAt' },
       { name: 'idx_createdBy' },
       { name: 'idx_data_old' },
     ]);
@@ -52,7 +53,12 @@ describe('FormRecordStore', () => {
       { name: 'idx_data_name' },
     );
     expect(collection.dropIndex).toHaveBeenCalledWith('idx_data_old');
+    expect(collection.createIndex).toHaveBeenCalledWith(
+      { updatedAt: -1 },
+      { name: 'idx_updatedAt' },
+    );
     expect(collection.dropIndex).not.toHaveBeenCalledWith('idx_createdAt');
+    expect(collection.dropIndex).not.toHaveBeenCalledWith('idx_updatedAt');
   });
 
   it('ignores missing collection on drop', async () => {

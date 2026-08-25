@@ -93,6 +93,8 @@ describe('FormRecordService', () => {
         data: { name: '张三' },
       }),
     );
+    const inserted = store.insert.mock.calls[0][0];
+    expect(inserted.updatedAt).toBe(inserted.createdAt);
     expect(result).toEqual({
       id: '64b64c4c4c4c4c4c4c4c4c4c',
       appId: 8,

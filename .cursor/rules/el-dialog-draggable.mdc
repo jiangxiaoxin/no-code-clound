@@ -1,0 +1,23 @@
+---
+description: Element Plus 弹框默认开启可拖拽
+globs: front/**/*.{vue,js}
+alwaysApply: true
+---
+
+# el-dialog 默认可拖拽
+
+写或改 `front/` 下的 `el-dialog` 时，默认加上 `draggable`，让用户可以拖动标题栏移动弹框。
+
+只有明确不需要拖拽时才省略。
+
+```vue
+<!-- ❌ BAD -->
+<el-dialog title="添加过滤条件" width="720px">
+  ...
+</el-dialog>
+
+<!-- ✅ GOOD -->
+<el-dialog title="添加过滤条件" width="720px" draggable>
+  ...
+</el-dialog>
+```

@@ -17,7 +17,11 @@ export const FILTERABLE_TYPES: ReadonlySet<string> = new Set([
   'relate',
 ]);
 
-export const SYSTEM_INDEX_NAMES = ['idx_createdAt', 'idx_createdBy'] as const;
+export const SYSTEM_INDEX_NAMES = [
+  'idx_createdAt',
+  'idx_updatedAt',
+  'idx_createdBy',
+] as const;
 
 export function collectionName(formId: number): string {
   return `frm_${formId}`;

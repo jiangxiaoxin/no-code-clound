@@ -2,6 +2,7 @@ import { computed, ref, unref, watch } from 'vue'
 import { useUserStore } from '../../stores/user'
 
 export const CREATED_AT_KEY = '__createdAt'
+export const UPDATED_AT_KEY = '__updatedAt'
 export const DEFAULT_COL_WIDTH = 100
 
 export function normalizeColWidth(value) {
@@ -83,6 +84,13 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
       {
         key: CREATED_AT_KEY,
         title: '创建时间',
+        visible: true,
+        fixed: '',
+        minWidth: DEFAULT_COL_WIDTH,
+      },
+      {
+        key: UPDATED_AT_KEY,
+        title: '更新时间',
         visible: true,
         fixed: '',
         minWidth: DEFAULT_COL_WIDTH,
