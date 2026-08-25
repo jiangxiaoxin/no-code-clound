@@ -6,6 +6,11 @@ export const UPDATED_AT_KEY = '__updatedAt'
 export const CREATED_BY_KEY = '__createdBy'
 export const UPDATED_BY_KEY = '__updatedBy'
 export const DEFAULT_COL_WIDTH = 100
+export const TIME_COL_WIDTH = 160
+
+export function isTimeColumnKey(key) {
+  return key === CREATED_AT_KEY || key === UPDATED_AT_KEY
+}
 
 export function normalizeColWidth(value) {
   const n = Number(value)
@@ -13,6 +18,10 @@ export function normalizeColWidth(value) {
     return DEFAULT_COL_WIDTH
   }
   return Math.round(n)
+}
+
+function columnWidth(key, value) {
+  return isTimeColumnKey(key) ? TIME_COL_WIDTH : normalizeColWidth(value)
 }
 
 export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
@@ -49,7 +58,7 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
           key: item.key,
           visible: item.visible !== false,
           fixed: item.fixed === 'left' || item.fixed === 'right' ? item.fixed : '',
-          minWidth: normalizeColWidth(item.minWidth),
+          minWidth: columnWidth(item.key, item.minWidth),
         }))
     } catch {
       return []
@@ -68,7 +77,7 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
           key: col.key,
           visible: col.visible !== false,
           fixed: col.fixed === 'left' || col.fixed === 'right' ? col.fixed : '',
-          minWidth: normalizeColWidth(col.minWidth),
+          minWidth: columnWidth(col.key, col.minWidth),
         })),
       ),
     )
@@ -95,7 +104,7 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
         title: '创建时间',
         visible: true,
         fixed: '',
-        minWidth: DEFAULT_COL_WIDTH,
+        minWidth: TIME_COL_WIDTH,
       },
       {
         key: UPDATED_BY_KEY,
@@ -109,7 +118,7 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
         title: '更新时间',
         visible: true,
         fixed: '',
-        minWidth: DEFAULT_COL_WIDTH,
+        minWidth: TIME_COL_WIDTH,
       },
     ]
   }
@@ -133,7 +142,7 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
       ...defaultMap.get(col.key),
       visible: col.visible !== false,
       fixed: col.fixed === 'left' || col.fixed === 'right' ? col.fixed : '',
-      minWidth: normalizeColWidth(col.minWidth),
+      minWidth: columnWidth(col.key, col.minWidth),
     }))
     defaults.forEach((col, index) => {
       if (keptKeys.has(col.key)) {

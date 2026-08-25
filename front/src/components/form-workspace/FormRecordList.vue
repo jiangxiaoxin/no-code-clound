@@ -35,7 +35,9 @@
             v-for="col in visibleColumns"
             :key="col.key"
             :label="col.title"
-            :min-width="normalizeColWidth(col.minWidth)"
+            :width="isTimeColumnKey(col.key) ? TIME_COL_WIDTH : undefined"
+            :min-width="isTimeColumnKey(col.key) ? undefined : normalizeColWidth(col.minWidth)"
+            :resizable="!isTimeColumnKey(col.key)"
             :fixed="col.fixed || undefined"
             :class-name="isDataColumn(col.key) ? 'record-data-col' : undefined"
             :show-overflow-tooltip="!isDataColumn(col.key)"
@@ -99,6 +101,8 @@ import {
   UPDATED_AT_KEY,
   CREATED_BY_KEY,
   UPDATED_BY_KEY,
+  TIME_COL_WIDTH,
+  isTimeColumnKey,
   normalizeColWidth,
   useColumnPrefs,
 } from './columnPrefs'

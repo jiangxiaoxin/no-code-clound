@@ -48,12 +48,13 @@
         <el-input-number
           v-model="col.minWidth"
           class="col-setup-width"
-          :min="100"
+          :disabled="isTimeColumnKey(col.key)"
+          :min="isTimeColumnKey(col.key) ? TIME_COL_WIDTH : 100"
           :precision="0"
           :step="10"
           :controls="false"
           size="small"
-          @change="col.minWidth = normalizeColWidth($event)"
+          @change="col.minWidth = isTimeColumnKey(col.key) ? TIME_COL_WIDTH : normalizeColWidth($event)"
           align="left"
         />
         <el-select
@@ -74,7 +75,7 @@
 <script setup>
 import { ref } from 'vue'
 import { Rank, Setting } from '@element-plus/icons-vue'
-import { normalizeColWidth } from './columnPrefs'
+import { TIME_COL_WIDTH, isTimeColumnKey, normalizeColWidth } from './columnPrefs'
 
 const props = defineProps({
   modelValue: { type: Array, required: true },
