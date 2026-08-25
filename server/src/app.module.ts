@@ -23,7 +23,7 @@ import { MongoModule } from './mongo/mongo.module';
         database: config.get<string>('DB_NAME'),
         autoLoadEntities: true,
         synchronize: false,
-        logging: ['query', 'error'],
+        logging: ['error'], // 'query',
       }),
     }),
     AuthModule,

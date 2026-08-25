@@ -148,6 +148,11 @@ export function valuesEqual(field, a, b) {
 
 export function formatCellValue(field, value, dictItemsByCode) {
   if (value == null || value === '') return ''
+  /**
+   * 下拉多选，要么按照字典选，要么是按照其他表数据选
+   * 按照字典选，记录的是字典项的value。value不可变，label随便变，变了以后会跟着刷新显示
+   * 按照其他表数据选，选的是表里数据的某个字段，存的也是这个字段的值，所以数据源里修改了数据，下拉这里不会跟着一起变
+   */
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     const items = dictItemsByCode[field.dictCode] || []
     const map = Object.fromEntries(items.map((item) => [item.value, item.label]))
@@ -163,9 +168,34 @@ export function formatCellValue(field, value, dictItemsByCode) {
     const found = items.find((item) => item.value === value)
     return found ? found.label : String(value)
   }
+  if (field.type === 'date') {
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
+    const d = match ? null : asDate(value)
+    if (!match && !d) return String(value)
+    const y = match ? match[1] : String(d.getFullYear())
+    const m = match ? match[2] : pad(d.getMonth() + 1)
+    const day = match ? match[3] : pad(d.getDate())
+    if (field.format === 'year') return y
+    if (field.format === 'month') return `${y}-${m}`
+    return `${y}-${m}-${day}`
+  }
+  if (field.type === 'time') {
+    let text = typeof value === 'string' ? value : ''
+    if (!text) {
+      const d = asDate(value)
+      text = d
+        ? `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+        : String(value)
+    }
+    return (field.format || 'HH:mm:ss') === 'HH:mm' ? text.slice(0, 5) : text
+  }
   if (field.type === 'datetime') {
     const d = asDate(value)
-    return d ? d.toLocaleString() : String(value)
+    if (!d) return String(value)
+    const text = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    return (field.format || 'YYYY-MM-DD HH:mm:ss') === 'YYYY-MM-DD HH:mm'
+      ? text.slice(0, 16)
+      : text
   }
   if (Array.isArray(value)) return value.join('、')
   return String(value)
