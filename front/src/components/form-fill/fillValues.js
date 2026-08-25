@@ -93,13 +93,15 @@ export function serializeValue(field, value) {
   return value
 }
 
-export function buildRecordData(fields, values) {
+export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
   const data = {}
   for (const field of fields) {
     if (!isFillable(field)) continue
     const next = serializeValue(field, values[field.key])
     if (next !== undefined) {
       data[field.key] = next
+    } else if (clearEmpty) {
+      data[field.key] = null
     }
   }
   return data

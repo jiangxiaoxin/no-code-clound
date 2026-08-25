@@ -35,9 +35,11 @@ describe('buildRecordQuery', () => {
       ],
     });
     expect(result.filter).toEqual({
-      'data.name': { $regex: 'a\\.c\\+', $options: 'i' },
-      'data.age': 18,
-      createdBy: 3,
+      $and: [
+        { 'data.name': { $regex: 'a\\.c\\+', $options: 'i' } },
+        { 'data.age': 18 },
+        { createdBy: 3 },
+      ],
     });
   });
 
@@ -123,5 +125,57 @@ describe('buildRecordQuery', () => {
         filters: [{ key: 'age', op: 'eq', value: '18' }],
       }).filter,
     ).toEqual({ 'data.age': 18 });
+  });
+
+  it('keeps multiple nempty filters under match all', () => {
+    expect(
+      buildRecordQuery(fields, {
+        match: 'all',
+        filters: [
+          { key: 'name', op: 'nempty' },
+          { key: 'age', op: 'nempty' },
+        ],
+      }).filter,
+    ).toEqual({
+      $and: [
+        {
+          $nor: [
+            {
+              $or: [
+                { 'data.name': { $exists: false } },
+                { 'data.name': null },
+                { 'data.name': '' },
+                { 'data.name': [] },
+              ],
+            },
+          ],
+        },
+        {
+          $nor: [
+            {
+              $or: [
+                { 'data.age': { $exists: false } },
+                { 'data.age': null },
+                { 'data.age': '' },
+                { 'data.age': [] },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('keeps both bounds when filtering the same number field', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [
+          { key: 'age', op: 'gte', value: 18 },
+          { key: 'age', op: 'lte', value: 30 },
+        ],
+      }).filter,
+    ).toEqual({
+      $and: [{ 'data.age': { $gte: 18 } }, { 'data.age': { $lte: 30 } }],
+    });
   });
 });

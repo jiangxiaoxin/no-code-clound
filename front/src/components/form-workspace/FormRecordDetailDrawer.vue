@@ -97,7 +97,7 @@ async function saveDetail() {
       props.appId,
       props.formId,
       props.record.id,
-      buildRecordData(props.fields, detailValues),
+      buildRecordData(props.fields, detailValues, { clearEmpty: true }),
     )
     applyValues(updated.data)
     editing.value = false
