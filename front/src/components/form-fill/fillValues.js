@@ -115,6 +115,37 @@ export function validateRequired(fields, values) {
   return ''
 }
 
+const INLINE_EDIT_TYPES = new Set([
+  'input',
+  'textarea',
+  'number',
+  'radio',
+  'checkbox',
+  'select',
+  'select-multiple',
+  'date',
+  'time',
+  'datetime',
+])
+
+export function isInlineEditable(field) {
+  return isFillable(field) && INLINE_EDIT_TYPES.has(field.type)
+}
+
+export function cloneCellValue(field, value) {
+  if (field.type === 'checkbox' || field.type === 'select-multiple') {
+    return Array.isArray(value) ? [...value] : []
+  }
+  return value == null ? emptyValue(field) : value
+}
+
+export function valuesEqual(field, a, b) {
+  return (
+    JSON.stringify(serializeValue(field, a) ?? null) ===
+    JSON.stringify(serializeValue(field, b) ?? null)
+  )
+}
+
 export function formatCellValue(field, value, dictItemsByCode) {
   if (value == null || value === '') return ''
   if (field.type === 'checkbox' || field.type === 'select-multiple') {

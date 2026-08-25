@@ -13,6 +13,7 @@
           </el-button>
         </div>
         <div class="list-toolbar-extra">
+          <el-button :icon="Refresh" link @click="onRefresh">刷新</el-button>
           <FormRecordColumnSetup v-model="columnPrefs" />
         </div>
       </div>
@@ -36,7 +37,8 @@
             :label="col.title"
             :min-width="normalizeColWidth(col.minWidth)"
             :fixed="col.fixed || undefined"
-            show-overflow-tooltip
+            :class-name="isDataColumn(col.key) ? 'record-data-col' : undefined"
+            :show-overflow-tooltip="!isDataColumn(col.key)"
           >
             <template #default="{ row }">
               <template v-if="col.key === CREATED_AT_KEY">
@@ -51,9 +53,18 @@
               <template v-else-if="col.key === UPDATED_BY_KEY">
                 {{ row.updatedByName }}
               </template>
-              <template v-else>
-                {{ formatCellValue(fieldByKey[col.key], row.data?.[col.key], dictItemsByCode) }}
-              </template>
+              <FormRecordCell
+                v-else-if="fieldByKey[col.key]"
+                :app-id="appId"
+                :form-id="form.id"
+                :row="row"
+                :field="fieldByKey[col.key]"
+                :dict-items-by-code="dictItemsByCode"
+                :editing="editingCell === cellKey(row.id, col.key)"
+                @start="editingCell = cellKey(row.id, col.key)"
+                @close="onCellClose(row.id, col.key)"
+                @saved="upsertRecord"
+              />
             </template>
           </el-table-column>
         </el-table>
@@ -78,8 +89,10 @@
 <script setup>
 import { computed, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import { deleteFormRecordApi, queryFormRecordsApi } from '../../api/apps'
-import { formatCellValue, isFillable } from '../form-fill/fillValues.js'
+import { isFillable } from '../form-fill/fillValues.js'
+import FormRecordCell from './FormRecordCell.vue'
 import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
 import {
   CREATED_AT_KEY,
@@ -106,6 +119,7 @@ const selectedRecords = ref([])
 const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const editingCell = ref('')
 // 切换表单时作废进行中的请求，避免把上一张表的记录写进来
 const loadSession = ref(0)
 
@@ -127,8 +141,26 @@ function formatTime(value) {
   return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
 }
 
+function isDataColumn(key) {
+  return Boolean(fieldByKey.value[key])
+}
+
+function cellKey(rowId, fieldKey) {
+  return `${rowId}:${fieldKey}`
+}
+
+function onCellClose(rowId, fieldKey) {
+  if (editingCell.value === cellKey(rowId, fieldKey)) {
+    editingCell.value = ''
+  }
+}
+
 function onRecordRowClick(row, _column, event) {
-  if (event?.target?.closest('.el-table-column--selection')) {
+  if (
+    event?.target?.closest(
+      '.el-table-column--selection, .record-cell-edit, .record-cell.is-editing',
+    )
+  ) {
     return
   }
   emit('row-click', row)
@@ -210,6 +242,11 @@ async function reload({ resetPage = false } = {}) {
   await loadRecords()
 }
 
+function onRefresh() {
+  editingCell.value = ''
+  loadRecords()
+}
+
 function upsertRecord(updated) {
   const index = records.value.findIndex((item) => item.id === updated.id)
   if (index >= 0) {
@@ -225,6 +262,7 @@ watch(
     selectedRecords.value = []
     records.value = []
     total.value = 0
+    editingCell.value = ''
     loadRecords()
   },
   { immediate: true },
@@ -265,5 +303,9 @@ defineExpose({ reload, upsertRecord })
   flex-shrink: 0;
   justify-content: center;
   padding-top: 12px;
+}
+
+:deep(td.record-data-col .cell) {
+  overflow: visible;
 }
 </style>
