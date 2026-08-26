@@ -1,6 +1,10 @@
 <template>
   <div class="fill-field" :class="widthClass[field.width] || 'is-w-full'">
-    <span v-if="field.type !== 'divider'" class="fill-field-title">
+    <span
+      v-if="field.type !== 'divider'"
+      class="fill-field-title"
+      :title="fieldKeyTitle"
+    >
       <span v-if="field.required" class="fill-field-required">*</span>
       <span class="fill-field-title-text">{{ field.title }}</span>
       <el-tooltip
@@ -138,7 +142,7 @@
       @update:model-value="onUpdateModelValue"
       @fill="onFill"
     />
-    <el-divider v-else-if="field.type === 'divider'">
+    <el-divider v-else-if="field.type === 'divider'" :title="fieldKeyTitle">
       {{ field.title }}
     </el-divider>
     <el-upload
@@ -176,6 +180,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue', 'fill'])
+
+const fieldKeyTitle = computed(() =>
+  import.meta.env.DEV ? props.field.key || undefined : undefined,
+)
 
 function onUpdateModelValue(value) {
   emit('update:modelValue', value)
