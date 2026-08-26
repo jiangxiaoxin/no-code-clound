@@ -179,7 +179,7 @@ function combineClauses(
   if (!clauses.length) return {};
   if (clauses.length === 1) return clauses[0];
   if (match === 'any') return { $or: clauses };
-  return Object.assign({}, ...clauses);
+  return { $and: clauses };
 }
 
 export function buildRecordQuery(
