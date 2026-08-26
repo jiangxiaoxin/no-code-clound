@@ -9,6 +9,7 @@ import {
 const fields = [
   { key: 'name', type: 'input' },
   { key: 'age', type: 'number' },
+  { key: 'tags', type: 'checkbox' },
   { key: 'pic', type: 'image' },
 ];
 
@@ -141,6 +142,32 @@ describe('buildRecordQuery', () => {
         filters: [{ key: 'age', op: 'eq', value: '18' }],
       }).filter,
     ).toEqual({ 'data.age': 18 });
+  });
+
+  it('contains on number matches stringified value', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'age', op: 'contains', value: '18' }],
+      }).filter,
+    ).toEqual({
+      $expr: {
+        $regexMatch: {
+          input: { $toString: { $ifNull: ['$data.age', ''] } },
+          regex: '18',
+          options: 'i',
+        },
+      },
+    });
+  });
+
+  it('contains on checkbox matches array elements', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'tags', op: 'contains', value: 'a.c+' }],
+      }).filter,
+    ).toEqual({
+      'data.tags': { $regex: 'a\\.c\\+', $options: 'i' },
+    });
   });
 
   it('keeps multiple nempty filters under match all', () => {

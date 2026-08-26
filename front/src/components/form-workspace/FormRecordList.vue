@@ -13,6 +13,13 @@
           </el-button>
         </div>
         <div class="list-toolbar-extra">
+          <FormRecordQuickSearch
+            :key="quickSearchKey"
+            :app-id="appId"
+            :form-id="form.id"
+            :fields="quickSearchFields"
+            @search="onQuickSearch"
+          />
           <el-button :icon="Refresh" link @click="onRefresh">刷新</el-button>
           <FormRecordSortSetup
             v-model="sortRules"
@@ -101,6 +108,7 @@ import { deleteFormRecordApi, queryFormRecordsApi } from '../../api/apps'
 import { isFillable } from '../form-fill/fillValues.js'
 import FormRecordCell from './FormRecordCell.vue'
 import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
+import FormRecordQuickSearch from './FormRecordQuickSearch.vue'
 import FormRecordSortSetup from './FormRecordSortSetup.vue'
 import {
   CREATED_AT_KEY,
@@ -112,6 +120,7 @@ import {
   normalizeColWidth,
   useColumnPrefs,
 } from './columnPrefs'
+import { buildQuickSearchQuery, isQuickSearchField } from './quickSearch'
 import { useSortPrefs } from './sortPrefs'
 
 const props = defineProps({
@@ -138,6 +147,14 @@ const tableFields = computed(() => props.fields.filter(isFillable))
 const fieldByKey = computed(() =>
   Object.fromEntries(tableFields.value.map((field) => [field.key, field])),
 )
+const quickSearchFields = computed(() =>
+  tableFields.value.filter(isQuickSearchField),
+)
+const quickSearchKey = computed(
+  () => `${props.appId}:${props.form?.id || ''}`,
+)
+const searchKeyword = ref('')
+const searchFieldKeys = ref(null)
 
 const { columnPrefs, visibleColumns } = useColumnPrefs({
   appId: toRef(props, 'appId'),
@@ -192,12 +209,22 @@ async function loadRecords() {
   }
   listLoading.value = true
   try {
+    const searchQuery = buildQuickSearchQuery(
+      searchFieldKeys.value == null
+        ? quickSearchFields.value
+        : quickSearchFields.value.filter((field) =>
+            searchFieldKeys.value.includes(field.key),
+          ),
+      searchKeyword.value,
+      props.dictItemsByCode,
+    )
     const result = await queryFormRecordsApi(props.appId, props.form.id, {
       page: page.value,
       pageSize: pageSize.value,
       ...(sortRules.value.length
         ? { sort: sortRules.value.map(({ key, order }) => ({ key, order })) }
         : {}),
+      ...(searchQuery || {}),
     })
     if (session !== loadSession.value) return
     records.value = result?.items || []
@@ -274,6 +301,18 @@ function onSortApply(rules) {
   loadRecords()
 }
 
+function onQuickSearch(payload) {
+  const keyword = payload?.keyword || ''
+  const fieldKeys = payload?.fieldKeys ?? null
+  const sameKeys =
+    JSON.stringify(fieldKeys) === JSON.stringify(searchFieldKeys.value)
+  if (keyword === searchKeyword.value && sameKeys) return
+  searchKeyword.value = keyword
+  searchFieldKeys.value = fieldKeys
+  page.value = 1
+  loadRecords()
+}
+
 function upsertRecord(updated) {
   const index = records.value.findIndex((item) => item.id === updated.id)
   if (index >= 0) {
@@ -290,6 +329,8 @@ watch(
     records.value = []
     total.value = 0
     editingCell.value = ''
+    searchKeyword.value = ''
+    searchFieldKeys.value = null
     loadRecords()
   },
   { immediate: true },

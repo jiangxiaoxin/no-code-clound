@@ -18,6 +18,8 @@ const STRING_CONTAINS_TYPES = new Set([
   'time',
   'radio',
   'select',
+  'select-multiple',
+  'checkbox',
   'date',
 ]);
 const RANGE_TYPES = new Set(['number', 'date', 'datetime']);
@@ -135,9 +137,19 @@ function containsClause(
   value: unknown,
 ): Record<string, unknown> {
   if (type === 'createdAt' || type === 'createdBy') unsupported();
-  if (!STRING_CONTAINS_TYPES.has(type) || typeof value !== 'string') {
-    unsupported();
+  if (typeof value !== 'string') unsupported();
+  if (type === 'number') {
+    return {
+      $expr: {
+        $regexMatch: {
+          input: { $toString: { $ifNull: [`$${path}`, ''] } },
+          regex: escapeRegex(value),
+          options: 'i',
+        },
+      },
+    };
   }
+  if (!STRING_CONTAINS_TYPES.has(type)) unsupported();
   return { [path]: { $regex: escapeRegex(value), $options: 'i' } };
 }
 
@@ -159,7 +171,8 @@ function buildClause(
   if (op === 'contains') return containsClause(type, path, value);
   if (op === 'ncontains') {
     const clause = containsClause(type, path, value);
-    const regex = (clause[path] as { $regex: string; $options: string });
+    if (clause.$expr) return { $nor: [clause] };
+    const regex = clause[path] as { $regex: string; $options: string };
     return { [path]: { $not: regex } };
   }
   if (op === 'empty') return emptyClause(path);
