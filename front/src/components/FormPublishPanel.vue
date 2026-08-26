@@ -92,7 +92,6 @@ async function save() {
   margin: 0 auto;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
 }
 
 .publish-menu {
