@@ -2,7 +2,21 @@ import { BadRequestException } from '@nestjs/common';
 import { FILTERABLE_TYPES } from './form-record.indexes';
 import { FormField } from './form-record.types';
 
-export type RecordFilter = { key: string; op: string; value: unknown };
+export type DatePrecision =
+  | 'year'
+  | 'month'
+  | 'day'
+  | 'hour'
+  | 'minute'
+  | 'second';
+
+export type RecordFilter = {
+  key: string;
+  op: string;
+  value: unknown;
+  /** 日期时间等于/包含时，按年/月/日/时/分/秒匹配一段时间，而不是精确到毫秒 */
+  precision?: DatePrecision;
+};
 export type RecordSort = { key: string; order?: string };
 export type RecordQueryBody = {
   filters?: RecordFilter[];
@@ -22,7 +36,7 @@ const STRING_CONTAINS_TYPES = new Set([
   'checkbox',
   'date',
 ]);
-const RANGE_TYPES = new Set(['number', 'date', 'datetime']);
+const RANGE_TYPES = new Set(['number', 'date', 'time', 'datetime']);
 const DICT_VALUE_OPS = new Set(['eq', 'ne', 'in']);
 
 type DictItem = { label: string; value: string };
@@ -96,12 +110,33 @@ function resolvePath(
   key: string,
   fields: FormField[] | null | undefined,
 ): { path: string; type: string } {
-  if (key === 'createdAt') return { path: 'createdAt', type: 'createdAt' };
-  if (key === 'updatedAt') return { path: 'updatedAt', type: 'updatedAt' };
+  if (key === 'createdAt') return { path: 'createdAt', type: 'datetime' };
+  if (key === 'updatedAt') return { path: 'updatedAt', type: 'datetime' };
   if (key === 'createdBy') return { path: 'createdBy', type: 'createdBy' };
+  if (key === 'updatedBy') return { path: 'updatedBy', type: 'createdBy' };
   const field = (fields ?? []).find((item) => item.key === key);
   if (!field || !FILTERABLE_TYPES.has(field.type)) unsupported();
   return { path: `data.${key}`, type: field.type };
+}
+
+function parseWallDateTime(
+  value: string,
+): { date: Date; hasSeconds: boolean } | null {
+  const wall = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+  if (!wall) return null;
+  return {
+    date: new Date(
+      Number(wall[1]),
+      Number(wall[2]) - 1,
+      Number(wall[3]),
+      Number(wall[4]),
+      Number(wall[5]),
+      Number(wall[6] || 0),
+    ),
+    hasSeconds: wall[6] != null,
+  };
 }
 
 function asDateIfNeeded(type: string, value: unknown): unknown {
@@ -109,15 +144,209 @@ function asDateIfNeeded(type: string, value: unknown): unknown {
     const n = Number(value);
     if (Number.isFinite(n)) return n;
   }
-  if (
-    (type === 'datetime' || type === 'createdAt') &&
-    typeof value === 'string'
-  ) {
+  if (type === 'createdBy') {
+    if (typeof value === 'number' && Number.isInteger(value)) return value;
+    if (typeof value === 'string' && value !== '') {
+      const n = Number(value);
+      if (Number.isInteger(n)) return n;
+    }
+    unsupported();
+  }
+  if (type === 'datetime' && typeof value === 'string') {
+    const wall = parseWallDateTime(value);
+    if (wall) return wall.date;
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) unsupported();
     return date;
   }
   return value;
+}
+
+const DATE_PRECISIONS = new Set<DatePrecision>([
+  'year',
+  'month',
+  'day',
+  'hour',
+  'minute',
+  'second',
+]);
+
+function parseOffsetMinutes(value: string): number {
+  if (value.endsWith('Z')) return 0;
+  const match = value.match(/([+-])(\d{2}):?(\d{2})$/);
+  if (!match) return 0;
+  const minutes = Number(match[2]) * 60 + Number(match[3]);
+  return match[1] === '+' ? minutes : -minutes;
+}
+
+/**
+ * 带时区的 ISO 时间按给定粒度转成左闭右开区间。日历分量取自字符串里的偏移，再换算成 UTC。
+ */
+function dateRangeForPrecision(
+  value: unknown,
+  precision: DatePrecision,
+): { start: Date; end: Date } {
+  if (typeof value !== 'string') unsupported();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) unsupported();
+
+  const offsetMinutes = parseOffsetMinutes(value);
+  const wallClock = new Date(parsed.getTime() + offsetMinutes * 60_000);
+  const year = wallClock.getUTCFullYear();
+  const month = wallClock.getUTCMonth();
+  const day = wallClock.getUTCDate();
+  const hour = wallClock.getUTCHours();
+  const minute = wallClock.getUTCMinutes();
+  const second = wallClock.getUTCSeconds();
+
+  let startWallMs = Date.UTC(year, month, day, hour, minute, second, 0);
+  if (precision === 'year') startWallMs = Date.UTC(year, 0, 1);
+  else if (precision === 'month') startWallMs = Date.UTC(year, month, 1);
+  else if (precision === 'day') startWallMs = Date.UTC(year, month, day);
+  else if (precision === 'hour') {
+    startWallMs = Date.UTC(year, month, day, hour);
+  } else if (precision === 'minute') {
+    startWallMs = Date.UTC(year, month, day, hour, minute);
+  }
+
+  const endWall = new Date(startWallMs);
+  if (precision === 'year') endWall.setUTCFullYear(year + 1);
+  else if (precision === 'month') endWall.setUTCMonth(month + 1);
+  else if (precision === 'day') endWall.setUTCDate(day + 1);
+  else if (precision === 'hour') endWall.setUTCHours(hour + 1);
+  else if (precision === 'minute') endWall.setUTCMinutes(minute + 1);
+  else endWall.setUTCSeconds(second + 1);
+
+  return {
+    start: new Date(startWallMs - offsetMinutes * 60_000),
+    end: new Date(endWall.getTime() - offsetMinutes * 60_000),
+  };
+}
+
+function hasExplicitOffset(value: string): boolean {
+  return /Z$/i.test(value.trim()) || /[+-]\d{2}:\d{2}$/.test(value);
+}
+
+function inferDatetimePrecision(value: string): DatePrecision | undefined {
+  const wall = parseWallDateTime(value);
+  if (!wall) return undefined;
+  return wall.hasSeconds ? 'second' : 'minute';
+}
+
+function localRangeForPrecision(
+  d: Date,
+  precision: DatePrecision,
+): { start: Date; end: Date } {
+  const y = d.getFullYear();
+  const m = d.getMonth();
+  const day = d.getDate();
+  const h = d.getHours();
+  const min = d.getMinutes();
+  const s = d.getSeconds();
+  if (precision === 'year') {
+    return { start: new Date(y, 0, 1), end: new Date(y + 1, 0, 1) };
+  }
+  if (precision === 'month') {
+    return { start: new Date(y, m, 1), end: new Date(y, m + 1, 1) };
+  }
+  if (precision === 'day') {
+    return { start: new Date(y, m, day), end: new Date(y, m, day + 1) };
+  }
+  if (precision === 'hour') {
+    return { start: new Date(y, m, day, h), end: new Date(y, m, day, h + 1) };
+  }
+  if (precision === 'minute') {
+    return {
+      start: new Date(y, m, day, h, min),
+      end: new Date(y, m, day, h, min + 1),
+    };
+  }
+  return {
+    start: new Date(y, m, day, h, min, s),
+    end: new Date(y, m, day, h, min, s + 1),
+  };
+}
+
+function datetimeRange(
+  value: unknown,
+  precision: DatePrecision,
+): { start: Date; end: Date } {
+  if (typeof value !== 'string') unsupported();
+  if (!hasExplicitOffset(value)) {
+    const wall = parseWallDateTime(value);
+    if (wall) return localRangeForPrecision(wall.date, precision);
+  }
+  return dateRangeForPrecision(value, precision);
+}
+
+function datePrecisionClause(
+  path: string,
+  value: unknown,
+  precision: DatePrecision,
+): Record<string, unknown> {
+  const range = datetimeRange(value, precision);
+  return { [path]: { $gte: range.start, $lt: range.end } };
+}
+
+function datePeriod(value: string): { start: string; end?: string } {
+  if (/^\d{4}$/.test(value)) {
+    return { start: `${value}-01-01`, end: `${Number(value) + 1}-01-01` };
+  }
+  if (/^\d{4}-\d{2}$/.test(value)) {
+    const year = Number(value.slice(0, 4));
+    const month = Number(value.slice(5, 7));
+    const end =
+      month === 12
+        ? `${year + 1}-01-01`
+        : `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    return { start: `${value}-01`, end };
+  }
+  return { start: value };
+}
+
+function dateCompare(
+  path: string,
+  op: string,
+  value: unknown,
+): Record<string, unknown> {
+  if (op === 'between') {
+    if (!Array.isArray(value) || value.length !== 2) unsupported();
+    if (typeof value[0] !== 'string' || typeof value[1] !== 'string') {
+      unsupported();
+    }
+    const start = datePeriod(value[0]);
+    const end = datePeriod(value[1]);
+    return {
+      [path]: end.end
+        ? { $gte: start.start, $lt: end.end }
+        : { $gte: start.start, $lte: end.start },
+    };
+  }
+  if (typeof value !== 'string') unsupported();
+  const period = datePeriod(value);
+  if (op === 'eq') {
+    return period.end
+      ? { [path]: { $gte: period.start, $lt: period.end } }
+      : { [path]: period.start };
+  }
+  if (op === 'ne') {
+    return period.end
+      ? { $nor: [{ [path]: { $gte: period.start, $lt: period.end } }] }
+      : { [path]: { $ne: period.start } };
+  }
+  if (op === 'gte') return { [path]: { $gte: period.start } };
+  if (op === 'gt') {
+    return period.end
+      ? { [path]: { $gte: period.end } }
+      : { [path]: { $gt: period.start } };
+  }
+  if (op === 'lt') return { [path]: { $lt: period.start } };
+  if (op === 'lte') {
+    return period.end
+      ? { [path]: { $lt: period.end } }
+      : { [path]: { $lte: period.start } };
+  }
+  unsupported();
 }
 
 function emptyClause(path: string): Record<string, unknown> {
@@ -136,7 +365,9 @@ function containsClause(
   path: string,
   value: unknown,
 ): Record<string, unknown> {
-  if (type === 'createdAt' || type === 'createdBy') unsupported();
+  if (type === 'createdAt' || type === 'createdBy' || type === 'updatedAt') {
+    unsupported();
+  }
   if (typeof value !== 'string') unsupported();
   if (type === 'number') {
     return {
@@ -158,13 +389,84 @@ function buildClause(
   path: string,
   op: string,
   value: unknown,
+  precision?: DatePrecision,
 ): Record<string, unknown> {
-  if (type === 'createdBy' && op !== 'eq' && op !== 'in') unsupported();
+  if (op === 'empty') return emptyClause(path);
+  if (op === 'nempty') return { $nor: [emptyClause(path)] };
+  if (
+    type === 'createdBy' &&
+    op !== 'eq' &&
+    op !== 'ne' &&
+    op !== 'in'
+  ) {
+    unsupported();
+  }
+  if (
+    type === 'date' &&
+    (op === 'eq' ||
+      op === 'ne' ||
+      op === 'gt' ||
+      op === 'gte' ||
+      op === 'lt' ||
+      op === 'lte' ||
+      op === 'between')
+  ) {
+    return dateCompare(path, op, value);
+  }
+  let resolvedPrecision = precision;
+  if (
+    resolvedPrecision === undefined &&
+    type === 'datetime' &&
+    typeof value === 'string' &&
+    (op === 'eq' || op === 'ne')
+  ) {
+    resolvedPrecision = inferDatetimePrecision(value);
+  }
+  if (resolvedPrecision !== undefined) {
+    if (type !== 'datetime' || !DATE_PRECISIONS.has(resolvedPrecision)) {
+      unsupported();
+    }
+    if (op !== 'eq' && op !== 'ne' && op !== 'in') {
+      unsupported();
+    }
+  }
   const prepared = asDateIfNeeded(type, value);
-  if (op === 'eq') return { [path]: prepared };
-  if (op === 'ne') return { [path]: { $ne: prepared } };
+  if (op === 'eq') {
+    return resolvedPrecision
+      ? datePrecisionClause(path, value, resolvedPrecision)
+      : { [path]: prepared };
+  }
+  if (op === 'ne') {
+    if (resolvedPrecision) {
+      const range = datetimeRange(value, resolvedPrecision);
+      return { $nor: [{ [path]: { $gte: range.start, $lt: range.end } }] };
+    }
+    return { [path]: { $ne: prepared } };
+  }
   if (op === 'in') {
     if (!Array.isArray(value)) unsupported();
+    if (precision) {
+      if (!value.length) return { [path]: { $in: [] } };
+      return {
+        $or: value.map((item) => datePrecisionClause(path, item, precision)),
+      };
+    }
+    if (
+      type === 'datetime' &&
+      value.some(
+        (item) => typeof item === 'string' && inferDatetimePrecision(item),
+      )
+    ) {
+      return {
+        $or: value.map((item) => {
+          const itemPrecision =
+            typeof item === 'string' ? inferDatetimePrecision(item) : undefined;
+          return itemPrecision
+            ? datePrecisionClause(path, item, itemPrecision)
+            : { [path]: asDateIfNeeded(type, item) };
+        }),
+      };
+    }
     const items = value.map((item) => asDateIfNeeded(type, item));
     return { [path]: { $in: items } };
   }
@@ -175,11 +477,16 @@ function buildClause(
     const regex = clause[path] as { $regex: string; $options: string };
     return { [path]: { $not: regex } };
   }
-  if (op === 'empty') return emptyClause(path);
-  if (op === 'nempty') return { $nor: [emptyClause(path)] };
   if (op === 'gt' || op === 'gte' || op === 'lt' || op === 'lte') {
-    if (type !== 'createdAt' && !RANGE_TYPES.has(type)) unsupported();
+    if (!RANGE_TYPES.has(type)) unsupported();
     return { [path]: { [`$${op}`]: prepared } };
+  }
+  if (op === 'between') {
+    if (!RANGE_TYPES.has(type)) unsupported();
+    if (!Array.isArray(value) || value.length !== 2) unsupported();
+    const start = asDateIfNeeded(type, value[0]);
+    const end = asDateIfNeeded(type, value[1]);
+    return { [path]: { $gte: start, $lte: end } };
   }
   unsupported();
 }
@@ -220,7 +527,13 @@ export function buildRecordQuery(
 
   const clauses = (body.filters ?? []).map((item) => {
     const resolved = resolvePath(item.key, fields);
-    return buildClause(resolved.type, resolved.path, item.op, item.value);
+    return buildClause(
+      resolved.type,
+      resolved.path,
+      item.op,
+      item.value,
+      item.precision,
+    );
   });
   const filter = combineClauses(clauses, body.match);
 

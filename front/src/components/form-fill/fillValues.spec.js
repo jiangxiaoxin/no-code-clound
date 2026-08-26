@@ -4,8 +4,10 @@ import {
   buildRecordData,
   cloneRecordValues,
   emptyRecordValues,
+  formatCellValue,
   isFillable,
 } from './fillValues.js'
+import { asDate, formatQueryTimeValue } from '../../utils/timeValue.js'
 
 const fields = [
   { key: 'name', type: 'input' },
@@ -55,5 +57,38 @@ test('选择数据 id is persisted but not treated as a fillable column', () => 
   assert.deepEqual(
     buildRecordData([pick], { pick: undefined }, { clearEmpty: true }),
     { pick: null },
+  )
+})
+
+test('asDate keeps ISO datetime in UTC and parses wall-clock strings locally', () => {
+  const iso = asDate('2026-07-31T16:00:00.000Z')
+  assert.equal(iso.getTime(), Date.parse('2026-07-31T16:00:00.000Z'))
+  const wall = asDate('2026-08-01 00:00:00')
+  assert.equal(wall.getFullYear(), 2026)
+  assert.equal(wall.getMonth(), 7)
+  assert.equal(wall.getDate(), 1)
+  assert.equal(wall.getHours(), 0)
+})
+
+test('formatQueryTimeValue follows field format', () => {
+  const picked = new Date(2026, 7, 1, 14, 30, 0)
+  assert.equal(formatQueryTimeValue('date', 'year', picked), '2026')
+  assert.equal(
+    formatQueryTimeValue('datetime', 'YYYY-MM-DD HH:mm', picked),
+    '2026-08-01 14:30',
+  )
+})
+
+test('formatCellValue shows datetime from ISO in local time', () => {
+  assert.equal(
+    formatCellValue(
+      { type: 'datetime', format: 'YYYY-MM-DD HH:mm:ss' },
+      '2026-07-31T16:00:00.000Z',
+    ),
+    formatQueryTimeValue(
+      'datetime',
+      'YYYY-MM-DD HH:mm:ss',
+      new Date('2026-07-31T16:00:00.000Z'),
+    ),
   )
 })

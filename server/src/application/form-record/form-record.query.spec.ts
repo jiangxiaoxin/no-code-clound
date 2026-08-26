@@ -9,6 +9,7 @@ import {
 const fields = [
   { key: 'name', type: 'input' },
   { key: 'age', type: 'number' },
+  { key: 'happenedAt', type: 'datetime' },
   { key: 'tags', type: 'checkbox' },
   { key: 'pic', type: 'image' },
 ];
@@ -220,6 +221,155 @@ describe('buildRecordQuery', () => {
     ).toEqual({
       $and: [{ 'data.age': { $gte: 18 } }, { 'data.age': { $lte: 30 } }],
     });
+  });
+
+  it('maps between to a closed range', () => {
+    expect(
+      buildRecordQuery(
+        [
+          { key: 'day', type: 'date' },
+          { key: 'name', type: 'input' },
+        ],
+        {
+          filters: [
+            { key: 'day', op: 'between', value: ['2026-08-01', '2026-08-31'] },
+          ],
+        },
+      ).filter,
+    ).toEqual({
+      'data.day': { $gte: '2026-08-01', $lte: '2026-08-31' },
+    });
+  });
+
+  it('matches date eq by year and month wall-clock strings', () => {
+    expect(
+      buildRecordQuery([{ key: 'day', type: 'date' }], {
+        filters: [{ key: 'day', op: 'eq', value: '2026' }],
+      }).filter,
+    ).toEqual({
+      'data.day': { $gte: '2026-01-01', $lt: '2027-01-01' },
+    });
+    expect(
+      buildRecordQuery([{ key: 'day', type: 'date' }], {
+        filters: [{ key: 'day', op: 'eq', value: '2026-08' }],
+      }).filter,
+    ).toEqual({
+      'data.day': { $gte: '2026-08-01', $lt: '2026-09-01' },
+    });
+  });
+
+  it('matches datetime wall-clock eq by the value format', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'happenedAt', op: 'eq', value: '2026-08-26 14:20:35' }],
+      }).filter,
+    ).toEqual({
+      'data.happenedAt': {
+        $gte: new Date(2026, 7, 26, 14, 20, 35),
+        $lt: new Date(2026, 7, 26, 14, 20, 36),
+      },
+    });
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'happenedAt', op: 'eq', value: '2026-08-26 14:20' }],
+      }).filter,
+    ).toEqual({
+      'data.happenedAt': {
+        $gte: new Date(2026, 7, 26, 14, 20, 0),
+        $lt: new Date(2026, 7, 26, 14, 21, 0),
+      },
+    });
+  });
+
+  it('parses datetime gte from a wall-clock string', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [
+          { key: 'happenedAt', op: 'gte', value: '2026-08-01 00:00:00' },
+        ],
+      }).filter,
+    ).toEqual({
+      'data.happenedAt': { $gte: new Date(2026, 7, 1, 0, 0, 0) },
+    });
+  });
+
+  it('filters system createdAt and updatedBy', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [
+          {
+            key: 'createdAt',
+            op: 'between',
+            value: ['2026-08-01T00:00:00.000Z', '2026-08-31T23:59:59.000Z'],
+          },
+        ],
+      }).filter,
+    ).toEqual({
+      createdAt: {
+        $gte: new Date('2026-08-01T00:00:00.000Z'),
+        $lte: new Date('2026-08-31T23:59:59.000Z'),
+      },
+    });
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'updatedBy', op: 'eq', value: '3' }],
+      }).filter,
+    ).toEqual({ updatedBy: 3 });
+  });
+
+  it.each([
+    ['year', '2026-08-26T14:20:35+08:00', '2025-12-31T16:00:00.000Z', '2026-12-31T16:00:00.000Z'],
+    ['month', '2026-08-26T14:20:35+08:00', '2026-07-31T16:00:00.000Z', '2026-08-31T16:00:00.000Z'],
+    ['day', '2026-08-26T14:20:35+08:00', '2026-08-25T16:00:00.000Z', '2026-08-26T16:00:00.000Z'],
+    ['hour', '2026-08-26T14:20:35+08:00', '2026-08-26T06:00:00.000Z', '2026-08-26T07:00:00.000Z'],
+    ['minute', '2026-08-26T14:20:35+08:00', '2026-08-26T06:20:00.000Z', '2026-08-26T06:21:00.000Z'],
+    ['second', '2026-08-26T14:20:35+08:00', '2026-08-26T06:20:35.000Z', '2026-08-26T06:20:36.000Z'],
+  ])('matches datetime eq by %s precision', (precision, value, start, end) => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [{ key: 'createdAt', op: 'eq', value, precision }],
+      }).filter,
+    ).toEqual({
+      createdAt: { $gte: new Date(start), $lt: new Date(end) },
+    });
+  });
+
+  it('applies precision to form datetime fields and supports in', () => {
+    expect(
+      buildRecordQuery(fields, {
+        filters: [
+          {
+            key: 'happenedAt',
+            op: 'in',
+            value: ['2026-08-26T06:20:35.000Z', '2026-08-26T06:21:00.000Z'],
+            precision: 'second',
+          },
+        ],
+      }).filter,
+    ).toEqual({
+      $or: [
+        {
+          'data.happenedAt': {
+            $gte: new Date('2026-08-26T06:20:35.000Z'),
+            $lt: new Date('2026-08-26T06:20:36.000Z'),
+          },
+        },
+        {
+          'data.happenedAt': {
+            $gte: new Date('2026-08-26T06:21:00.000Z'),
+            $lt: new Date('2026-08-26T06:21:01.000Z'),
+          },
+        },
+      ],
+    });
+  });
+
+  it('rejects precision for non-datetime fields', () => {
+    expect(() =>
+      buildRecordQuery(fields, {
+        filters: [{ key: 'name', op: 'eq', value: 'x', precision: 'day' }],
+      }),
+    ).toThrow(BadRequestException);
   });
 });
 

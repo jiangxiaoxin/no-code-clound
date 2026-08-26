@@ -1,10 +1,16 @@
 import { Type } from 'class-transformer';
 import { IsArray, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import type { DatePrecision } from '../form-record.query';
 
 export class QueryRecordsDto {
   @IsOptional()
   @IsArray()
-  filters?: { key: string; op: string; value: unknown }[];
+  filters?: {
+    key: string;
+    op: string;
+    value: unknown;
+    precision?: DatePrecision;
+  }[];
 
   @IsOptional()
   @IsIn(['all', 'any'])

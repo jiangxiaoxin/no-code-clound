@@ -135,7 +135,7 @@ async function loadTableItems() {
         const result = await queryRecordsOnce(
           props.appId,
           resolveSourceFormId(field),
-          buildSourceQuery(field.optionFilters, props.values),
+          buildSourceQuery(field.optionFilters, props.values, props.fields),
         )
         next[field.key] = recordsToSelectItems(
           result?.items,

@@ -73,6 +73,7 @@
                 :form-id="form.id"
                 :row="row"
                 :field="fieldByKey[col.key]"
+                :fields="fields"
                 :dict-items-by-code="dictItemsByCode"
                 :editing="editingCell === cellKey(row.id, col.key)"
                 @start="editingCell = cellKey(row.id, col.key)"

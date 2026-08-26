@@ -1,3 +1,5 @@
+import { asDate, formatTimeFieldValue, pad } from '../../utils/timeValue.js'
+
 const SKIP_TYPES = new Set([
   'divider',
   'image',
@@ -61,18 +63,6 @@ export function isEmptyValue(field, value) {
     return value == null || value === ''
   }
   return value == null || value === ''
-}
-
-function pad(n) {
-  return String(n).padStart(2, '0')
-}
-
-function asDate(value) {
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value
-  }
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? null : d
 }
 
 export function serializeValue(field, value) {
@@ -180,34 +170,10 @@ export function formatCellValue(field, value, dictItemsByCode) {
     const found = items.find((item) => item.value === value)
     return found ? found.label : String(value)
   }
-  if (field.type === 'date') {
-    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/)
-    const d = match ? null : asDate(value)
-    if (!match && !d) return String(value)
-    const y = match ? match[1] : String(d.getFullYear())
-    const m = match ? match[2] : pad(d.getMonth() + 1)
-    const day = match ? match[3] : pad(d.getDate())
-    if (field.format === 'year') return y
-    if (field.format === 'month') return `${y}-${m}`
-    return `${y}-${m}-${day}`
-  }
-  if (field.type === 'time') {
-    let text = typeof value === 'string' ? value : ''
-    if (!text) {
-      const d = asDate(value)
-      text = d
-        ? `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-        : String(value)
-    }
-    return (field.format || 'HH:mm:ss') === 'HH:mm' ? text.slice(0, 5) : text
-  }
-  if (field.type === 'datetime') {
+  if (field.type === 'date' || field.type === 'time' || field.type === 'datetime') {
     const d = asDate(value)
     if (!d) return String(value)
-    const text = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-    return (field.format || 'YYYY-MM-DD HH:mm:ss') === 'YYYY-MM-DD HH:mm'
-      ? text.slice(0, 16)
-      : text
+    return formatTimeFieldValue(field.type, field.format, d)
   }
   if (Array.isArray(value)) return value.join('、')
   return String(value)

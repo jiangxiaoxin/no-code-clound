@@ -19,34 +19,34 @@
     </span>
     <el-input
       v-if="field.type === 'input'"
-      :model-value="modelValue"
+      v-model="draft"
       :disabled="disabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onCommitDraft"
     />
     <el-input-number
       v-else-if="field.type === 'number'"
       class="fill-full"
       align="left"
-      :model-value="modelValue"
+      v-model="draft"
       :disabled="disabled"
       :controls="false"
       :precision="field.precision"
       :min="field.rangeEnabled ? field.min : undefined"
       :max="field.rangeEnabled ? field.max : undefined"
       :placeholder="field.placeholder"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onCommitDraft"
     />
     <el-input
       v-else-if="field.type === 'textarea'"
+      v-model="draft"
       type="textarea"
       :rows="3"
-      :model-value="modelValue"
       :disabled="disabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onCommitDraft"
     />
     <div
       v-else-if="(field.type === 'radio' || field.type === 'checkbox') && !field.dictCode"
@@ -58,7 +58,7 @@
       v-else-if="field.type === 'radio'"
       :model-value="modelValue"
       :disabled="disabled"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onUpdateModelValue"
     >
       <el-radio v-for="item in items" :key="item.value" :value="item.value">
         {{ item.label }}
@@ -68,7 +68,7 @@
       v-else-if="field.type === 'checkbox'"
       :model-value="modelValue"
       :disabled="disabled"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onUpdateModelValue"
     >
       <el-checkbox v-for="item in items" :key="item.value" :value="item.value">
         {{ item.label }}
@@ -77,31 +77,31 @@
     <el-date-picker
       v-else-if="field.type === 'date'"
       class="fill-full"
-      :model-value="modelValue"
+      v-model="draft"
       :disabled="disabled"
       :type="field.format || 'date'"
       :placeholder="field.placeholder || '请选择'"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onCommitDraft"
     />
     <el-time-picker
       v-else-if="field.type === 'time'"
       class="fill-full"
-      :model-value="modelValue"
+      v-model="draft"
       :disabled="disabled"
       :format="field.format || 'HH:mm:ss'"
       :value-format="field.format || 'HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onCommitDraft"
     />
     <el-date-picker
       v-else-if="field.type === 'datetime'"
       class="fill-full"
       type="datetime"
-      :model-value="modelValue"
+      v-model="draft"
       :disabled="disabled"
       :format="field.format || 'YYYY-MM-DD HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onCommitDraft"
     />
     <div v-else-if="needsOptionSourceHint" class="fill-field-hint">
       请配置选项来源
@@ -113,7 +113,7 @@
       :model-value="modelValue"
       :disabled="disabled"
       :placeholder="field.placeholder"
-      @update:model-value="$emit('update:modelValue', $event)"
+      @change="onUpdateModelValue"
     >
       <el-option
         v-for="item in items"
@@ -166,7 +166,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { isSelectType, widthClass } from '../form-design/fieldTypes'
 import FormDataSelect from './FormDataSelect.vue'
@@ -181,12 +181,29 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'fill'])
 
+function cloneDraft(value) {
+  return Array.isArray(value) ? [...value] : value
+}
+
+const draft = ref(cloneDraft(props.modelValue))
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    draft.value = cloneDraft(value)
+  },
+)
+
 const fieldKeyTitle = computed(() =>
   import.meta.env.DEV ? props.field.key || undefined : undefined,
 )
 
 function onUpdateModelValue(value) {
   emit('update:modelValue', value)
+}
+
+function onCommitDraft() {
+  emit('update:modelValue', cloneDraft(draft.value))
 }
 
 function onFill(patches) {

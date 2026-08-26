@@ -132,6 +132,7 @@ const props = defineProps({
   formId: { type: Number, required: true },
   row: { type: Object, required: true },
   field: { type: Object, default: null },
+  fields: { type: Array, default: () => [] },
   dictItemsByCode: { type: Object, default: () => ({}) },
   editing: { type: Boolean, default: false },
 })
@@ -200,7 +201,7 @@ async function loadTableItems() {
     const result = await queryFormRecordsApi(
       props.appId,
       resolveSourceFormId(field),
-      buildSourceQuery(field.optionFilters, props.row.data),
+      buildSourceQuery(field.optionFilters, props.row.data, props.fields),
     )
     tableItems.value = recordsToSelectItems(
       result?.items,
