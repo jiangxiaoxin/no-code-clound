@@ -1,0 +1,43 @@
+---
+description: 模板和 HTML 里不允许写行内 JS，即使只有一行也要抽到 script
+globs: front/**/*.{vue,js,html}
+alwaysApply: true
+---
+
+# 禁止行内 JS
+
+写或改 `front/` 时，**不要在模板、HTML 属性里写 JavaScript**，即使只有一行赋值或调用。逻辑放到 `<script>` 里的函数。
+
+事件只绑定函数名，不要在 `@click` / `@change` 等属性里写语句。
+
+```vue
+<!-- ❌ BAD -->
+<div @click="mappingVisible = true">设置填充字段</div>
+<el-button @click="previewVisible = false">关闭</el-button>
+<el-radio-group @change="$emit('update:width', $event)">
+```
+
+```vue
+<!-- ✅ GOOD -->
+<div @click="openMapping">设置填充字段</div>
+<el-button @click="closePreview">关闭</el-button>
+<el-radio-group @change="onWidthChange">
+```
+
+```js
+function openMapping() {
+  mappingVisible.value = true
+}
+
+function closePreview() {
+  previewVisible.value = false
+}
+
+function onWidthChange(value) {
+  emit('update:width', value)
+}
+```
+
+也不要写 `onclick="..."`、`javascript:` 链接，或在 `<template>` 里塞 `<script>`。
+
+`v-if`、`v-model`、插值绑定已有变量可以继续用。已有行内 JS 不必专门改写；改到相关代码时抽成函数。

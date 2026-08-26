@@ -142,6 +142,51 @@
           </div>
         </el-form-item>
       </template>
+      <template v-else-if="field.type === 'data'">
+        <el-form-item label="数据源">
+          <FormSourcePicker
+            :app-id="appId"
+            :form-id="formId"
+            :source-form-id="field.sourceFormId"
+            @select="onSourceFormSelect"
+          />
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId" label="显示字段">
+          <div
+            class="filter-trigger"
+            :class="{ 'is-placeholder': !hasDisplayFields }"
+            @click="openDisplayFields"
+          >
+            {{ displayFieldsTriggerText }}
+          </div>
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId" label="填充到表单中的字段">
+          <div
+            class="filter-trigger"
+            :class="{ 'is-placeholder': !hasFillMappings(field.fillMappings) }"
+            @click="mappingVisible = true"
+          >
+            {{
+              hasFillMappings(field.fillMappings)
+                ? `已添加 ${field.fillMappings.length} 条填充规则`
+                : '设置填充字段'
+            }}
+          </div>
+        </el-form-item>
+      </template>
+      <DataSelectDisplayFieldsDialog
+        v-model="displayVisible"
+        :display-field-keys="field?.displayFieldKeys"
+        :source-fields="sourceFields"
+        @confirm="onDisplayConfirm"
+      />
+      <DataSelectFillMappingDialog
+        v-model="mappingVisible"
+        :fill-mappings="field?.fillMappings"
+        :source-fields="sourceFields"
+        :form-fields="formFields"
+        @confirm="onMappingConfirm"
+      />
       <FormOptionFilterDialog
         v-model="filterVisible"
         :app-id="appId"
@@ -170,8 +215,17 @@
 import { computed, ref, watch } from 'vue'
 import { formatOptions, formColumnOptions } from './fieldTypes'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
+import FormSourcePicker from './FormSourcePicker.vue'
 import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
+import DataSelectDisplayFieldsDialog from './DataSelectDisplayFieldsDialog.vue'
+import DataSelectFillMappingDialog from './DataSelectFillMappingDialog.vue'
 import { hasOptionFilters } from './optionFilters'
+import {
+  cloneDisplayFieldKeys,
+  findDisplaySourceField,
+  hasDisplayFieldKeys,
+  hasFillMappings,
+} from './dataSelect'
 import { isFillable } from '../form-fill/fillValues'
 import { listDictionaryOptionsApi, listFormFieldsApi } from '../../api/apps'
 
@@ -189,12 +243,31 @@ defineEmits(['update:tab', 'update:width', 'update:columns'])
 const dictionaries = ref([])
 const sourceFields = ref([])
 const filterVisible = ref(false)
+const displayVisible = ref(false)
+const mappingVisible = ref(false)
 
 const formFields = computed(() =>
   (props.fields || []).filter(
     (item) => isFillable(item) && item.key !== props.field?.key,
   ),
 )
+
+const hasDisplayFields = computed(() =>
+  hasDisplayFieldKeys(props.field?.displayFieldKeys),
+)
+
+const displayFieldsTriggerText = computed(() => {
+  if (!hasDisplayFields.value) {
+    return '请选择显示字段'
+  }
+  return `已选择 ${cloneDisplayFieldKeys(props.field.displayFieldKeys).length} 个字段`
+})
+
+function openDisplayFields() {
+  displayVisible.value = true
+  console.log('open field config', props.field);
+  
+}
 
 async function loadOptions() {
   if (!props.appId) {
@@ -246,6 +319,46 @@ function onFilterConfirm(next) {
   }
 }
 
+function onSourceFormSelect({ formId }) {
+  if (!props.field) {
+    return
+  }
+  if (props.field.sourceFormId !== formId) {
+    props.field.displayFieldKeys = []
+    props.field.fillMappings = []
+    delete props.field.displayFieldLabels
+  }
+  props.field.sourceFormId = formId
+}
+
+function onDisplayConfirm(next) {
+  if (!props.field) {
+    return
+  }
+  props.field.displayFieldKeys = next
+  const labels = {}
+  for (const key of next) {
+    const item = findDisplaySourceField(sourceFields.value, key)
+    labels[key] = item?.title || key
+  }
+  if (next.length) {
+    props.field.displayFieldLabels = labels
+  } else {
+    delete props.field.displayFieldLabels
+  }
+}
+
+function onMappingConfirm(next) {
+  if (!props.field) {
+    return
+  }
+  if (next.length) {
+    props.field.fillMappings = next
+  } else {
+    delete props.field.fillMappings
+  }
+}
+
 async function loadSourceFields() {
   if (!props.appId || !props.field?.sourceFormId) {
     sourceFields.value = []
@@ -274,6 +387,8 @@ watch(
   () => props.field?.key,
   () => {
     filterVisible.value = false
+    displayVisible.value = false
+    mappingVisible.value = false
   },
 )
 </script>

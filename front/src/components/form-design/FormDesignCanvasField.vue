@@ -127,12 +127,18 @@
       v-else-if="
         field.type === 'member' ||
         field.type === 'dept' ||
-        field.type === 'data' ||
         field.type === 'relate'
       "
       disabled
       class="canvas-item"
       :placeholder="field.placeholder"
+    />
+    <FormDataSelect
+      v-else-if="field.type === 'data'"
+      class="canvas-item"
+      :app-id="appId"
+      :field="field"
+      preview
     />
     <el-divider v-else-if="field.type === 'divider'">
       {{ field.title }}
@@ -163,8 +169,10 @@
 import { computed } from 'vue'
 import { CopyDocument, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { isSelectType, widthClass } from './fieldTypes'
+import FormDataSelect from '../form-fill/FormDataSelect.vue'
 
 const props = defineProps({
+  appId: { type: Number, default: 0 },
   field: { type: Object, required: true },
   items: { type: Array, default: () => [] },
   selected: { type: Boolean, default: false },

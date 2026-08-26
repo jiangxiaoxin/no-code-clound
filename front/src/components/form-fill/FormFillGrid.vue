@@ -3,11 +3,13 @@
     <FormFillField
       v-for="field in fields"
       :key="field.key"
+      :app-id="appId"
       :field="field"
       :items="itemsFor(field)"
       :model-value="values[field.key]"
       :disabled="disabled"
       @update:model-value="values[field.key] = $event"
+      @fill="onFill"
     />
   </div>
 </template>
@@ -76,6 +78,13 @@ function itemsFor(field) {
     return tableItemsByKey.value[field.key] || []
   }
   return props.dictItemsByCode[field.dictCode] || []
+}
+
+function onFill(patches) {
+  if (!patches) return
+  for (const [key, value] of Object.entries(patches)) {
+    props.values[key] = value
+  }
 }
 
 function hasFieldFilterRefs() {

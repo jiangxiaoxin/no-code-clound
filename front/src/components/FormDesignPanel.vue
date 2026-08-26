@@ -8,6 +8,7 @@
     <el-container class="form-layout">
       <FormDesignPalette @add="addField" />
       <FormDesignCanvas
+        :app-id="appId"
         :fields="fields"
         :selected-key="selectedKey"
         :dict-items-by-code="dictItemsByCode"
@@ -54,6 +55,11 @@ import FormDesignProps from './form-design/FormDesignProps.vue'
 import { listDictionaryItemsByCodesApi, saveFormFieldsApi } from '../api/apps'
 import { defaultWidthByColumns, isSelectType } from './form-design/fieldTypes'
 import { cloneOptionFilters } from './form-design/optionFilters'
+import {
+  cloneDisplayFieldKeys,
+  cloneDisplayFieldLabels,
+  cloneFillMappings,
+} from './form-design/dataSelect'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -164,6 +170,15 @@ function copyField(field) {
   }
   if (field.optionFilters) {
     copied.optionFilters = cloneOptionFilters(field.optionFilters)
+  }
+  if (field.displayFieldKeys) {
+    copied.displayFieldKeys = cloneDisplayFieldKeys(field.displayFieldKeys)
+  }
+  if (field.displayFieldLabels) {
+    copied.displayFieldLabels = cloneDisplayFieldLabels(field.displayFieldLabels)
+  }
+  if (field.fillMappings) {
+    copied.fillMappings = cloneFillMappings(field.fillMappings)
   }
   const index = fields.value.findIndex((item) => item.key === field.key)
   fields.value.splice(index + 1, 0, copied)

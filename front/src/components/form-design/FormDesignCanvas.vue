@@ -14,6 +14,7 @@
         <FormDesignCanvasField
           v-for="field in fields"
           :key="field.key"
+          :app-id="appId"
           :field="field"
           :items="dictItemsByCode[field.dictCode] || []"
           :selected="selectedKey === field.key"
@@ -38,6 +39,7 @@ import { fieldTypes } from './fieldTypes'
 import FormDesignCanvasField from './FormDesignCanvasField.vue'
 
 defineProps({
+  appId: { type: Number, default: 0 },
   fields: { type: Array, required: true },
   selectedKey: { type: String, default: '' },
   dictItemsByCode: { type: Object, default: () => ({}) },

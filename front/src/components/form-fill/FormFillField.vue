@@ -122,12 +122,19 @@
       v-else-if="
         field.type === 'member' ||
         field.type === 'dept' ||
-        field.type === 'data' ||
         field.type === 'relate'
       "
       disabled
       class="fill-full"
       :placeholder="field.placeholder"
+    />
+    <FormDataSelect
+      v-else-if="field.type === 'data'"
+      class="fill-full"
+      :app-id="appId"
+      :field="field"
+      :disabled="disabled"
+      @fill="$emit('fill', $event)"
     />
     <el-divider v-else-if="field.type === 'divider'">
       {{ field.title }}
@@ -156,15 +163,17 @@
 import { computed } from 'vue'
 import { InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { isSelectType, widthClass } from '../form-design/fieldTypes'
+import FormDataSelect from './FormDataSelect.vue'
 
 const props = defineProps({
   field: { type: Object, required: true },
   items: { type: Array, default: () => [] },
   modelValue: { default: undefined },
   disabled: { type: Boolean, default: false },
+  appId: { type: Number, default: 0 },
 })
 
-defineEmits(['update:modelValue'])
+defineEmits(['update:modelValue', 'fill'])
 
 const needsOptionSourceHint = computed(() => {
   const field = props.field
