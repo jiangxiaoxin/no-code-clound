@@ -24,10 +24,11 @@ http.interceptors.response.use(
     return body?.data
   },
   async (error) => {
-    const message = error.response?.data?.message || '请求失败'
-    ElMessage.error(message)
-
     const status = error.response?.status
+    const message = error.response?.data?.message || '请求失败'
+    if (!(error.config?.silent404 && status === 404)) {
+      ElMessage.error(message)
+    }
     const url = String(error.config?.url || '')
     const isAuthAttempt =
       url.includes('/auth/login') || url.includes('/auth/register')

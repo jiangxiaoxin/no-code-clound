@@ -29,8 +29,8 @@ export const fieldTypes = [
   { type: 'select', label: '下拉单选框', icon: SemiSelect, component: 'el-select', placeholder: '请选择' },
   { type: 'select-multiple', label: '下拉多选框', icon: SemiSelect, component: 'el-select', placeholder: '请选择' },
   { type: 'divider', label: '分割线', icon: Minus, component: 'el-divider', placeholder: '' },
-  
   { type: 'data', label: '选择数据', icon: Grid, component: 'DataSelect', placeholder: '请选择' },
+  // -----------以下未完成
   { type: 'member', label: '成员选择', icon: User, component: 'MemberSelect', placeholder: '请选择' },
   { type: 'dept', label: '部门选择', icon: OfficeBuilding, component: 'DeptSelect', placeholder: '请选择' },
   { type: 'image', label: '图片上传', icon: Picture, component: 'el-upload', placeholder: '' },

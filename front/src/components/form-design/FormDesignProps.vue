@@ -9,7 +9,7 @@
       </span>
     </div>
     <el-empty v-if="tab === 'field' && !field" description="请选择字段" />
-    <el-form v-else-if="tab === 'form'" label-position="top">
+    <el-form v-else-if="tab === 'form'" label-position="top" @submit.prevent>
       <el-form-item label="表单布局">
         <el-select :model-value="columns" @change="$emit('update:columns', $event)">
           <el-option
@@ -21,7 +21,7 @@
         </el-select>
       </el-form-item>
     </el-form>
-    <el-form v-else-if="tab === 'field'" label-position="top">
+    <el-form v-else-if="tab === 'field'" label-position="top" @submit.prevent>
       <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>

@@ -91,6 +91,12 @@ const dictItemsByCode = ref({})
 const loadSession = ref(0)
 
 function resetValues() {
+  console.log('--resteValues');
+  setTimeout(() => {
+    console.log('清空后', values);
+    
+  }, 1000);
+  
   for (const key of Object.keys(values)) {
     delete values[key]
   }

@@ -134,7 +134,9 @@
       :app-id="appId"
       :field="field"
       :disabled="disabled"
-      @fill="$emit('fill', $event)"
+      :model-value="modelValue"
+      @update:model-value="onUpdateModelValue"
+      @fill="onFill"
     />
     <el-divider v-else-if="field.type === 'divider'">
       {{ field.title }}
@@ -173,7 +175,15 @@ const props = defineProps({
   appId: { type: Number, default: 0 },
 })
 
-defineEmits(['update:modelValue', 'fill'])
+const emit = defineEmits(['update:modelValue', 'fill'])
+
+function onUpdateModelValue(value) {
+  emit('update:modelValue', value)
+}
+
+function onFill(patches) {
+  emit('fill', patches)
+}
 
 const needsOptionSourceHint = computed(() => {
   const field = props.field

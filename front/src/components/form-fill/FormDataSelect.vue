@@ -80,6 +80,7 @@ import { computed, ref, watch } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import {
   getFormApi,
+  getFormRecordApi,
   listDictionaryItemsByCodesApi,
   queryFormRecordsApi,
 } from '../../api/apps'
@@ -98,9 +99,10 @@ const props = defineProps({
   appId: { type: Number, default: 0 },
   disabled: { type: Boolean, default: false },
   preview: { type: Boolean, default: false },
+  modelValue: { default: undefined },
 })
 
-const emit = defineEmits(['fill'])
+const emit = defineEmits(['fill', 'update:modelValue'])
 
 /**
  * 选择数据是模拟select的样式和操作，实际上就是div
@@ -115,6 +117,8 @@ const pageSize = 10
 const sourceFields = ref([])
 const dictItemsByCode = ref({})
 const selected = ref(null)
+let selectedSeq = 0
+let loadedKey = ''
 
 const displayColumns = computed(() => {
   const keys = cloneDisplayFieldKeys(props.field.displayFieldKeys)
@@ -158,11 +162,14 @@ const previewRows = computed(() => {
   if (!selected.value) {
     return []
   }
-  return displayColumns.value.map((col) => ({
-    key: col.key,
-    title: col.title,
-    text: formatRecordField(col, selected.value),
-  }))
+  return keys.map((key) => {
+    const col = displayColumns.value.find((item) => item.key === key)
+    return {
+      key,
+      title: col?.title || displayFieldTitle(props.field, key),
+      text: col ? formatRecordField(col, selected.value) : '—',
+    }
+  })
 })
 
 const triggerText = computed(() => {
@@ -301,8 +308,15 @@ function onPageChange(next) {
   loadRecords()
 }
 
+function selectionKey(id) {
+  return `${props.appId}:${props.field.sourceFormId}:${id}`
+}
+
 function onPick(row) {
   selected.value = row
+  const id = row?.id || ''
+  loadedKey = id ? selectionKey(id) : ''
+  emit('update:modelValue', row?.id)
   const patches = {}
   for (const item of props.field.fillMappings || []) {
     if (!item?.sourceKey || !item?.targetKey) continue
@@ -311,6 +325,50 @@ function onPick(row) {
   emit('fill', patches)
   pickerVisible.value = false
 }
+
+async function loadSelected() {
+  const seq = ++selectedSeq
+  if (props.preview) {
+    selected.value = null
+    loadedKey = ''
+    return
+  }
+  const id =
+    typeof props.modelValue === 'string' ? props.modelValue.trim() : ''
+  if (!id || !props.appId || !props.field.sourceFormId) {
+    selected.value = null
+    loadedKey = ''
+    return
+  }
+  const key = selectionKey(id)
+  if (loadedKey === key && selected.value?.id === id) {
+    return
+  }
+  try {
+    await loadSource()
+    if (seq !== selectedSeq) return
+    if (loadedKey === key && selected.value?.id === id) return
+    const row = await getFormRecordApi(
+      props.appId,
+      props.field.sourceFormId,
+      id,
+      { silent404: true },
+    )
+    if (seq !== selectedSeq) return
+    selected.value = row
+    loadedKey = key
+  } catch {
+    if (seq !== selectedSeq) return
+    selected.value = null
+    loadedKey = ''
+  }
+}
+
+watch(
+  () => [props.modelValue, props.appId, props.field.sourceFormId, props.preview],
+  loadSelected,
+  { immediate: true },
+)
 </script>
 
 <style scoped lang="less">

@@ -88,6 +88,13 @@ export function createFormRecordApi(appId, formId, data) {
   return http.post(`/apps/${appId}/forms/${formId}/records`, { data })
 }
 
+export function getFormRecordApi(appId, formId, recordId, config = {}) {
+  return http.get(
+    `/apps/${appId}/forms/${formId}/records/${encodeURIComponent(recordId)}`,
+    config,
+  )
+}
+
 export function queryFormRecordsApi(appId, formId, payload) {
   return http.post(`/apps/${appId}/forms/${formId}/records/query`, payload)
 }

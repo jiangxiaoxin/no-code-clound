@@ -13,6 +13,10 @@ export function isFillable(field) {
   return Boolean(field?.key) && !SKIP_TYPES.has(field.type)
 }
 
+function persistsValue(field) {
+  return isFillable(field) || field.type === 'data'
+}
+
 export function emptyValue(field) {
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     return []
@@ -23,7 +27,7 @@ export function emptyValue(field) {
 export function emptyRecordValues(fields) {
   const next = {}
   for (const field of fields) {
-    if (isFillable(field)) {
+    if (persistsValue(field)) {
       next[field.key] = emptyValue(field)
     }
   }
@@ -33,6 +37,12 @@ export function emptyRecordValues(fields) {
 export function cloneRecordValues(fields, data) {
   const next = {}
   for (const field of fields) {
+    if (field.type === 'data') {
+      const value = data?.[field.key]
+      next[field.key] =
+        typeof value === 'string' && value ? value : undefined
+      continue
+    }
     if (!isFillable(field)) {
       continue
     }
@@ -96,7 +106,7 @@ export function serializeValue(field, value) {
 export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
   const data = {}
   for (const field of fields) {
-    if (!isFillable(field)) continue
+    if (!persistsValue(field)) continue
     const next = serializeValue(field, values[field.key])
     if (next !== undefined) {
       data[field.key] = next
