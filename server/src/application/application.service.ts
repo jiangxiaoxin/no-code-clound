@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AppForm } from './app-form.entity';
+import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
 import { CreateApplicationDto } from './dto/create-application.dto';
@@ -56,6 +57,8 @@ export class ApplicationService {
     private readonly groupRepo: Repository<AppGroup>,
     @InjectRepository(AppForm)
     private readonly formRepo: Repository<AppForm>,
+    @InjectRepository(AppFormConfig)
+    private readonly formConfigRepo: Repository<AppFormConfig>,
     private readonly formRecordStore: FormRecordStore,
   ) {}
 
@@ -151,6 +154,32 @@ export class ApplicationService {
       result.push({ id: form.id, name: form.name, fields });
     }
     return result;
+  }
+
+  async getFormConfig(ownerId: number, appId: number, formId: number) {
+    await this.requireOwnedApp(ownerId, appId);
+    await this.requireForm(appId, formId);
+    const row = await this.formConfigRepo.findOne({ where: { formId } });
+    return this.toFormConfig(row?.config);
+  }
+
+  async saveFormConfig(
+    ownerId: number,
+    appId: number,
+    formId: number,
+    config: unknown,
+  ) {
+    await this.requireOwnedApp(ownerId, appId);
+    await this.requireForm(appId, formId);
+    const next = this.normalizeFormConfig(config);
+    let row = await this.formConfigRepo.findOne({ where: { formId } });
+    if (!row) {
+      row = this.formConfigRepo.create({ formId, config: next });
+    } else {
+      row.config = next;
+    }
+    const saved = await this.formConfigRepo.save(row);
+    return this.toFormConfig(saved.config);
   }
 
   async directory(ownerId: number, id: number) {
@@ -329,6 +358,21 @@ export class ApplicationService {
       fields: schema.fields,
       columns: schema.columns,
     };
+  }
+
+  private normalizeFormConfig(value: unknown): Record<string, unknown> {
+    const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
+    const order = Array.isArray(input.workspaceTabOrder)
+      ? input.workspaceTabOrder.filter((item): item is 'create' | 'list' => item === 'create' || item === 'list')
+      : [];
+    const workspaceTabOrder = order.length === 2 && new Set(order).size === 2
+      ? order
+      : ['create', 'list'];
+    return { ...input, workspaceTabOrder };
+  }
+
+  private toFormConfig(value: Record<string, unknown> | null | undefined) {
+    return this.normalizeFormConfig(value);
   }
 
   private toOptionFields(

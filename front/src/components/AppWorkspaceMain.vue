@@ -9,18 +9,13 @@
         </div>
         <div class="form-work-tabs">
           <span
+            v-for="tabItem in workspaceTabs"
+            :key="tabItem.key"
             class="form-work-tab"
-            :class="{ 'is-active': tab === 'create' }"
-            @click="tab = 'create'"
+            :class="{ 'is-active': tab === tabItem.key }"
+            @click="tab = tabItem.key"
           >
-            添加数据
-          </span>
-          <span
-            class="form-work-tab"
-            :class="{ 'is-active': tab === 'list' }"
-            @click="tab = 'list'"
-          >
-            数据管理
+            {{ tabItem.label }}
           </span>
         </div>
       </div>
@@ -52,6 +47,7 @@ import { ElMessage } from 'element-plus'
 import { EditPen } from '@element-plus/icons-vue'
 import {
   createFormRecordApi,
+  getFormConfigApi,
   getFormApi,
   listDictionaryItemsByCodesApi,
 } from '../api/apps'
@@ -87,8 +83,24 @@ const saving = ref(false)
 const fields = ref([])
 const values = reactive({})
 const dictItemsByCode = ref({})
+const workspaceTabOrder = ref([])
 // 切换表单时作废进行中的请求，避免把上一张表的字段写进来
 const loadSession = ref(0)
+
+const workspaceTabs = computed(() => {
+  const labels = { create: '添加数据', list: '数据管理' }
+  const configured = Array.isArray(workspaceTabOrder.value) && workspaceTabOrder.value.length
+    ? workspaceTabOrder.value
+    : []
+  const order = configured.filter(
+    (key, index) =>
+      (key === 'create' || key === 'list') && configured.indexOf(key) === index,
+  )
+  ;['create', 'list'].forEach((key) => {
+    if (!order.includes(key)) order.push(key)
+  })
+  return order.map((key) => ({ key, label: labels[key] }))
+})
 
 function resetValues() {
   console.log('--resteValues');
@@ -144,6 +156,22 @@ async function loadSchema() {
   }
 }
 
+async function loadWorkspaceConfig() {
+  const session = loadSession.value
+  workspaceTabOrder.value = []
+  if (!props.form?.id || !props.appId) return
+  try {
+    const config = await getFormConfigApi(props.appId, props.form.id)
+    if (session !== loadSession.value) return
+    if (Array.isArray(config?.workspaceTabOrder)) {
+      workspaceTabOrder.value = config.workspaceTabOrder
+      tab.value = workspaceTabs.value[0]?.key || 'create'
+    }
+  } catch {
+    return
+  }
+}
+
 async function loadDictItems() {
   const session = loadSession.value
   const codes = dictCodes.value
@@ -189,8 +217,9 @@ watch(
   () => [props.appId, props.form?.id],
   () => {
     loadSession.value += 1
-    tab.value = 'create'
+    tab.value = workspaceTabs.value[0]?.key || 'create'
     loadSchema()
+    loadWorkspaceConfig()
   },
   { immediate: true },
 )

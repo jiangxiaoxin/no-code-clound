@@ -15,18 +15,19 @@
         </span>
         <span
           class="form-tab"
-          :class="{ 'is-active': page === 'records' }"
-          @click="setPage('records')"
-        >
-          数据管理
-        </span>
-        <span
-          class="form-tab"
           :class="{ 'is-active': page === 'publish' }"
           @click="setPage('publish')"
         >
           表单发布
         </span>
+        <span
+          class="form-tab"
+          :class="{ 'is-active': page === 'records' }"
+          @click="setPage('records')"
+        >
+          数据管理
+        </span>
+        
       </div>
       <div class="form-bar-side" />
     </el-header>
@@ -45,7 +46,12 @@
     >
       <FormRecordManage :app-id="appId" :form-id="formId" />
     </el-main>
-    <FormPublishPanel v-else-if="!loading && page === 'publish'" />
+    <FormPublishPanel
+      v-else-if="!loading && page === 'publish' && form"
+      :app-id="appId"
+      :form-id="formId"
+      :form="form"
+    />
   </el-container>
 </template>
 

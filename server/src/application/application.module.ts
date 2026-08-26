@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { AppForm } from './app-form.entity';
+import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { ApplicationController } from './application.controller';
 import { Application } from './application.entity';
@@ -21,6 +22,7 @@ import { User } from '../user/user.entity';
       Application,
       AppGroup,
       AppForm,
+      AppFormConfig,
       Dictionary,
       DictionaryItem,
       User,

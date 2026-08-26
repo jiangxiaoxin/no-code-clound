@@ -20,6 +20,7 @@ import { CreateFormDto } from './dto/create-form.dto';
 import { ListFormFieldsDto } from './dto/list-form-fields.dto';
 import { NameDto } from './dto/name.dto';
 import { SaveFormFieldsDto } from './dto/save-form-fields.dto';
+import { SaveFormConfigDto } from './dto/save-form-config.dto';
 
 @Controller('apps')
 @UseGuards(JwtAuthGuard)
@@ -120,6 +121,30 @@ export class ApplicationController {
       formId,
       dto.fields,
       dto.columns,
+    );
+  }
+
+  @Get(':id/forms/:formId/config')
+  getFormConfig(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Param('formId', ParseIntPipe) formId: number,
+  ) {
+    return this.applicationService.getFormConfig(req.user.id, id, formId);
+  }
+
+  @Patch(':id/forms/:formId/config')
+  saveFormConfig(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Param('formId', ParseIntPipe) formId: number,
+    @Body() dto: SaveFormConfigDto,
+  ) {
+    return this.applicationService.saveFormConfig(
+      req.user.id,
+      id,
+      formId,
+      dto.config,
     );
   }
 

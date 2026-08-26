@@ -1,13 +1,25 @@
 <template>
-  <el-popover v-model:visible="visible" placement="bottom-end" :width="380" trigger="click">
+  <el-popover
+    v-model:visible="visible"
+    placement="bottom-end"
+    :width="380"
+    trigger="click"
+    :show-arrow="false"
+  >
     <template #reference>
-      <el-button :icon="Sort" link :type="modelValue.length ? 'primary' : undefined">
+      <el-button
+        :icon="Sort"
+        link
+        :type="modelValue.length ? 'primary' : undefined"
+      >
         排序
       </el-button>
     </template>
     <div class="sort-setup">
       <button class="sort-add" type="button" @click="addRule">
-        <el-icon><Plus /></el-icon>
+        <el-icon>
+          <Plus />
+        </el-icon>
         添加排序规则
       </button>
       <div v-if="draftRules.length" class="sort-rules">
@@ -15,7 +27,10 @@
           v-for="(rule, index) in draftRules"
           :key="rule.id"
           class="sort-rule"
-          :class="{ 'is-dragging': dragIndex === index, 'is-drag-over': dragOverIndex === index }"
+          :class="{
+            'is-dragging': dragIndex === index,
+            'is-drag-over': dragOverIndex === index,
+          }"
           @dragover.prevent="dragOverIndex = index"
           @drop.prevent="dropRule(index)"
         >
@@ -24,15 +39,45 @@
             draggable="true"
             @dragstart.stop="onDragStart($event, index)"
             @dragend="onDragEnd"
-          ><el-icon><Rank /></el-icon></span>
-          <el-select v-model="rule.key" size="small" class="sort-field">
-            <el-option v-for="option in sortOptions" :key="option.key" :label="option.title" :value="option.key" />
+            ><el-icon>
+              <Rank /> </el-icon
+          ></span>
+          <el-select
+            v-model="rule.key"
+            size="small"
+            class="sort-field"
+            :teleported="false"
+          >
+          <!-- 默认select 会加到body上，会导致popover 触发组件外点击而关闭 -->
+           <!-- 这会导致每次切换一个字段后，弹框就会自动关闭一次 -->
+            <el-option
+              v-for="option in sortOptions"
+              :key="option.key"
+              :label="option.title"
+              :value="option.key"
+            />
           </el-select>
           <el-button-group class="sort-order">
-            <el-button size="small" :type="rule.order === 'asc' ? 'primary' : undefined" @click="rule.order = 'asc'">升序</el-button>
-            <el-button size="small" :type="rule.order === 'desc' ? 'primary' : undefined" @click="rule.order = 'desc'">降序</el-button>
+            <el-button
+              size="small"
+              :type="rule.order === 'asc' ? 'primary' : undefined"
+              @click="rule.order = 'asc'"
+              >升序</el-button
+            >
+            <el-button
+              size="small"
+              :type="rule.order === 'desc' ? 'primary' : undefined"
+              @click="rule.order = 'desc'"
+              >降序</el-button
+            >
           </el-button-group>
-          <el-button :icon="Delete" link size="small" title="删除" @click="removeRule(index)" />
+          <el-button
+            :icon="Delete"
+            link
+            size="small"
+            title="删除"
+            @click="removeRule(index)"
+          />
         </div>
       </div>
       <el-empty v-else :image-size="42" description="暂无排序规则" />
@@ -45,82 +90,168 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { Delete, Plus, Rank, Sort } from '@element-plus/icons-vue'
+  import { ref, watch } from "vue";
+  import { Delete, Plus, Rank, Sort } from "@element-plus/icons-vue";
 
-const props = defineProps({
-  modelValue: { type: Array, default: () => [] },
-  sortOptions: { type: Array, default: () => [] },
-})
+  const props = defineProps({
+    modelValue: { type: Array, default: () => [] },
+    sortOptions: { type: Array, default: () => [] },
+  });
 
-const emit = defineEmits(['update:modelValue', 'apply'])
-const visible = ref(false)
-const draftRules = ref([])
-const dragIndex = ref(-1)
-const dragOverIndex = ref(-1)
-let nextId = 0
+  const emit = defineEmits(["update:modelValue", "apply"]);
+  const visible = ref(false);
+  const draftRules = ref([]);
+  const dragIndex = ref(-1);
+  const dragOverIndex = ref(-1);
+  let nextId = 0;
 
-function cloneRules(rules) {
-  return (rules || []).map((rule) => ({ ...rule, id: rule.id || `sort-${nextId++}` }))
-}
+  function cloneRules(rules) {
+    return (rules || []).map((rule) => ({
+      ...rule,
+      id: rule.id || `sort-${nextId++}`,
+    }));
+  }
 
-watch(() => props.modelValue, (value) => { draftRules.value = cloneRules(value) }, { immediate: true, deep: true })
+  watch(
+    () => props.modelValue,
+    (value) => {
+      console.log('ccccc');
+      
+      draftRules.value = cloneRules(value);
+    },
+    { immediate: true, deep: true },
+  );
 
-function addRule() {
-  const used = new Set(draftRules.value.map((rule) => rule.key))
-  const first = props.sortOptions.find((option) => !used.has(option.key))
-  if (!first) return
-  draftRules.value.push({ id: `sort-${nextId++}`, key: first.key, order: 'asc' })
-}
+  watch(visible, (newvalue, oldvalue) => {
+    console.log('visible', newvalue, oldvalue);
+    
+  })
 
-function removeRule(index) { draftRules.value.splice(index, 1) }
-function clearRules() {
-  draftRules.value = []
-  apply()
-}
+  function addRule() {
+    const used = new Set(draftRules.value.map((rule) => rule.key));
+    const first = props.sortOptions.find((option) => !used.has(option.key));
+    if (!first) return;
+    draftRules.value.push({
+      id: `sort-${nextId++}`,
+      key: first.key,
+      order: "asc",
+    });
+  }
 
-function apply() {
-  const seen = new Set()
-  const rules = draftRules.value
-    .filter((rule) => {
-      if (seen.has(rule.key)) return false
-      seen.add(rule.key)
-      return true
-    })
-    .map(({ key, order }) => ({ key, order }))
-  emit('update:modelValue', rules)
-  emit('apply', rules)
-  visible.value = false
-}
+  function removeRule(index) {
+    draftRules.value.splice(index, 1);
+  }
+  function clearRules() {
+    draftRules.value = [];
+    apply();
+  }
 
-function onDragStart(event, index) {
-  dragIndex.value = index
-  dragOverIndex.value = index
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', String(index))
-}
-function onDragEnd() { dragIndex.value = -1; dragOverIndex.value = -1 }
-function dropRule(to) {
-  const from = dragIndex.value
-  if (from < 0 || from === to) return onDragEnd()
-  const next = draftRules.value.slice()
-  const [moved] = next.splice(from, 1)
-  next.splice(to, 0, moved)
-  draftRules.value = next
-  onDragEnd()
-}
+  function apply() {
+    console.log('apply');
+    
+    const seen = new Set();
+    // 对添加的规则进行去重，确保每个key只出现一次
+    const rules = draftRules.value
+      .filter((rule) => {
+        if (seen.has(rule.key)) return false;
+        seen.add(rule.key);
+        return true;
+      })
+      .map(({ key, order }) => ({ key, order }));
+    emit("update:modelValue", rules);
+    emit("apply", rules);
+    visible.value = false;
+  }
+
+  function onDragStart(event, index) {
+    dragIndex.value = index;
+    dragOverIndex.value = index;
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(index));
+  }
+  function onDragEnd() {
+    dragIndex.value = -1;
+    dragOverIndex.value = -1;
+  }
+  function dropRule(to) {
+    const from = dragIndex.value;
+    if (from < 0 || from === to) return onDragEnd();
+    const next = draftRules.value.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    draftRules.value = next;
+    onDragEnd();
+  }
 </script>
 
 <style scoped lang="less">
-.sort-setup { display: flex; flex-direction: column; }
-.sort-add { display: inline-flex; align-items: center; align-self: flex-start; padding: 6px 10px; border: 0; background: transparent; color: var(--el-color-primary); cursor: pointer; }
-.sort-rules { display: flex; flex-direction: column; margin-top: 8px; padding: 8px; border-radius: 6px; background: var(--el-fill-color-light); }
-.sort-rule { display: flex; align-items: center; min-height: 36px; }
-.sort-handle { display: inline-flex; flex: none; width: 22px; color: var(--el-text-color-secondary); cursor: grab; }
-.sort-field { flex: 1; min-width: 0; }
-.sort-order { display: flex; flex: none; margin-left: 8px; }
-.sort-rule > .el-button { flex: none; margin-left: 4px; }
-.sort-rule.is-dragging { opacity: .55; }
-.sort-rule.is-drag-over { outline: 1px dashed var(--el-color-primary); }
-.sort-footer { display: flex; align-items: center; margin-top: 12px; }
+  .sort-setup {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sort-add {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    padding: 6px 10px;
+    border: 0;
+    background: transparent;
+    color: var(--el-color-primary);
+    cursor: pointer;
+  }
+
+  .sort-rules {
+    display: flex;
+    flex-direction: column;
+    margin-top: 8px;
+    padding: 8px;
+    border-radius: 6px;
+    background: var(--el-fill-color-light);
+    min-height: 165px; // 跟el-empty高度差不多，减少晃动
+  }
+
+  .sort-rule {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+  }
+
+  .sort-handle {
+    display: inline-flex;
+    flex: none;
+    width: 22px;
+    color: var(--el-text-color-secondary);
+    cursor: grab;
+  }
+
+  .sort-field {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .sort-order {
+    display: flex;
+    flex: none;
+    margin-left: 8px;
+  }
+
+  .sort-rule > .el-button {
+    flex: none;
+    margin-left: 4px;
+  }
+
+  .sort-rule.is-dragging {
+    opacity: 0.55;
+  }
+
+  .sort-rule.is-drag-over {
+    outline: 1px dashed var(--el-color-primary);
+  }
+
+  .sort-footer {
+    display: flex;
+    align-items: center;
+    margin-top: 12px;
+  }
 </style>

@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { AppForm } from './app-form.entity';
+import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
 import { ApplicationService } from './application.service';
@@ -30,6 +31,11 @@ describe('ApplicationService', () => {
     remove: jest.fn(),
     count: jest.fn(),
   };
+  const formConfigRepo = {
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+  };
 
   const formRecordStore = {
     dropFormCollection: jest.fn(),
@@ -51,6 +57,7 @@ describe('ApplicationService', () => {
         { provide: getRepositoryToken(Application), useValue: repo },
         { provide: getRepositoryToken(AppGroup), useValue: groupRepo },
         { provide: getRepositoryToken(AppForm), useValue: formRepo },
+        { provide: getRepositoryToken(AppFormConfig), useValue: formConfigRepo },
         { provide: FormRecordStore, useValue: formRecordStore },
       ],
     }).compile();

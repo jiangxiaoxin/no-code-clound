@@ -48,6 +48,14 @@ export function saveFormFieldsApi(appId, formId, payload) {
   return http.put(`/apps/${appId}/forms/${formId}/fields`, payload)
 }
 
+export function getFormConfigApi(appId, formId) {
+  return http.get(`/apps/${appId}/forms/${formId}/config`)
+}
+
+export function saveFormConfigApi(appId, formId, config) {
+  return http.patch(`/apps/${appId}/forms/${formId}/config`, { config })
+}
+
 export function listFormFieldsApi(appId, params) {
   return http.get(`/apps/${appId}/form-fields`, { params })
 }
