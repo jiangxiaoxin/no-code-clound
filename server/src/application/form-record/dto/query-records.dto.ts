@@ -11,7 +11,7 @@ export class QueryRecordsDto {
   match?: 'all' | 'any';
 
   @IsOptional()
-  sort?: { key: string; order?: string };
+  sort?: { key: string; order?: string } | { key: string; order?: string }[];
 
   @IsOptional()
   @Type(() => Number)

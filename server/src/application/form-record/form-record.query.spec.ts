@@ -31,6 +31,17 @@ describe('buildRecordQuery', () => {
     ).toEqual({ createdAt: 1 });
   });
 
+  it('supports multiple sort rules in priority order', () => {
+    expect(
+      buildRecordQuery(fields, {
+        sort: [
+          { key: 'name', order: 'asc' },
+          { key: 'age', order: 'desc' },
+        ],
+      }).sort,
+    ).toEqual({ 'data.name': 1, 'data.age': -1 });
+  });
+
   it('maps eq to data path and contains to escaped regex', () => {
     const result = buildRecordQuery(fields, {
       filters: [

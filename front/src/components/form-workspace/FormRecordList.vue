@@ -14,6 +14,11 @@
         </div>
         <div class="list-toolbar-extra">
           <el-button :icon="Refresh" link @click="onRefresh">刷新</el-button>
+          <FormRecordSortSetup
+            v-model="sortRules"
+            :sort-options="sortOptions"
+            @apply="onSortApply"
+          />
           <FormRecordColumnSetup v-model="columnPrefs" />
         </div>
       </div>
@@ -96,6 +101,7 @@ import { deleteFormRecordApi, queryFormRecordsApi } from '../../api/apps'
 import { isFillable } from '../form-fill/fillValues.js'
 import FormRecordCell from './FormRecordCell.vue'
 import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
+import FormRecordSortSetup from './FormRecordSortSetup.vue'
 import {
   CREATED_AT_KEY,
   UPDATED_AT_KEY,
@@ -106,6 +112,7 @@ import {
   normalizeColWidth,
   useColumnPrefs,
 } from './columnPrefs'
+import { useSortPrefs } from './sortPrefs'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -133,6 +140,12 @@ const fieldByKey = computed(() =>
 )
 
 const { columnPrefs, visibleColumns } = useColumnPrefs({
+  appId: toRef(props, 'appId'),
+  formId: computed(() => props.form?.id),
+  tableFields,
+  schemaLoading: toRef(props, 'schemaLoading'),
+})
+const { sortRules, sortOptions, saveSortRules } = useSortPrefs({
   appId: toRef(props, 'appId'),
   formId: computed(() => props.form?.id),
   tableFields,
@@ -182,6 +195,9 @@ async function loadRecords() {
     const result = await queryFormRecordsApi(props.appId, props.form.id, {
       page: page.value,
       pageSize: pageSize.value,
+      ...(sortRules.value.length
+        ? { sort: sortRules.value.map(({ key, order }) => ({ key, order })) }
+        : {}),
     })
     if (session !== loadSession.value) return
     records.value = result?.items || []
@@ -248,6 +264,13 @@ async function reload({ resetPage = false } = {}) {
 
 function onRefresh() {
   editingCell.value = ''
+  loadRecords()
+}
+
+function onSortApply(rules) {
+  sortRules.value = rules
+  saveSortRules(rules)
+  page.value = 1
   loadRecords()
 }
 

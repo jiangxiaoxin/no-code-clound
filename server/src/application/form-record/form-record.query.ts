@@ -7,7 +7,7 @@ export type RecordSort = { key: string; order?: string };
 export type RecordQueryBody = {
   filters?: RecordFilter[];
   match?: 'all' | 'any';
-  sort?: RecordSort;
+  sort?: RecordSort | RecordSort[];
   page?: number;
   pageSize?: number;
 };
@@ -211,14 +211,22 @@ export function buildRecordQuery(
   });
   const filter = combineClauses(clauses, body.match);
 
-  const sortKey = body.sort?.key ?? 'updatedAt';
-  const orderRaw = body.sort?.order ?? 'desc';
-  if (orderRaw !== 'asc' && orderRaw !== 'desc') unsupported();
-  const resolvedSort = resolvePath(sortKey, fields);
-  const sort = { [resolvedSort.path]: orderRaw === 'asc' ? 1 : -1 } as Record<
-    string,
-    1 | -1
-  >;
+  const sortItems = Array.isArray(body.sort)
+    ? body.sort
+    : body.sort
+      ? [body.sort]
+      : [];
+  const sort = {} as Record<string, 1 | -1>;
+  for (const item of sortItems) {
+    if (!item || typeof item.key !== 'string') unsupported();
+    const orderRaw = item.order ?? 'desc';
+    if (orderRaw !== 'asc' && orderRaw !== 'desc') unsupported();
+    const resolvedSort = resolvePath(item.key, fields);
+    sort[resolvedSort.path] = orderRaw === 'asc' ? 1 : -1;
+  }
+  if (!Object.keys(sort).length) {
+    sort.updatedAt = -1;
+  }
 
   return {
     filter,
