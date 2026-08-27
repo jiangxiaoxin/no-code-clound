@@ -45,7 +45,7 @@
         </div>
         <div class="pager">
           <el-pagination background layout="total, sizes, prev, pager, next" :current-page="page" :page-size="pageSize"
-            :page-sizes="[10, 20, 50, 100]" :total="total" @current-change="onPageChange"
+            :page-sizes="PAGE_SIZES" :total="total" @current-change="onPageChange"
             @size-change="onPageSizeChange" size="small" />
         </div>
       </div>
@@ -119,6 +119,7 @@ import {
   listDictionariesApi,
   updateDictionaryApi,
 } from '../../api/apps'
+import { PAGE_SIZES } from '../../utils/pagination'
 
 const route = useRoute()
 const appId = computed(() => Number(route.params.id))

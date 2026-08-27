@@ -177,13 +177,22 @@
           <div
             class="filter-trigger"
             :class="{ 'is-placeholder': !hasFillMappings(field.fillMappings) }"
-            @click="mappingVisible = true"
+            @click="openFillMapping"
           >
             {{
               hasFillMappings(field.fillMappings)
                 ? `已添加 ${field.fillMappings.length} 条填充规则`
                 : '设置填充字段'
             }}
+          </div>
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId" label="选择过程设置">
+          <div
+            class="filter-trigger"
+            :class="{ 'is-placeholder': !hasProcessSetup }"
+            @click="openProcess"
+          >
+            {{ processTriggerText }}
           </div>
         </el-form-item>
       </template>
@@ -199,6 +208,15 @@
         :source-fields="sourceFields"
         :form-fields="formFields"
         @confirm="onMappingConfirm"
+      />
+      <DataSelectProcessDrawer
+        v-model="processVisible"
+        :app-id="appId"
+        :picker-column-keys="field?.pickerColumnKeys"
+        :option-filters="field?.optionFilters"
+        :source-fields="sourceFields"
+        :form-fields="formFields"
+        @confirm="onProcessConfirm"
       />
       <FormOptionFilterDialog
         v-model="filterVisible"
@@ -233,6 +251,7 @@ import FormSourcePicker from './FormSourcePicker.vue'
 import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
 import DataSelectDisplayFieldsDialog from './DataSelectDisplayFieldsDialog.vue'
 import DataSelectFillMappingDialog from './DataSelectFillMappingDialog.vue'
+import DataSelectProcessDrawer from './DataSelectProcessDrawer.vue'
 import { hasOptionFilters } from './optionFilters'
 import {
   cloneDisplayFieldKeys,
@@ -270,6 +289,7 @@ const sourceFields = ref([])
 const filterVisible = ref(false)
 const displayVisible = ref(false)
 const mappingVisible = ref(false)
+const processVisible = ref(false)
 
 const formFields = computed(() =>
   (props.fields || []).filter(
@@ -290,10 +310,39 @@ const displayFieldsTriggerText = computed(() => {
   return `已选择 ${cloneDisplayFieldKeys(props.field.displayFieldKeys).length} 个字段`
 })
 
+const hasProcessSetup = computed(() => {
+  if (!props.field) return false
+  return (
+    cloneDisplayFieldKeys(props.field.pickerColumnKeys).length > 0 ||
+    hasOptionFilters(props.field.optionFilters)
+  )
+})
+
+const processTriggerText = computed(() => {
+  if (!hasProcessSetup.value) {
+    return '选择过程设置'
+  }
+  const parts = []
+  const colCount = cloneDisplayFieldKeys(props.field.pickerColumnKeys).length
+  if (colCount) parts.push(`${colCount} 列`)
+  if (hasOptionFilters(props.field.optionFilters)) {
+    parts.push('已添加过滤条件')
+  }
+  return parts.join('，')
+})
+
 function openDisplayFields() {
   displayVisible.value = true
   console.log('open field config', props.field);
   
+}
+
+function openFillMapping() {
+  mappingVisible.value = true
+}
+
+function openProcess() {
+  processVisible.value = true
 }
 
 async function loadOptions() {
@@ -353,7 +402,9 @@ function onSourceFormSelect({ formId }) {
   if (props.field.sourceFormId !== formId) {
     props.field.displayFieldKeys = []
     props.field.fillMappings = []
+    props.field.pickerColumnKeys = []
     delete props.field.displayFieldLabels
+    delete props.field.optionFilters
   }
   props.field.sourceFormId = formId
 }
@@ -383,6 +434,18 @@ function onMappingConfirm(next) {
     props.field.fillMappings = next
   } else {
     delete props.field.fillMappings
+  }
+}
+
+function onProcessConfirm({ pickerColumnKeys, optionFilters }) {
+  if (!props.field) {
+    return
+  }
+  props.field.pickerColumnKeys = pickerColumnKeys
+  if (optionFilters) {
+    props.field.optionFilters = optionFilters
+  } else {
+    delete props.field.optionFilters
   }
 }
 
@@ -416,6 +479,7 @@ watch(
     filterVisible.value = false
     displayVisible.value = false
     mappingVisible.value = false
+    processVisible.value = false
   },
 )
 </script>

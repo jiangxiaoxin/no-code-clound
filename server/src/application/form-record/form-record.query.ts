@@ -18,9 +18,15 @@ export type RecordFilter = {
   precision?: DatePrecision;
 };
 export type RecordSort = { key: string; order?: string };
+export type RecordFilterGroup = {
+  filters?: RecordFilter[];
+  match?: 'all' | 'any';
+};
+
 export type RecordQueryBody = {
   filters?: RecordFilter[];
   match?: 'all' | 'any';
+  groups?: RecordFilterGroup[];
   sort?: RecordSort | RecordSort[];
   page?: number;
   pageSize?: number;
@@ -491,6 +497,22 @@ function buildClause(
   unsupported();
 }
 
+function clausesFromFilters(
+  filters: RecordFilter[] | undefined,
+  fields: FormField[] | null | undefined,
+): Record<string, unknown>[] {
+  return (filters ?? []).map((item) => {
+    const resolved = resolvePath(item.key, fields);
+    return buildClause(
+      resolved.type,
+      resolved.path,
+      item.op,
+      item.value,
+      item.precision,
+    );
+  });
+}
+
 function combineClauses(
   clauses: Record<string, unknown>[],
   match?: string,
@@ -525,17 +547,19 @@ export function buildRecordQuery(
     throw new BadRequestException('分页大小不正确');
   }
 
-  const clauses = (body.filters ?? []).map((item) => {
-    const resolved = resolvePath(item.key, fields);
-    return buildClause(
-      resolved.type,
-      resolved.path,
-      item.op,
-      item.value,
-      item.precision,
+  const clauses = clausesFromFilters(body.filters, fields);
+  const parts: Record<string, unknown>[] = [];
+  const top = combineClauses(clauses, body.match);
+  if (Object.keys(top).length) parts.push(top);
+  for (const group of body.groups ?? []) {
+    const next = combineClauses(
+      clausesFromFilters(group.filters, fields),
+      group.match,
     );
-  });
-  const filter = combineClauses(clauses, body.match);
+    if (Object.keys(next).length) parts.push(next);
+  }
+  const filter =
+    parts.length <= 1 ? (parts[0] ?? {}) : { $and: parts };
 
   const sortItems = Array.isArray(body.sort)
     ? body.sort

@@ -83,6 +83,19 @@ export class FormRecordService {
         fields,
         body.filters,
       ),
+      groups: body.groups
+        ? await Promise.all(
+            body.groups.map(async (group) => ({
+              ...group,
+              filters: await this.resolveDictFilters(
+                ownerId,
+                appId,
+                fields,
+                group.filters,
+              ),
+            })),
+          )
+        : body.groups,
     });
     const { items, total } = await this.store.query(formId, built);
     const names = await this.loadUserNames(items);

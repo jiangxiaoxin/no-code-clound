@@ -9,6 +9,8 @@
       :model-value="values[field.key]"
       :disabled="disabled"
       :updating="updating"
+      :record-values="values"
+      :form-fields="fields"
       @update:model-value="values[field.key] = $event"
       @fill="onFill"
     />

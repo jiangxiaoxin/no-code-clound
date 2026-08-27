@@ -8,7 +8,7 @@ import {
   valueTypeForTimeOp,
   withFilterSystemFields,
 } from './optionFilters.js'
-import { buildSourceQuery } from '../form-fill/tableOptions.js'
+import { buildSourceQuery, mergeFilterQueries } from '../form-fill/tableOptions.js'
 
 const now = new Date(2026, 7, 26, 15, 30, 0)
 
@@ -206,5 +206,36 @@ test('buildSourceQuery formats date year and datetime gte as wall-clock strings'
       { targetAt: picked },
     ).filters,
     [{ key: 'happenedAt', op: 'gte', value: '2026-08-01 09:00:00' }],
+  )
+})
+
+test('mergeFilterQueries keeps a single group as filters', () => {
+  assert.deepEqual(
+    mergeFilterQueries(
+      { match: 'all', filters: [{ key: 'name', op: 'eq', value: '张三' }] },
+      { match: 'any', filters: [] },
+    ),
+    {
+      match: 'all',
+      filters: [{ key: 'name', op: 'eq', value: '张三' }],
+    },
+  )
+})
+
+test('mergeFilterQueries ands two groups', () => {
+  assert.deepEqual(
+    mergeFilterQueries(
+      { match: 'all', filters: [{ key: 'name', op: 'eq', value: '张三' }] },
+      {
+        match: 'any',
+        filters: [{ key: 'name', op: 'contains', value: '三' }],
+      },
+    ),
+    {
+      groups: [
+        { match: 'all', filters: [{ key: 'name', op: 'eq', value: '张三' }] },
+        { match: 'any', filters: [{ key: 'name', op: 'contains', value: '三' }] },
+      ],
+    },
   )
 })

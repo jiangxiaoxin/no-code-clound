@@ -32,7 +32,7 @@ function serializeCompareValue(item, value, valueField) {
   return next ? { value: next } : null
 }
 
-export function buildSourceQuery(optionFilters, values, formFields) {
+export function buildSourceQuery(optionFilters, values, formFields, paging) {
   const match = optionFilters?.match === 'any' ? 'any' : 'all'
   const filters = []
   for (const item of optionFilters?.conditions || []) {
@@ -87,7 +87,29 @@ export function buildSourceQuery(optionFilters, values, formFields) {
   }
   // 这里写死了100条数据，那需要通过筛选条件将数据压到100条以下,才能满足下拉框的使用。否则有些数据，下拉框永远选不到
   // 而选择数据和关联数据，都是通过翻页table实现，怎么的都能查到数据
-  return { match, filters, page: 1, pageSize: 100 }
+  return {
+    match,
+    filters,
+    page: paging?.page ?? 1,
+    pageSize: paging?.pageSize ?? 100,
+  }
+}
+
+export function mergeFilterQueries(...parts) {
+  const groups = parts.filter((item) => item?.filters?.length)
+  if (!groups.length) return {}
+  if (groups.length === 1) {
+    return {
+      match: groups[0].match || 'all',
+      filters: groups[0].filters,
+    }
+  }
+  return {
+    groups: groups.map((item) => ({
+      match: item.match || 'all',
+      filters: item.filters,
+    })),
+  }
 }
 
 export function recordsToSelectItems(records, fieldKey) {

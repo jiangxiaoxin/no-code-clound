@@ -10,7 +10,7 @@
     body-class="my-dialog-body"
     @update:model-value="onDialogVisible"
   >
-    <p class="filter-desc">添加过滤条件来限定选项内容</p>
+    <p class="filter-desc">{{ description }}</p>
     <div class="filter-match">
       <span>符合以下</span>
       <el-select v-model="draft.match" class="filter-match-select" size="small">
@@ -209,6 +209,7 @@ const props = defineProps({
   optionFilters: { type: Object, default: null },
   sourceFields: { type: Array, default: () => [] },
   formFields: { type: Array, default: () => [] },
+  description: { type: String, default: '添加过滤条件来限定选项内容' },
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm'])

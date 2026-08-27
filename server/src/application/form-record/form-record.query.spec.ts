@@ -137,6 +137,36 @@ describe('buildRecordQuery', () => {
     });
   });
 
+  it('ands filter groups so default filters and search can both apply', () => {
+    expect(
+      buildRecordQuery(fields, {
+        groups: [
+          {
+            match: 'all',
+            filters: [{ key: 'name', op: 'eq', value: '张三' }],
+          },
+          {
+            match: 'any',
+            filters: [
+              { key: 'name', op: 'contains', value: '三' },
+              { key: 'tags', op: 'contains', value: '三' },
+            ],
+          },
+        ],
+      }).filter,
+    ).toEqual({
+      $and: [
+        { 'data.name': '张三' },
+        {
+          $or: [
+            { 'data.name': { $regex: '三', $options: 'i' } },
+            { 'data.tags': { $regex: '三', $options: 'i' } },
+          ],
+        },
+      ],
+    });
+  });
+
   it('coerces numeric strings when filtering a number field', () => {
     expect(
       buildRecordQuery(fields, {

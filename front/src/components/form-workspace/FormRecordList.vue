@@ -90,7 +90,7 @@
           layout="total, sizes, prev, pager, next"
           :current-page="page"
           :page-size="pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="PAGE_SIZES"
           :total="total"
           size="small"
           @current-change="onPageChange"
@@ -122,6 +122,7 @@ import {
   useColumnPrefs,
 } from './columnPrefs'
 import { buildQuickSearchQuery, isQuickSearchField } from './quickSearch'
+import { PAGE_SIZES } from '../../utils/pagination'
 import { useSortPrefs } from './sortPrefs'
 
 const props = defineProps({

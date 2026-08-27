@@ -139,6 +139,8 @@
       :field="field"
       :disabled="isDisabled"
       :model-value="modelValue"
+      :record-values="recordValues"
+      :form-fields="formFields"
       @update:model-value="onUpdateModelValue"
       @fill="onFill"
     />
@@ -184,6 +186,8 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   updating: { type: Boolean, default: false },
   appId: { type: Number, default: 0 },
+  recordValues: { type: Object, default: () => ({}) },
+  formFields: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['update:modelValue', 'fill'])

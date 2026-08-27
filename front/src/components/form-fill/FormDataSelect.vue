@@ -37,6 +37,20 @@
         destroy-on-close
         @open="onPickerOpen"
       >
+        <div class="data-select-toolbar">
+          <el-input
+            v-model="keyword"
+            clearable
+            placeholder="快捷搜索"
+            @clear="onSearchNow"
+            @keyup.enter="onSearchNow"
+            size="small"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+        </div>
         <el-table
           v-loading="listLoading"
           :data="records"
@@ -63,11 +77,14 @@
         <div class="data-select-pager">
           <el-pagination
             background
-            layout="total, prev, pager, next"
+            layout="total, sizes, prev, pager, next"
             :current-page="page"
             :page-size="pageSize"
+            :page-sizes="PAGE_SIZES"
             :total="total"
+            size="small"
             @current-change="onPageChange"
+            @size-change="onPageSizeChange"
           />
         </div>
       </el-dialog>
@@ -76,8 +93,8 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { ArrowDown, Search } from '@element-plus/icons-vue'
 import {
   getFormApi,
   getFormRecordApi,
@@ -93,16 +110,26 @@ import {
 } from '../form-workspace/columnPrefs'
 import { cloneDisplayFieldKeys, displayFieldTitle, findDisplaySourceField } from '../form-design/dataSelect'
 import { formatCellValue, isFillable } from './fillValues'
+import { buildSourceQuery, mergeFilterQueries } from './tableOptions'
+import { buildQuickSearchQuery } from '../form-workspace/quickSearch'
+import { PAGE_SIZES } from '../../utils/pagination'
 
 const props = defineProps({
   field: { type: Object, required: true },
   appId: { type: Number, default: 0 },
   disabled: { type: Boolean, default: false },
-  preview: { type: Boolean, default: false },
+  preview: { type: Boolean, default: false }, // true-画布上用来占位的显示 false-真实的组件使用
   modelValue: { default: undefined },
+  recordValues: { type: Object, default: () => ({}) },
+  formFields: { type: Array, default: () => [] },
 })
 
 const emit = defineEmits(['fill', 'update:modelValue'])
+
+onMounted(() => {
+  console.log('form data select 组件', props.preview);
+  
+})
 
 /**
  * 选择数据是模拟select的样式和操作，实际上就是div
@@ -113,7 +140,8 @@ const listLoading = ref(false)
 const records = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 10
+const pageSize = ref(PAGE_SIZES[0])
+const keyword = ref('')
 const sourceFields = ref([])
 const dictItemsByCode = ref({})
 const selected = ref(null)
@@ -134,8 +162,16 @@ const displayColumns = computed(() => {
 })
 
 const tableColumns = computed(() => {
-  if (displayColumns.value.length) {
-    return displayColumns.value
+  const keys = cloneDisplayFieldKeys(props.field.pickerColumnKeys)
+  if (keys.length) {
+    return keys
+      .map((key) => findDisplaySourceField(sourceFields.value, key))
+      .filter(Boolean)
+      .map((field) => ({
+        key: field.key,
+        title: field.title || field.key,
+        field,
+      }))
   }
   return sourceFields.value.filter(isFillable).map((field) => ({
     key: field.key,
@@ -282,10 +318,25 @@ async function loadRecords() {
   }
   listLoading.value = true
   try {
+    const optionQuery = buildSourceQuery(
+      props.field.optionFilters,
+      props.recordValues,
+      props.formFields,
+      { page: page.value, pageSize: pageSize.value },
+    )
+    const searchQuery = buildQuickSearchQuery(
+      tableColumns.value.map((col) => col.field).filter(Boolean),
+      keyword.value,
+      dictItemsByCode.value,
+    )
     const result = await queryFormRecordsApi(
       props.appId,
       props.field.sourceFormId,
-      { page: page.value, pageSize },
+      {
+        page: page.value,
+        pageSize: pageSize.value,
+        ...mergeFilterQueries(optionQuery, searchQuery),
+      },
     )
     records.value = result?.items || []
     total.value = result?.total || 0
@@ -299,12 +350,24 @@ async function loadRecords() {
 
 async function onPickerOpen() {
   page.value = 1
+  keyword.value = ''
   await loadSource()
   await loadRecords()
 }
 
+function onSearchNow() {
+  page.value = 1
+  loadRecords()
+}
+
 function onPageChange(next) {
   page.value = next
+  loadRecords()
+}
+
+function onPageSizeChange(next) {
+  pageSize.value = next
+  page.value = 1
   loadRecords()
 }
 
@@ -449,5 +512,16 @@ watch(
   display: flex;
   justify-content: flex-end;
   margin-top: 12px;
+}
+
+.data-select-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.data-select-toolbar .el-input {
+  width: 260px;
 }
 </style>

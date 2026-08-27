@@ -17,6 +17,13 @@ export class QueryRecordsDto {
   match?: 'all' | 'any';
 
   @IsOptional()
+  @IsArray()
+  groups?: {
+    filters?: QueryRecordsDto['filters'];
+    match?: 'all' | 'any';
+  }[];
+
+  @IsOptional()
   sort?: { key: string; order?: string } | { key: string; order?: string }[];
 
   @IsOptional()
