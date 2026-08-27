@@ -82,6 +82,15 @@ export class FormRecordStore {
     return { id: result.insertedId.toHexString() };
   }
 
+  async insertMany(docs: Omit<FormRecordDoc, '_id'>[]): Promise<number> {
+    if (!docs.length) return 0;
+    await this.ensureSystemIndexes(docs[0].formId);
+    const result = await this.col(docs[0].formId).insertMany(
+      docs as FormRecordDoc[],
+    );
+    return result.insertedCount;
+  }
+
   async findById(formId: number, id: string): Promise<FormRecordDoc | null> {
     const objectId = this.parseId(id);
     if (!objectId) return null;

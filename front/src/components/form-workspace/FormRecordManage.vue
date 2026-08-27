@@ -8,6 +8,7 @@
       :fields="fields"
       :dict-items-by-code="dictItemsByCode"
       :schema-loading="schemaLoading"
+      :record-actions="recordActions"
       @create="openCreate"
       @row-click="openDetail"
     />
@@ -40,6 +41,7 @@ import { ElMessage } from 'element-plus'
 import {
   createFormRecordApi,
   getFormApi,
+  getFormConfigApi,
   listDictionaryItemsByCodesApi,
 } from '../../api/apps'
 import {
@@ -48,6 +50,7 @@ import {
   validateRequired,
 } from '../form-fill/fillValues.js'
 import { isSelectType as isSelectField } from '../form-design/fieldTypes'
+import { normalizeRecordActions } from '../../utils/recordActions'
 import FormRecordList from './FormRecordList.vue'
 import FormRecordCreateDrawer from './FormRecordCreateDrawer.vue'
 import FormRecordDetailDrawer from './FormRecordDetailDrawer.vue'
@@ -64,6 +67,7 @@ const form = ref(null)
 const fields = ref([])
 const values = reactive({})
 const dictItemsByCode = ref({})
+const recordActions = ref(normalizeRecordActions())
 const createVisible = ref(false)
 const detailVisible = ref(false)
 const detailRecord = ref(null)
@@ -118,6 +122,22 @@ async function loadSchema() {
     if (session === loadSession.value) {
       schemaLoading.value = false
     }
+  }
+}
+
+async function loadConfig() {
+  const session = loadSession.value
+  if (!props.appId || !props.formId) {
+    recordActions.value = normalizeRecordActions()
+    return
+  }
+  try {
+    const config = await getFormConfigApi(props.appId, props.formId)
+    if (session !== loadSession.value) return
+    recordActions.value = normalizeRecordActions(config?.recordActions)
+  } catch {
+    if (session !== loadSession.value) return
+    recordActions.value = normalizeRecordActions()
   }
 }
 
@@ -190,6 +210,7 @@ watch(
     detailVisible.value = false
     detailRecord.value = null
     loadSchema()
+    loadConfig()
   },
   { immediate: true },
 )

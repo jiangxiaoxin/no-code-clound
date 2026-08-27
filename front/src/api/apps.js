@@ -1,4 +1,6 @@
 import http from './http'
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
 
 export function listAppsApi() {
   return http.get('/apps')
@@ -113,4 +115,54 @@ export function updateFormRecordApi(appId, formId, recordId, data) {
 
 export function deleteFormRecordApi(appId, formId, recordId) {
   return http.delete(`/apps/${appId}/forms/${formId}/records/${recordId}`)
+}
+
+export async function downloadRecordImportTemplateApi(appId, formId) {
+  const token = localStorage.getItem('accessToken')
+  try {
+    const response = await axios.get(
+      `/api/apps/${appId}/forms/${formId}/records/import-template`,
+      {
+        responseType: 'blob',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      },
+    )
+    const contentType = String(response.headers['content-type'] || '')
+    if (contentType.includes('application/json')) {
+      const body = JSON.parse(await response.data.text())
+      throw Object.assign(new Error(body.message || '下载失败'), { body })
+    }
+    const disposition = String(response.headers['content-disposition'] || '')
+    const matched = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+    const filename = matched
+      ? decodeURIComponent(matched[1])
+      : '导入模版.xlsx'
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    const data = error.response?.data
+    if (data instanceof Blob) {
+      try {
+        const body = JSON.parse(await data.text())
+        ElMessage.error(body.message || '下载失败')
+        return Promise.reject(error)
+      } catch {
+        // ignore parse error
+      }
+    }
+    ElMessage.error(error.body?.message || error.message || '下载失败')
+    return Promise.reject(error)
+  }
+}
+
+export function importFormRecordsApi(appId, formId, file) {
+  const payload = new FormData()
+  payload.append('file', file)
+  return http.post(`/apps/${appId}/forms/${formId}/records/import`, payload, {
+    timeout: 120000,
+  })
 }

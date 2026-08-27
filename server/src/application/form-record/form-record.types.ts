@@ -4,4 +4,6 @@ export type FormField = {
   title?: string;
   unique?: boolean;
   dictCode?: string;
+  required?: boolean;
+  optionSource?: string;
 };

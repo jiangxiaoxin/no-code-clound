@@ -7,9 +7,24 @@
     <template v-else>
       <div class="list-toolbar">
         <div class="list-toolbar-actions">
-          <el-button type="primary" @click="$emit('create')">新增</el-button>
-          <el-button type="danger" :disabled="!selectedRecords.length" @click="onDeleteSelected">
+          <el-button v-if="actions.create" type="primary" @click="onCreateClick">
+            新增
+          </el-button>
+          <el-button
+            v-if="actions.delete"
+            type="danger"
+            :disabled="!selectedRecords.length"
+            @click="onDeleteSelected"
+          >
             删除
+          </el-button>
+          <el-button v-if="actions.import" @click="openImport" type="info">导入</el-button>
+          <el-button
+            v-if="actions.downloadTemplate"
+            @click="onDownloadTemplate"
+            type="info"
+          >
+            下载导入模版
           </el-button>
         </div>
         <div class="list-toolbar-extra">
@@ -39,9 +54,9 @@
           size="small"
           row-key="id"
           @row-click="onRecordRowClick"
-          @selection-change="selectedRecords = $event"
+          @selection-change="onSelectionChange"
         >
-          <el-table-column type="selection" width="42" fixed="left" />
+          <el-table-column v-if="actions.delete" type="selection" width="42" fixed="left" />
           <el-table-column type="index" width="55" label="序号" fixed="left" />
           <el-table-column
             v-for="col in visibleColumns"
@@ -98,6 +113,12 @@
         />
       </div>
     </template>
+    <FormRecordImportDialog
+      v-model="importVisible"
+      :app-id="appId"
+      :form-id="form?.id || 0"
+      @imported="onImported"
+    />
   </div>
 </template>
 
@@ -105,10 +126,11 @@
 import { computed, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
-import { deleteFormRecordApi, queryFormRecordsApi } from '../../api/apps'
+import { deleteFormRecordApi, downloadRecordImportTemplateApi, queryFormRecordsApi } from '../../api/apps'
 import { isFillable } from '../form-fill/fillValues.js'
 import FormRecordCell from './FormRecordCell.vue'
 import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
+import FormRecordImportDialog from './FormRecordImportDialog.vue'
 import FormRecordQuickSearch from './FormRecordQuickSearch.vue'
 import FormRecordSortSetup from './FormRecordSortSetup.vue'
 import {
@@ -123,6 +145,7 @@ import {
 } from './columnPrefs'
 import { buildQuickSearchQuery, isQuickSearchField } from './quickSearch'
 import { PAGE_SIZES } from '../../utils/pagination'
+import { normalizeRecordActions } from '../../utils/recordActions'
 import { useSortPrefs } from './sortPrefs'
 
 const props = defineProps({
@@ -131,6 +154,7 @@ const props = defineProps({
   fields: { type: Array, default: () => [] },
   dictItemsByCode: { type: Object, default: () => ({}) },
   schemaLoading: { type: Boolean, default: false },
+  recordActions: { type: Object, default: () => normalizeRecordActions() },
 })
 
 const emit = defineEmits(['create', 'row-click'])
@@ -142,8 +166,10 @@ const page = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
 const editingCell = ref('')
+const importVisible = ref(false)
 // 切换表单时作废进行中的请求，避免把上一张表的记录写进来
 const loadSession = ref(0)
+const actions = computed(() => normalizeRecordActions(props.recordActions))
 
 const tableFields = computed(() => props.fields.filter(isFillable))
 const fieldByKey = computed(() =>
@@ -251,6 +277,27 @@ function onPageSizeChange(next) {
   pageSize.value = next
   page.value = 1
   loadRecords()
+}
+
+function onCreateClick() {
+  emit('create')
+}
+
+function onSelectionChange(rows) {
+  selectedRecords.value = rows
+}
+
+function openImport() {
+  importVisible.value = true
+}
+
+async function onDownloadTemplate() {
+  if (!props.form?.id) return
+  await downloadRecordImportTemplateApi(props.appId, props.form.id)
+}
+
+async function onImported() {
+  await reload({ resetPage: true })
 }
 
 async function onDeleteSelected() {

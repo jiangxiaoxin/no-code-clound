@@ -14,6 +14,7 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
 import { FormRecordStore } from './form-record/form-record.store';
+import { mergeFormConfig, normalizeFormConfig } from './form-config';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
 
 const OPTION_FIELD_TYPES = new Set([
@@ -171,8 +172,9 @@ export class ApplicationService {
   ) {
     await this.requireOwnedApp(ownerId, appId);
     await this.requireForm(appId, formId);
-    const next = this.normalizeFormConfig(config);
-    let row = await this.formConfigRepo.findOne({ where: { formId } });
+    const existing = await this.formConfigRepo.findOne({ where: { formId } });
+    const next = mergeFormConfig(existing?.config, config);
+    let row = existing;
     if (!row) {
       row = this.formConfigRepo.create({ formId, config: next });
     } else {
@@ -361,14 +363,7 @@ export class ApplicationService {
   }
 
   private normalizeFormConfig(value: unknown): Record<string, unknown> {
-    const input = value && typeof value === 'object' ? value as Record<string, unknown> : {};
-    const order = Array.isArray(input.workspaceTabOrder)
-      ? input.workspaceTabOrder.filter((item): item is 'create' | 'list' => item === 'create' || item === 'list')
-      : [];
-    const workspaceTabOrder = order.length === 2 && new Set(order).size === 2
-      ? order
-      : ['create', 'list'];
-    return { ...input, workspaceTabOrder };
+    return normalizeFormConfig(value);
   }
 
   private toFormConfig(value: Record<string, unknown> | null | undefined) {

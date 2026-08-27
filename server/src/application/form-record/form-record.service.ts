@@ -1,4 +1,4 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AppForm } from '../app-form.entity';
@@ -15,6 +15,14 @@ import { parseFormSchema } from '../form-schema';
 import { FormField } from './form-record.types';
 import { User } from '../../user/user.entity';
 import { DictionaryService } from '../dictionary/dictionary.service';
+import {
+  headerFromCell,
+  importableFields,
+  importHeaders,
+  MAX_IMPORT_FILE_SIZE,
+  parseImportRows,
+} from './form-record.import';
+import ExcelJS from 'exceljs';
 
 export type FormRecordView = {
   id: string;
@@ -147,6 +155,114 @@ export class FormRecordService {
     const deleted = await this.store.deleteById(formId, recordId);
     if (!deleted) throw new NotFoundException('记录不存在');
     return { ok: true };
+  }
+
+  async buildImportTemplate(
+    ownerId: number,
+    appId: number,
+    formId: number,
+  ): Promise<{ buffer: Buffer; filename: string }> {
+    const form = await this.requireForm(ownerId, appId, formId);
+    const fields = importableFields(this.readFields(form));
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('数据');
+    sheet.addRow(importHeaders(fields));
+    const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+    const name = (form.name || '表单').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
+    return { buffer, filename: `${name}-导入模版.xlsx` };
+  }
+
+  async importFromExcel(
+    ownerId: number,
+    appId: number,
+    formId: number,
+    file?: { buffer?: Buffer; size?: number; originalname?: string },
+  ): Promise<{ imported: number }> {
+    if (!file?.buffer?.length) {
+      throw new BadRequestException('请选择要导入的文件');
+    }
+    if ((file.size || file.buffer.length) > MAX_IMPORT_FILE_SIZE) {
+      throw new BadRequestException('文件不能超过 10MB');
+    }
+    if (!file.originalname?.toLowerCase().endsWith('.xlsx')) {
+      throw new BadRequestException('请上传 xlsx 文件');
+    }
+    const form = await this.requireForm(ownerId, appId, formId);
+    const fields = this.readFields(form);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.buffer as never);
+    const sheet = workbook.worksheets[0];
+    if (!sheet) {
+      return { imported: 0 };
+    }
+    let headers: string[] = [];
+    const rows: unknown[][] = [];
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) {
+        const count = Math.max(row.cellCount, 1);
+        headers = Array.from({ length: count }, (_, index) =>
+          headerFromCell(row.getCell(index + 1).value),
+        );
+        return;
+      }
+      rows.push(
+        headers.map((_, index) => row.getCell(index + 1).value),
+      );
+    });
+    const codes = [
+      ...new Set(
+        importableFields(fields)
+          .map((field) => field.dictCode)
+          .filter((code): code is string => Boolean(code)),
+      ),
+    ];
+    const dictRows = codes.length
+      ? await this.dictionaryService.listEnabledItemsByCodes(
+          ownerId,
+          appId,
+          codes,
+        )
+      : [];
+    const dictItemsByCode = Object.fromEntries(
+      dictRows.map((row) => [row.code, row.items || []]),
+    );
+    const parsed = parseImportRows(headers, rows, fields, dictItemsByCode);
+    const now = new Date();
+    const docs: Omit<FormRecordDoc, '_id'>[] = [];
+    const seen = new Map<string, Set<string>>();
+    for (const data of parsed) {
+      let skip = false;
+      for (const field of fields ?? []) {
+        if (field.type !== 'input' || !field.unique) continue;
+        const value = data[field.key];
+        if (typeof value !== 'string' || !value) continue;
+        let bucket = seen.get(field.key);
+        if (!bucket) {
+          bucket = new Set();
+          seen.set(field.key, bucket);
+        }
+        if (
+          bucket.has(value) ||
+          (await this.store.existsByDataValue(formId, field.key, value))
+        ) {
+          skip = true;
+          break;
+        }
+        bucket.add(value);
+      }
+      if (skip) continue;
+      docs.push({
+        appId,
+        formId,
+        createdBy: ownerId,
+        createdAt: now,
+        updatedBy: ownerId,
+        updatedAt: now,
+        data,
+      });
+    }
+    const imported = await this.store.insertMany(docs);
+    return { imported };
   }
 
   private async assertUniqueFields(
