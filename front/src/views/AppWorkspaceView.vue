@@ -39,7 +39,7 @@
         :data="treeData"
         node-key="key"
         highlight-current
-        :default-expand-all="false"
+        :default-expand-all="true"
         :expand-on-click-node="true"
         :current-node-key="currentForm?.key"
         :props="{ label: 'name', children: 'children' }"
@@ -352,7 +352,7 @@ async function onSubmitName() {
       nameVisible.value = false
       await loadDirectory()
       router.push({
-        name: 'app-workspace-form',
+        name: 'form-design',
         params: { id, formId: form.id },
       })
       return
