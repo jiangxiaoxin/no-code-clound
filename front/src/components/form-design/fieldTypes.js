@@ -32,7 +32,7 @@ export const fieldTypes = [
   { type: 'divider', label: '分割线', icon: Minus, component: 'el-divider', placeholder: '' },
   { type: 'currentUser', label: '当前登录人', icon: UserFilled, component: 'CurrentUserName', placeholder: '' },
   { type: 'data', label: '选择数据', icon: Grid, component: 'DataSelect', placeholder: '请选择' },
-  // -----------以下未完成
+  // -----------以下未完成------
   { type: 'member', label: '成员选择', icon: User, component: 'MemberSelect', placeholder: '请选择' },
   { type: 'dept', label: '部门选择', icon: OfficeBuilding, component: 'DeptSelect', placeholder: '请选择' },
   { type: 'image', label: '图片上传', icon: Picture, component: 'el-upload', placeholder: '' },

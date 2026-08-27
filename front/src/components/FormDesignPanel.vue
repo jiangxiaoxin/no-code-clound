@@ -142,6 +142,8 @@ function addField(item, beforeKey) {
     placeholder: item.placeholder || '',
     width: item.type === 'divider' ? '1' : defaultWidthByColumns(columns.value),
     required: false,
+    disabled: false,
+    editable: true,
     description: '',
     ...(item.type === 'number' ? { rangeEnabled: false, precision: 0 } : {}),
     ...(item.type === 'date' ? { format: 'date' } : {}),

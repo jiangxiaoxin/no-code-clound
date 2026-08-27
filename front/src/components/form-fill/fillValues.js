@@ -132,7 +132,12 @@ const INLINE_EDIT_TYPES = new Set([
 ])
 
 export function isInlineEditable(field) {
-  return isFillable(field) && INLINE_EDIT_TYPES.has(field.type)
+  return (
+    isFillable(field) &&
+    INLINE_EDIT_TYPES.has(field.type) &&
+    !field.disabled &&
+    field.editable !== false
+  )
 }
 
 export function cloneCellValue(field, value) {

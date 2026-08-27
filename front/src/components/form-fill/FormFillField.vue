@@ -20,7 +20,7 @@
     <el-input
       v-if="field.type === 'input'"
       v-model="draft"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
       @change="onCommitDraft"
@@ -30,7 +30,7 @@
       class="fill-full"
       align="left"
       v-model="draft"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :controls="false"
       :precision="field.precision"
       :min="field.rangeEnabled ? field.min : undefined"
@@ -43,7 +43,7 @@
       v-model="draft"
       type="textarea"
       :rows="3"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
       @change="onCommitDraft"
@@ -57,7 +57,7 @@
     <el-radio-group
       v-else-if="field.type === 'radio'"
       :model-value="modelValue"
-      :disabled="disabled"
+      :disabled="isDisabled"
       @change="onUpdateModelValue"
     >
       <el-radio v-for="item in items" :key="item.value" :value="item.value">
@@ -67,7 +67,7 @@
     <el-checkbox-group
       v-else-if="field.type === 'checkbox'"
       :model-value="modelValue"
-      :disabled="disabled"
+      :disabled="isDisabled"
       @change="onUpdateModelValue"
     >
       <el-checkbox v-for="item in items" :key="item.value" :value="item.value">
@@ -78,7 +78,7 @@
       v-else-if="field.type === 'date'"
       class="fill-full"
       v-model="draft"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :type="field.format || 'date'"
       :placeholder="field.placeholder || '请选择'"
       @change="onCommitDraft"
@@ -87,7 +87,7 @@
       v-else-if="field.type === 'time'"
       class="fill-full"
       v-model="draft"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :format="field.format || 'HH:mm:ss'"
       :value-format="field.format || 'HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
@@ -98,7 +98,7 @@
       class="fill-full"
       type="datetime"
       v-model="draft"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :format="field.format || 'YYYY-MM-DD HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
       @change="onCommitDraft"
@@ -111,7 +111,7 @@
       class="fill-full"
       :multiple="field.type === 'select-multiple'"
       :model-value="modelValue"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :placeholder="field.placeholder"
       @change="onUpdateModelValue"
     >
@@ -137,7 +137,7 @@
       class="fill-full"
       :app-id="appId"
       :field="field"
-      :disabled="disabled"
+      :disabled="isDisabled"
       :model-value="modelValue"
       @update:model-value="onUpdateModelValue"
       @fill="onFill"
@@ -182,6 +182,7 @@ const props = defineProps({
   items: { type: Array, default: () => [] },
   modelValue: { default: undefined },
   disabled: { type: Boolean, default: false },
+  updating: { type: Boolean, default: false },
   appId: { type: Number, default: 0 },
 })
 
@@ -202,6 +203,13 @@ watch(
 
 const fieldKeyTitle = computed(() =>
   import.meta.env.DEV ? props.field.key || undefined : undefined,
+)
+
+const isDisabled = computed(
+  () =>
+    props.disabled ||
+    Boolean(props.field.disabled) ||
+    (props.updating && props.field.editable === false),
 )
 
 function onUpdateModelValue(value) {

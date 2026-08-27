@@ -44,6 +44,14 @@
             <span>必填</span>
             <el-switch v-model="field.required" />
           </div>
+          <div class="required-row">
+            <span>是否禁用</span>
+            <el-switch v-model="field.disabled" />
+          </div>
+          <div class="required-row">
+            <span>是否可修改</span>
+            <el-switch :model-value="field.editable !== false" @change="onEditableChange" />
+          </div>
           <div v-if="field.type === 'input'" class="required-row">
             <span>不允许重复值</span>
             <el-switch v-model="field.unique" />
@@ -156,7 +164,7 @@
             @select="onSourceFormSelect"
           />
         </el-form-item>
-        <el-form-item v-if="field.sourceFormId" label="显示字段">
+        <el-form-item v-if="field.sourceFormId" label="显示在表单中的字段">
           <div
             class="filter-trigger"
             :class="{ 'is-placeholder': !hasDisplayFields }"
@@ -248,6 +256,13 @@ const emit = defineEmits(['update:tab', 'update:width', 'update:columns'])
 
 function onWidthChange(value) {
   emit('update:width', value)
+}
+
+function onEditableChange(value) {
+  if (!props.field) {
+    return
+  }
+  props.field.editable = value
 }
 
 const dictionaries = ref([])

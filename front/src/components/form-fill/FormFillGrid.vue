@@ -8,6 +8,7 @@
       :items="itemsFor(field)"
       :model-value="values[field.key]"
       :disabled="disabled"
+      :updating="updating"
       @update:model-value="values[field.key] = $event"
       @fill="onFill"
     />
@@ -27,6 +28,7 @@ const props = defineProps({
   values: { type: Object, required: true },
   dictItemsByCode: { type: Object, default: () => ({}) },
   disabled: { type: Boolean, default: false },
+  updating: { type: Boolean, default: false },
 })
 
 const tableItemsByKey = ref({})

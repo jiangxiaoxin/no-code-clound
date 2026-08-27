@@ -15,6 +15,7 @@
         :values="detailValues"
         :dict-items-by-code="dictItemsByCode"
         :disabled="!editing"
+        :updating="true"
       />
     </div>
     <template #footer>

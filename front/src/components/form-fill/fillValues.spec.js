@@ -6,6 +6,8 @@ import {
   emptyRecordValues,
   formatCellValue,
   isFillable,
+  isInlineEditable,
+  validateRequired,
 } from './fillValues.js'
 import { asDate, formatQueryTimeValue } from '../../utils/timeValue.js'
 
@@ -84,6 +86,33 @@ test('formatQueryTimeValue follows field format', () => {
   assert.equal(
     formatQueryTimeValue('datetime', 'YYYY-MM-DD HH:mm', picked),
     '2026-08-01 14:30',
+  )
+})
+
+test('disabled field still validates required and is not inline editable', () => {
+  const field = {
+    key: 'name',
+    type: 'input',
+    title: '姓名',
+    required: true,
+    disabled: true,
+  }
+  assert.equal(validateRequired([field], { name: '' }), '请填写「姓名」')
+  assert.equal(isInlineEditable(field), false)
+  assert.equal(
+    isInlineEditable({ key: 'name', type: 'input', disabled: false }),
+    true,
+  )
+})
+
+test('uneditable field cannot be inline edited after create', () => {
+  assert.equal(
+    isInlineEditable({ key: 'name', type: 'input', editable: false }),
+    false,
+  )
+  assert.equal(
+    isInlineEditable({ key: 'name', type: 'input' }),
+    true,
   )
 })
 
