@@ -180,7 +180,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { Connection, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
-import { isSelectType, widthClass } from '../form-design/fieldTypes'
+import { widthClass } from '../form-design/fieldTypes'
+import { needsOptionSourceHint as fieldNeedsOptionSourceHint } from '../form-design/linkage'
 import FormDataSelect from './FormDataSelect.vue'
 import CurrentUserName from './CurrentUserName.vue'
 
@@ -234,17 +235,9 @@ function onFill(patches) {
   emit('fill', patches)
 }
 
-const needsOptionSourceHint = computed(() => {
-  const field = props.field
-  if (!isSelectType(field.type)) {
-    return false
-  }
-  const source = field.optionSource || 'dictionary'
-  if (source === 'table_data') {
-    return !field.sourceFormId || !field.sourceFieldKey
-  }
-  return !field.dictCode
-})
+const needsOptionSourceHint = computed(() =>
+  fieldNeedsOptionSourceHint(props.field),
+)
 </script>
 
 <style scoped lang="less">

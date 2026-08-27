@@ -119,7 +119,7 @@
           />
         </el-select>
       </el-form-item>
-      <template v-else-if="field.type === 'select' || field.type === 'select-multiple'">
+      <template v-else-if="hasLinkageSource(field.type)">
         <el-form-item label="数据源">
           <el-select
             v-model="field.optionSource"
@@ -127,7 +127,7 @@
             @change="onOptionSourceChange"
           >
             <el-option
-              v-for="item in optionSourceOptions"
+              v-for="item in optionSourceChoices(field.type)"
               :key="item.value"
               :label="item.label"
               :value="item.value"
@@ -157,9 +157,27 @@
           <div
             class="filter-trigger"
             :class="{ 'is-placeholder': !hasOptionFilters(field.optionFilters) }"
-            @click="filterVisible = true"
+            @click="openOptionFilters"
           >
             {{ hasOptionFilters(field.optionFilters) ? '已添加过滤条件' : '添加过滤条件' }}
+          </div>
+        </el-form-item>
+        <el-form-item v-if="field.optionSource === 'linkage'" label="数据联动">
+          <div class="linkage-row">
+            <div
+              class="filter-trigger"
+              :class="{ 'is-placeholder': !hasLinkage(field) }"
+              @click="openLinkage"
+            >
+              {{ hasLinkage(field) ? '已设置数据联动' : '设置数据联动' }}
+            </div>
+            <el-icon
+              v-if="hasLinkage(field)"
+              class="linkage-clear"
+              @click.stop="confirmClearLinkage"
+            >
+              <CircleClose />
+            </el-icon>
           </div>
         </el-form-item>
       </template>
@@ -226,6 +244,17 @@
         :form-fields="formFields"
         @confirm="onProcessConfirm"
       />
+      <DataLinkageDialog
+        v-model="linkageVisible"
+        :app-id="appId"
+        :form-id="formId"
+        :field-title="field.title"
+        :field-type="field.type"
+        :linkage="field.linkage"
+        :current-fields="fields"
+        :form-fields="formFields"
+        @confirm="onLinkageConfirm"
+      />
       <FormOptionFilterDialog
         v-model="filterVisible"
         :app-id="appId"
@@ -253,6 +282,8 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { CircleClose } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 import { formatOptions, formColumnOptions, fieldTypeLabel } from './fieldTypes'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
 import FormSourcePicker from './FormSourcePicker.vue'
@@ -260,7 +291,13 @@ import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
 import DataSelectDisplayFieldsDialog from './DataSelectDisplayFieldsDialog.vue'
 import DataSelectFillMappingDialog from './DataSelectFillMappingDialog.vue'
 import DataSelectProcessDrawer from './DataSelectProcessDrawer.vue'
+import DataLinkageDialog from './DataLinkageDialog.vue'
 import { hasOptionFilters } from './optionFilters'
+import {
+  hasLinkage,
+  hasLinkageSource,
+  optionSourceChoices,
+} from './linkage'
 import {
   cloneDisplayFieldKeys,
   findDisplaySourceField,
@@ -281,11 +318,6 @@ const props = defineProps({
 
 const emit = defineEmits(['update:tab', 'update:width', 'update:columns'])
 
-const optionSourceOptions = [
-  { value: 'dictionary', label: '系统字典表' },
-  { value: 'table_data', label: '其他表数据' },
-]
-
 function onWidthChange(value) {
   emit('update:width', value)
 }
@@ -300,6 +332,7 @@ function onEditableChange(value) {
 const dictionaries = ref([])
 const sourceFields = ref([])
 const filterVisible = ref(false)
+const linkageVisible = ref(false)
 const displayVisible = ref(false)
 const mappingVisible = ref(false)
 const processVisible = ref(false)
@@ -358,6 +391,33 @@ function openProcess() {
   processVisible.value = true
 }
 
+function openOptionFilters() {
+  filterVisible.value = true
+}
+
+function openLinkage() {
+  linkageVisible.value = true
+}
+
+async function confirmClearLinkage() {
+  if (!props.field) return
+  try {
+    await ElMessageBox.confirm('确定删除数据联动？', '删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  delete props.field.linkage
+}
+
+function onLinkageConfirm(next) {
+  if (!props.field) return
+  props.field.linkage = next
+}
+
 async function loadOptions() {
   if (!props.appId) {
     dictionaries.value = []
@@ -374,15 +434,18 @@ function onOptionSourceChange(value) {
   if (!props.field) {
     return
   }
-  if (value === 'table_data') {
+  if (value !== 'dictionary') {
     delete props.field.dictCode
-  } else {
+  } else if (props.field.dictCode == null) {
+    props.field.dictCode = ''
+  }
+  if (value !== 'table_data') {
     delete props.field.sourceFormId
     delete props.field.sourceFieldKey
     delete props.field.optionFilters
-    if (props.field.dictCode == null) {
-      props.field.dictCode = ''
-    }
+  }
+  if (value !== 'linkage') {
+    delete props.field.linkage
   }
 }
 
@@ -490,6 +553,7 @@ watch(
   () => props.field?.key,
   () => {
     filterVisible.value = false
+    linkageVisible.value = false
     displayVisible.value = false
     mappingVisible.value = false
     processVisible.value = false
@@ -584,6 +648,27 @@ watch(
 
 .filter-trigger.is-placeholder {
   color: var(--el-text-color-placeholder);
+}
+
+.linkage-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.linkage-row .filter-trigger {
+  flex: 1;
+  min-width: 0;
+}
+
+.linkage-clear {
+  margin-left: 8px;
+  color: var(--el-text-color-placeholder);
+  cursor: pointer;
+}
+
+.linkage-clear:hover {
+  color: var(--el-text-color-regular);
 }
 
 .field-type-row {

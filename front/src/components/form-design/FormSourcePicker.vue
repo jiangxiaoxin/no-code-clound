@@ -58,6 +58,7 @@ const props = defineProps({
   appId: { type: Number, required: true },
   formId: { type: Number, required: true },
   sourceFormId: { type: Number, default: null },
+  includeCurrent: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['select'])
@@ -94,12 +95,13 @@ const filteredForms = computed(() => {
 async function loadForms() {
   loadError.value = false
   try {
-    const rows = (await listFormFieldsApi(props.appId, {
-      excludeFormId: props.formId,
-    })) || []
-    forms.value = rows.filter(
-      (form) => Number(form.id) !== Number(props.formId),
-    )
+    const params = props.includeCurrent
+      ? {}
+      : { excludeFormId: props.formId }
+    const rows = (await listFormFieldsApi(props.appId, params)) || []
+    forms.value = props.includeCurrent
+      ? rows
+      : rows.filter((form) => Number(form.id) !== Number(props.formId))
   } catch {
     forms.value = []
     loadError.value = true
@@ -126,7 +128,7 @@ onMounted(() => {
 })
 
 watch(
-  () => [props.appId, props.formId],
+  () => [props.appId, props.formId, props.includeCurrent],
   () => {
     forms.value = []
     if (open.value || props.sourceFormId) {

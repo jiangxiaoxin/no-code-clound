@@ -1,0 +1,25 @@
+---
+description: 使用图标前必须确认 @element-plus/icons-vue 里有对应导出，禁止用 JS/浏览器全局名冒充图标
+globs: front/**/*.{vue,js}
+alwaysApply: true
+---
+
+# 使用 icon 前先查验 Element Plus
+
+写或改 `front/` 里的图标时，**必须从 `@element-plus/icons-vue` 确认有同名导出**，再 `import` 后使用。不要凭印象写图标名。
+
+查验方式任选其一：从该包 `import` 该名字；或在 `node_modules/@element-plus/icons-vue` 里确认导出。没有对应图标就换一个库里存在的，不要用原生标签或 JS 内置对象凑。
+
+```js
+// ❌ BAD：Number、Document 是 JS/浏览器全局，不是图标组件
+{ type: 'serialNumber', icon: Number }
+{ type: 'tabs', icon: Document }
+
+// ✅ GOOD：从 @element-plus/icons-vue 导入真实存在的图标
+import { CollectionTag, Document } from '@element-plus/icons-vue'
+
+{ type: 'serialNumber', icon: CollectionTag }
+{ type: 'tabs', icon: Document }
+```
+
+未从该包导入就写到模板或 `el-icon` 里，刷新后可能白屏。库里没有的名字不要编。

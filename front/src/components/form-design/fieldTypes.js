@@ -2,6 +2,8 @@ import {
   Calendar,
   CircleCheck,
   Clock,
+  CollectionTag,
+  Document,
   EditPen,
   Finished,
   Grid,
@@ -37,9 +39,13 @@ export const fieldTypes = [
   { type: 'dept', label: '部门选择', icon: OfficeBuilding, component: 'DeptSelect', placeholder: '请选择' },
   { type: 'image', label: '图片上传', icon: Picture, component: 'el-upload', placeholder: '' },
   { type: 'file', label: '文件上传', icon: Upload, component: 'el-upload', placeholder: '' },
-  
-  { type: 'subform', label: '子表单', icon: Tickets, component: 'SubForm', placeholder: '' },
+  { type: 'serialNumber', label: '流水号生成', icon: CollectionTag, component: 'SerialNumber', placeholder: '请选择' },
   { type: 'relate', label: '关联数据', icon: Link, component: 'RelateData', placeholder: '请选择' },
+ 
+  { type: 'subform', label: '子表单', icon: Tickets, component: 'SubForm', placeholder: '' },
+  { type: 'relate-subform', label: '关联子表单', icon: Link, component: 'RelateSubForm', placeholder: '请选择' },
+  { type: 'tabs', label: '标签页', icon: Document, component: 'Tabs', placeholder: '' },
+  
 ]
 
 export const formatOptions = {
@@ -83,6 +89,19 @@ export function defaultWidthByColumns(columns) {
 
 export function fieldTypeLabel(type) {
   return fieldTypes.find((item) => item.type === type)?.label || type
+}
+
+export function fieldOptionLabel(field) {
+  const title = field?.title || field?.key || ''
+  const typeLabel = fieldTypeLabel(field?.type)
+  if (!typeLabel || typeLabel === field?.type) {
+    return title
+  }
+  return `${title}（${typeLabel}）`
+}
+
+export function fieldTypeIcon(type) {
+  return fieldTypes.find((item) => item.type === type)?.icon || null
 }
 
 export function isSelectType(type) {

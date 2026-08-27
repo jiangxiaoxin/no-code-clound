@@ -55,6 +55,7 @@ import FormDesignProps from './form-design/FormDesignProps.vue'
 import { listDictionaryItemsByCodesApi, saveFormFieldsApi } from '../api/apps'
 import { defaultWidthByColumns, isSelectType } from './form-design/fieldTypes'
 import { cloneOptionFilters } from './form-design/optionFilters'
+import { cloneLinkage, LINKAGE_VALUE_TYPES } from './form-design/linkage'
 import {
   cloneDisplayFieldKeys,
   cloneDisplayFieldLabels,
@@ -155,6 +156,9 @@ function addField(item, beforeKey) {
     ...(item.type === 'select' || item.type === 'select-multiple'
       ? { optionSource: 'dictionary', dictCode: '' }
       : {}),
+    ...(LINKAGE_VALUE_TYPES.includes(item.type)
+      ? { optionSource: 'custom' }
+      : {}),
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)
@@ -172,6 +176,9 @@ function copyField(field) {
   }
   if (field.optionFilters) {
     copied.optionFilters = cloneOptionFilters(field.optionFilters)
+  }
+  if (field.linkage) {
+    copied.linkage = cloneLinkage(field.linkage)
   }
   if (field.displayFieldKeys) {
     copied.displayFieldKeys = cloneDisplayFieldKeys(field.displayFieldKeys)
@@ -218,6 +225,9 @@ function ensureOptionSource(field) {
     if (field.optionSource === 'dictionary' && field.dictCode == null) {
       field.dictCode = ''
     }
+  }
+  if (LINKAGE_VALUE_TYPES.includes(field.type) && !field.optionSource) {
+    field.optionSource = 'custom'
   }
 }
 

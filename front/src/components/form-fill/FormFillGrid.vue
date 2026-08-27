@@ -20,10 +20,18 @@
 
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { queryFormRecordsApi } from '../../api/apps'
 import { fillInfluencerTips } from '../form-design/dataSelect'
 import { isSelectType } from '../form-design/fieldTypes'
+import { hasLinkage } from '../form-design/linkage'
 import FormFillField from './FormFillField.vue'
+import { emptyValue } from './fillValues'
+import {
+  applyLinkageResult,
+  linkageConditionsReady,
+  linkageQueryPaging,
+} from './linkageRuntime'
 import { buildSourceQuery, recordsToSelectItems } from './tableOptions'
 
 const props = defineProps({
@@ -37,14 +45,23 @@ const props = defineProps({
 
 const fillTips = computed(() => fillInfluencerTips(props.fields))
 const tableItemsByKey = ref({})
+const linkageItemsByKey = ref({})
 const pendingQueries = new Map()
 let loadSeq = 0
+let linkageSeq = 0
 let loadTimer = 0
 let loadPrimed = false
 let lastLoadKeys = {}
+let lastLinkageKeys = {}
+let linkagePrimed = false
 
 function resolveSourceFormId(field) {
   const n = Number(field.sourceFormId)
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
+
+function resolveLinkageFormId(field) {
+  const n = Number(field.linkage?.sourceFormId)
   return Number.isInteger(n) && n > 0 ? n : 0
 }
 
@@ -56,6 +73,10 @@ function isTableSelect(field) {
     resolveSourceFormId(field) &&
     field.sourceFieldKey
   )
+}
+
+function isLinkageField(field) {
+  return hasLinkage(field)
 }
 
 function fieldLoadKey(field) {
@@ -73,16 +94,45 @@ function fieldLoadKey(field) {
   ].join(':')
 }
 
-const loadKey = computed(() =>
+function linkageFieldLoadKey(field) {
+  const refs = (field.linkage?.conditions || [])
+    .filter((item) => item.valueType === 'field' && item.value)
+    .map(
+      (item) => `${item.value}=${JSON.stringify(props.values?.[item.value])}`,
+    )
+  return [
+    resolveLinkageFormId(field),
+    field.linkage?.sourceKey,
+    field.linkage?.match,
+    JSON.stringify(field.linkage?.conditions || []),
+    refs.join('&'),
+  ].join(':')
+}
+
+const tableLoadKey = computed(() =>
   props.fields
     .filter(isTableSelect)
     .map((field) => `${field.key}:${fieldLoadKey(field)}`)
     .join('|'),
 )
 
+const linkageLoadKey = computed(() =>
+  props.fields
+    .filter(isLinkageField)
+    .map((field) => `${field.key}:${linkageFieldLoadKey(field)}`)
+    .join('|'),
+)
+
+const loadKey = computed(
+  () => `${tableLoadKey.value}#${linkageLoadKey.value}#${props.disabled}`,
+)
+
 function itemsFor(field) {
   if (isTableSelect(field)) {
     return tableItemsByKey.value[field.key] || []
+  }
+  if (isLinkageField(field) && isSelectType(field.type)) {
+    return linkageItemsByKey.value[field.key] || []
   }
   return props.dictItemsByCode[field.dictCode] || []
 }
@@ -95,13 +145,16 @@ function onFill(patches) {
 }
 
 function hasFieldFilterRefs() {
-  return props.fields.some(
-    (field) =>
-      isTableSelect(field) &&
-      (field.optionFilters?.conditions || []).some(
-        (item) => item.valueType === 'field' && item.value,
-      ),
-  )
+  return props.fields.some((field) => {
+    const conditions = isTableSelect(field)
+      ? field.optionFilters?.conditions
+      : isLinkageField(field)
+        ? field.linkage?.conditions
+        : null
+    return (conditions || []).some(
+      (item) => item.valueType === 'field' && item.value,
+    )
+  })
 }
 
 function queryRecordsOnce(appId, formId, query) {
@@ -113,6 +166,26 @@ function queryRecordsOnce(appId, formId, query) {
   })
   pendingQueries.set(key, pending)
   return pending
+}
+
+function canWriteLinkageValue(field) {
+  if (props.disabled) return false
+  if (props.updating && field.editable === false) return false
+  return true
+}
+
+function shouldWriteLinkageValues() {
+  return !props.disabled && (!props.updating || linkagePrimed)
+}
+
+function applyNotReady(field, writeValues) {
+  if (isSelectType(field.type)) {
+    return []
+  }
+  if (writeValues && canWriteLinkageValue(field)) {
+    props.values[field.key] = emptyValue(field)
+  }
+  return null
 }
 
 async function loadTableItems() {
@@ -159,6 +232,80 @@ async function loadTableItems() {
   }
 }
 
+async function loadLinkage() {
+  const seq = ++linkageSeq
+  if (props.disabled || !props.appId) {
+    linkagePrimed = false
+    lastLinkageKeys = {}
+    return
+  }
+  const fields = props.fields.filter(isLinkageField)
+  const writeValues = shouldWriteLinkageValues()
+  const next = { ...linkageItemsByKey.value }
+  const nextKeys = {}
+  for (const key of Object.keys(next)) {
+    if (!fields.some((field) => field.key === key)) {
+      delete next[key]
+    }
+  }
+  await Promise.all(
+    fields.map(async (field) => {
+      const key = linkageFieldLoadKey(field)
+      nextKeys[field.key] = key
+      if (lastLinkageKeys[field.key] === key) {
+        return
+      }
+      if (!linkageConditionsReady(field.linkage, props.values)) {
+        const items = applyNotReady(field, writeValues)
+        if (items) next[field.key] = items
+        return
+      }
+      try {
+        const result = await queryRecordsOnce(
+          props.appId,
+          resolveLinkageFormId(field),
+          buildSourceQuery(
+            {
+              match: field.linkage.match,
+              conditions: field.linkage.conditions,
+            },
+            props.values,
+            props.fields,
+            linkageQueryPaging(field),
+          ),
+        )
+        const applied = applyLinkageResult(
+          field,
+          result,
+          props.values[field.key],
+        )
+        if (isSelectType(field.type)) {
+          next[field.key] = applied.items
+        }
+        if (writeValues && canWriteLinkageValue(field)) {
+          props.values[field.key] = applied.value
+          if (applied.message) {
+            ElMessage.warning(applied.message)
+          }
+        }
+      } catch {
+        const items = applyNotReady(field, writeValues)
+        if (items) next[field.key] = items
+      }
+    }),
+  )
+  if (seq === linkageSeq) {
+    lastLinkageKeys = nextKeys
+    linkageItemsByKey.value = next
+    linkagePrimed = true
+  }
+}
+
+function runLoads() {
+  loadTableItems()
+  loadLinkage()
+}
+
 watch(
   () => [props.appId, loadKey.value],
   () => {
@@ -167,9 +314,9 @@ watch(
     const delay = loadPrimed && hasFieldFilterRefs() ? 1000 : 0
     loadPrimed = true
     if (delay) {
-      loadTimer = window.setTimeout(loadTableItems, delay)
+      loadTimer = window.setTimeout(runLoads, delay)
     } else {
-      loadTableItems()
+      runLoads()
     }
   },
   { immediate: true },
@@ -178,6 +325,7 @@ watch(
 onUnmounted(() => {
   window.clearTimeout(loadTimer)
   loadSeq += 1
+  linkageSeq += 1
 })
 </script>
 

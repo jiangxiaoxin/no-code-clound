@@ -174,7 +174,8 @@
 <script setup>
 import { computed } from 'vue'
 import { CopyDocument, Connection, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
-import { isSelectType, widthClass } from './fieldTypes'
+import { widthClass } from './fieldTypes'
+import { needsOptionSourceHint as fieldNeedsOptionSourceHint } from './linkage'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import CurrentUserName from '../form-fill/CurrentUserName.vue'
 
@@ -190,17 +191,9 @@ const props = defineProps({
 
 defineEmits(['select', 'copy', 'remove', 'dragstart', 'dragover', 'drop', 'dragend'])
 
-const needsOptionSourceHint = computed(() => {
-  const field = props.field
-  if (!isSelectType(field.type)) {
-    return false
-  }
-  const source = field.optionSource || 'dictionary'
-  if (source === 'table_data') {
-    return !field.sourceFormId || !field.sourceFieldKey
-  }
-  return !field.dictCode
-})
+const needsOptionSourceHint = computed(() =>
+  fieldNeedsOptionSourceHint(props.field),
+)
 </script>
 
 <style scoped lang="less">

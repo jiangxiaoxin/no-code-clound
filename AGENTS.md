@@ -24,6 +24,7 @@
 - 相邻 `el-button` 已有 `margin-left` 间距，按钮容器不要额外设置 `gap`。
 - 新增或修改 `el-dialog` 时默认开启 `draggable`，除非需求明确不需要拖拽。
 - 模板和 HTML 属性中不写行内 JavaScript（JavaScript，脚本语言）；事件逻辑抽到 `script setup` 函数中。
+- 使用图标前必须确认 `@element-plus/icons-vue` 中有对应导出，再导入后使用；不要用 `Number`、`Document` 等 JavaScript（JavaScript，脚本语言）或浏览器全局名当作图标。
 - 改动相关代码时，保留用户已有的注释、`console.log` 等日志输出；除非用户明确点名删除或修改。
 
 ## 日志文件

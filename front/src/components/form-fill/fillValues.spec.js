@@ -116,6 +116,17 @@ test('uneditable field cannot be inline edited after create', () => {
   )
 })
 
+test('linkage fields cannot be inline edited', () => {
+  assert.equal(
+    isInlineEditable({
+      key: 'name',
+      type: 'input',
+      optionSource: 'linkage',
+    }),
+    false,
+  )
+})
+
 test('formatCellValue shows datetime from ISO in local time', () => {
   assert.equal(
     formatCellValue(

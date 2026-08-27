@@ -60,11 +60,11 @@ export function isTimeFilterField(type) {
   return TIME_FILTER_TYPES.has(type)
 }
 
-export function emptyCondition() {
+export function emptyCondition(valueType = 'custom') {
   return {
     key: '',
     op: 'eq',
-    valueType: 'custom',
+    valueType: valueType === 'field' ? 'field' : 'custom',
     sourceType: '',
     sourceFormat: '',
     value: '',

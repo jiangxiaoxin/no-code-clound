@@ -136,7 +136,8 @@ export function isInlineEditable(field) {
     isFillable(field) &&
     INLINE_EDIT_TYPES.has(field.type) &&
     !field.disabled &&
-    field.editable !== false
+    field.editable !== false &&
+    field.optionSource !== 'linkage'
   )
 }
 
