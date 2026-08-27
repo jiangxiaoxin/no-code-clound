@@ -4,96 +4,71 @@
       请配置数据源
     </div>
     <template v-else>
-      <div
-        class="data-select-trigger"
-        :class="{
-          'is-open': pickerVisible,
-          'is-placeholder': !triggerText,
-          'is-disabled': preview || disabled,
-        }"
-        @click="openPicker"
-      >
+      <div class="data-select-trigger" :class="{
+        'is-open': pickerVisible,
+        'is-placeholder': !triggerText,
+        'is-disabled': preview || disabled,
+      }" @click="openPicker">
         <span class="data-select-value">
           {{ triggerText || field.placeholder || '请选择' }}
         </span>
-        <el-icon class="data-select-arrow"><ArrowDown /></el-icon>
+        <el-icon class="data-select-arrow">
+          <ArrowDown />
+        </el-icon>
       </div>
       <div v-if="previewRows.length" class="data-select-preview">
-        <div
-          v-for="item in previewRows"
-          :key="item.key"
-          class="data-select-preview-row"
-        >
+        <div v-for="item in previewRows" :key="item.key" class="data-select-preview-row">
           {{ item.title }}：{{ item.text || '—' }}
         </div>
       </div>
-      <el-dialog
-        v-if="!preview"
-        v-model="pickerVisible"
-        title="选择数据"
-        width="800px"
-        align-center
-        draggable
-        destroy-on-close
-        @open="onPickerOpen"
-      >
+      <el-dialog v-if="!preview" v-model="pickerVisible" title="选择数据" width="800px" align-center draggable
+        destroy-on-close @open="onPickerOpen">
         <div class="data-select-toolbar">
-          <el-input
-            v-model="keyword"
-            clearable
-            placeholder="快捷搜索"
-            @clear="onSearchNow"
-            @keyup.enter="onSearchNow"
-            size="small"
-          >
+          <el-input v-model="keyword" clearable placeholder="快捷搜索" @clear="onSearchNow" @keyup.enter="onSearchNow"
+            size="small">
             <template #prefix>
-              <el-icon><Search /></el-icon>
+              <el-icon>
+                <Search />
+              </el-icon>
             </template>
           </el-input>
         </div>
-        <el-table
-          v-loading="listLoading"
-          :data="records"
-          border
-          stripe
-          size="small"
-          height="360"
-          highlight-current-row
-          @row-click="onPick"
-        >
+        <el-table ref="tableRef" v-loading="listLoading" :data="records" border stripe size="small" height="360"
+          row-key="id" highlight-current-row class="data-select-table" @row-click="onRowClick" @select="onSelect"
+          @select-all="onSelectAll">
+          <el-table-column type="selection" width="42" />
           <el-table-column type="index" width="55" label="序号" />
-          <el-table-column
-            v-for="col in tableColumns"
-            :key="col.key"
-            :label="col.title"
-            min-width="120"
-            show-overflow-tooltip
-          >
+          <el-table-column v-for="col in tableColumns" :key="col.key" :label="col.title" min-width="120"
+            show-overflow-tooltip>
             <template #default="{ row }">
               {{ formatRecordField(col, row) }}
             </template>
           </el-table-column>
         </el-table>
-        <div class="data-select-pager">
-          <el-pagination
-            background
-            layout="total, sizes, prev, pager, next"
-            :current-page="page"
-            :page-size="pageSize"
-            :page-sizes="PAGE_SIZES"
-            :total="total"
-            size="small"
-            @current-change="onPageChange"
-            @size-change="onPageSizeChange"
-          />
-        </div>
+
+        <template #footer>
+          <!-- 弹框内table选择数据，不显得突兀和堆叠 -->
+          <div class="data-select-pager">
+            <el-pagination background layout="total, sizes, prev, pager, next" :current-page="page"
+              :page-size="pageSize" :page-sizes="PAGE_SIZES" :total="total" size="small" @current-change="onPageChange"
+              @size-change="onPageSizeChange" />
+            <div>
+              <el-button @click="closePicker">取消</el-button>
+              <el-button type="primary" :disabled="!canConfirm" @click="confirmPick">
+                确定
+              </el-button>
+            </div>
+
+          </div>
+
+        </template>
       </el-dialog>
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { ArrowDown, Search } from '@element-plus/icons-vue'
 import {
   getFormApi,
@@ -128,7 +103,7 @@ const emit = defineEmits(['fill', 'update:modelValue'])
 
 onMounted(() => {
   console.log('form data select 组件', props.preview);
-  
+
 })
 
 /**
@@ -145,6 +120,9 @@ const keyword = ref('')
 const sourceFields = ref([])
 const dictItemsByCode = ref({})
 const selected = ref(null)
+const tableRef = ref(null)
+const draftRow = ref(null)
+const canConfirm = computed(() => Boolean(draftRow.value?.id))
 let selectedSeq = 0
 let loadedKey = ''
 
@@ -346,13 +324,57 @@ async function loadRecords() {
   } finally {
     listLoading.value = false
   }
+  await nextTick()
+  restoreDraftSelection()
 }
 
 async function onPickerOpen() {
   page.value = 1
   keyword.value = ''
+  draftRow.value = selected.value
   await loadSource()
   await loadRecords()
+}
+
+function restoreDraftSelection() {
+  const table = tableRef.value
+  const id = draftRow.value?.id
+  if (!table) return
+  table.clearSelection()
+  if (!id) return
+  const row = records.value.find((item) => item.id === id)
+  if (!row) return
+  table.toggleRowSelection(row, true)
+  draftRow.value = row
+}
+
+function onSelect(selection, row) {
+  const checked = (selection || []).some((item) => item.id === row.id)
+  draftRow.value = checked ? row : null
+  nextTick(() => {
+    const table = tableRef.value
+    if (!table) return
+    table.clearSelection()
+    if (checked) table.toggleRowSelection(row, true)
+  })
+}
+
+function onSelectAll() {
+  draftRow.value = null
+  tableRef.value?.clearSelection()
+}
+
+function onRowClick(row, column) {
+  if (!row || column?.type === 'selection') return
+  draftRow.value = row
+  const table = tableRef.value
+  if (!table) return
+  table.clearSelection()
+  table.toggleRowSelection(row, true)
+}
+
+function closePicker() {
+  pickerVisible.value = false
 }
 
 function onSearchNow() {
@@ -375,11 +397,12 @@ function selectionKey(id) {
   return `${props.appId}:${props.field.sourceFormId}:${id}`
 }
 
-function onPick(row) {
+function confirmPick() {
+  const row = draftRow.value
+  if (!row?.id) return
   selected.value = row
-  const id = row?.id || ''
-  loadedKey = id ? selectionKey(id) : ''
-  emit('update:modelValue', row?.id)
+  loadedKey = selectionKey(row.id)
+  emit('update:modelValue', row.id)
   const patches = {}
   for (const item of props.field.fillMappings || []) {
     if (!item?.sourceKey || !item?.targetKey) continue
@@ -510,7 +533,7 @@ watch(
 
 .data-select-pager {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   margin-top: 12px;
 }
 
@@ -523,5 +546,9 @@ watch(
 
 .data-select-toolbar .el-input {
   width: 260px;
+}
+
+.data-select-table :deep(th.el-table-column--selection .el-checkbox) {
+  display: none;
 }
 </style>
