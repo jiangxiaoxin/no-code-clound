@@ -1,0 +1,12 @@
+---
+description: Codex 与 Cursor 规则文档保持同步
+alwaysApply: true
+---
+
+# Codex 与 Cursor 文档同步
+
+本项目同时维护根目录 `AGENTS.md`（Codex 规则）和 `.cursor/rules/*.mdc`（Cursor 规则）。
+
+新增或修改开发规则时，必须在同一次修改中更新两个工具对应的文档。两种格式的元数据可以不同，但规则含义、适用范围、例外条件和禁止事项必须一致。
+
+功能设计、实施计划和待办事项放在 `docs/`，不要把具体功能设计混入工具规则文件。
