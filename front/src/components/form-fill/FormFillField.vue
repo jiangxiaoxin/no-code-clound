@@ -85,6 +85,7 @@
       v-model="draft"
       :disabled="isDisabled"
       :type="field.format || 'date'"
+      value-format="YYYY-MM-DD"
       :placeholder="field.placeholder || '请选择'"
       @change="onCommitDraft"
     />
