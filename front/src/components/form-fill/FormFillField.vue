@@ -76,6 +76,7 @@
       :model-value="modelValue"
       :disabled="disabled"
       :type="field.format || 'date'"
+      value-format="YYYY-MM-DD"
       :placeholder="field.placeholder || '请选择'"
       @update:model-value="$emit('update:modelValue', $event)"
     />

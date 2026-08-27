@@ -65,19 +65,35 @@ function asDate(value) {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+// YYYY-MM-DD 按日历日期读，避免 `new Date('2026-08-27')` 被当成 UTC 零点后在西时区变成前一天
+function calendarDateParts(value) {
+  if (typeof value === 'string') {
+    const day = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (day) return { y: day[1], m: day[2], d: day[3] }
+    const month = value.match(/^(\d{4})-(\d{2})$/)
+    if (month) return { y: month[1], m: month[2], d: '01' }
+    const year = value.match(/^(\d{4})$/)
+    if (year) return { y: year[1], m: '01', d: '01' }
+  }
+  const d = asDate(value)
+  if (!d) return null
+  return {
+    y: String(d.getFullYear()),
+    m: pad(d.getMonth() + 1),
+    d: pad(d.getDate()),
+  }
+}
+
 export function serializeValue(field, value) {
   if (isEmptyValue(field, value)) {
     return undefined
   }
   if (field.type === 'date') {
-    const d = asDate(value)
-    if (!d) return undefined
-    const y = d.getFullYear()
-    const m = pad(d.getMonth() + 1)
-    const day = pad(d.getDate())
-    if (field.format === 'year') return `${y}-01-01`
-    if (field.format === 'month') return `${y}-${m}-01`
-    return `${y}-${m}-${day}`
+    const parts = calendarDateParts(value)
+    if (!parts) return undefined
+    if (field.format === 'year') return `${parts.y}-01-01`
+    if (field.format === 'month') return `${parts.y}-${parts.m}-01`
+    return `${parts.y}-${parts.m}-${parts.d}`
   }
   if (field.type === 'datetime') {
     const d = asDate(value)

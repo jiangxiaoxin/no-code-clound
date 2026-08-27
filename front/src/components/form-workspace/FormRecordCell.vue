@@ -69,6 +69,7 @@
         class="record-cell-control"
         size="small"
         :type="field.format || 'date'"
+        value-format="YYYY-MM-DD"
         :placeholder="field.placeholder || '请选择'"
         @keydown.esc.prevent="cancel"
         @change="commit"
