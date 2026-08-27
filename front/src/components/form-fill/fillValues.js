@@ -2,6 +2,7 @@ import { asDate, formatTimeFieldValue, pad } from '../../utils/timeValue.js'
 
 const SKIP_TYPES = new Set([
   'divider',
+  'currentUser',
   'image',
   'file',
   'subform',

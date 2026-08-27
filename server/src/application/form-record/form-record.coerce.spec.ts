@@ -6,6 +6,7 @@ const fields = [
   { key: 'age', type: 'number' },
   { key: 'tags', type: 'select-multiple' },
   { key: 'split', type: 'divider' },
+  { key: 'me', type: 'currentUser' },
   { key: 'kids', type: 'subform' },
 ];
 
@@ -16,6 +17,7 @@ describe('coerceRecordData', () => {
       age: 18,
       tags: ['a', 'b'],
       split: 'x',
+      me: '张三',
       extra: 'no',
     });
     expect(data).toEqual({

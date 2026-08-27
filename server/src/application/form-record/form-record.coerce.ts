@@ -19,6 +19,7 @@ function isEmpty(value: unknown): boolean {
 function coerceFieldValue(field: FormField, value: unknown): unknown {
   switch (field.type) {
     case 'divider':
+    case 'currentUser':
       return undefined;
     case 'input':
     case 'textarea':

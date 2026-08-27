@@ -44,6 +44,14 @@ test('create payload keeps 选择数据 source record id', () => {
   )
 })
 
+test('当前登录人 is display-only and not persisted', () => {
+  const field = { key: 'me', type: 'currentUser' }
+  assert.equal(isFillable(field), false)
+  assert.deepEqual(emptyRecordValues([field]), {})
+  assert.deepEqual(cloneRecordValues([field], { me: '张三' }), {})
+  assert.deepEqual(buildRecordData([field], { me: '张三' }), {})
+})
+
 test('选择数据 id is persisted but not treated as a fillable column', () => {
   const pick = { key: 'pick', type: 'data' }
   assert.equal(isFillable(pick), false)

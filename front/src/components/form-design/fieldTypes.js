@@ -15,6 +15,7 @@ import {
   Tickets,
   Upload,
   User,
+  UserFilled,
 } from '@element-plus/icons-vue'
 
 export const fieldTypes = [
@@ -29,6 +30,7 @@ export const fieldTypes = [
   { type: 'select', label: '下拉单选框', icon: SemiSelect, component: 'el-select', placeholder: '请选择' },
   { type: 'select-multiple', label: '下拉多选框', icon: SemiSelect, component: 'el-select', placeholder: '请选择' },
   { type: 'divider', label: '分割线', icon: Minus, component: 'el-divider', placeholder: '' },
+  { type: 'currentUser', label: '当前登录人', icon: UserFilled, component: 'CurrentUserName', placeholder: '' },
   { type: 'data', label: '选择数据', icon: Grid, component: 'DataSelect', placeholder: '请选择' },
   // -----------以下未完成
   { type: 'member', label: '成员选择', icon: User, component: 'MemberSelect', placeholder: '请选择' },

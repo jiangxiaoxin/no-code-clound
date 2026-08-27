@@ -22,6 +22,11 @@
       </el-form-item>
     </el-form>
     <el-form v-else-if="tab === 'field'" label-position="top" @submit.prevent>
+      <div class="field-type-row">
+        <span class="field-type-label">组件类型</span>
+        <span class="field-type-text">{{ fieldTypeText }}</span>
+      </div>
+      <template v-if="field.type !== 'currentUser'">
       <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
@@ -195,8 +200,10 @@
         :form-fields="formFields"
         @confirm="onFilterConfirm"
       />
-      <el-form-item label="字段宽度">
-        <el-radio-group class="width-options" :model-value="field.width" @change="$emit('update:width', $event)">
+      </template>
+      </template>
+      <el-form-item v-if="field.type !== 'divider'" label="字段宽度">
+        <el-radio-group class="width-options" :model-value="field.width" @change="onWidthChange">
           <el-radio-button value="1/4">1/4</el-radio-button>
           <el-radio-button value="1/3">1/3</el-radio-button>
           <el-radio-button value="1/2">1/2</el-radio-button>
@@ -205,7 +212,6 @@
           <el-radio-button value="1">整行</el-radio-button>
         </el-radio-group>
       </el-form-item>
-      </template>
 
     </el-form>
   </el-aside>
@@ -213,7 +219,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { formatOptions, formColumnOptions } from './fieldTypes'
+import { formatOptions, formColumnOptions, fieldTypeLabel } from './fieldTypes'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
 import FormSourcePicker from './FormSourcePicker.vue'
 import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
@@ -238,7 +244,11 @@ const props = defineProps({
   columns: { type: Number, default: 1 },
 })
 
-defineEmits(['update:tab', 'update:width', 'update:columns'])
+const emit = defineEmits(['update:tab', 'update:width', 'update:columns'])
+
+function onWidthChange(value) {
+  emit('update:width', value)
+}
 
 const dictionaries = ref([])
 const sourceFields = ref([])
@@ -251,6 +261,8 @@ const formFields = computed(() =>
     (item) => isFillable(item) && item.key !== props.field?.key,
   ),
 )
+
+const fieldTypeText = computed(() => fieldTypeLabel(props.field?.type))
 
 const hasDisplayFields = computed(() =>
   hasDisplayFieldKeys(props.field?.displayFieldKeys),
@@ -480,5 +492,29 @@ watch(
 
 .filter-trigger.is-placeholder {
   color: var(--el-text-color-placeholder);
+}
+
+.field-type-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.field-type-label {
+  flex-shrink: 0;
+  margin-right: 12px;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+}
+
+.field-type-text {
+  padding: 0 8px;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--el-text-color-regular);
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  flex: 1;
+  font-weight: bold;
 }
 </style>

@@ -142,6 +142,11 @@
       @update:model-value="onUpdateModelValue"
       @fill="onFill"
     />
+    <CurrentUserName
+      v-else-if="field.type === 'currentUser'"
+      class="fill-full"
+      :title="fieldKeyTitle"
+    />
     <el-divider v-else-if="field.type === 'divider'" :title="fieldKeyTitle">
       {{ field.title }}
     </el-divider>
@@ -170,6 +175,7 @@ import { computed, ref, watch } from 'vue'
 import { InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { isSelectType, widthClass } from '../form-design/fieldTypes'
 import FormDataSelect from './FormDataSelect.vue'
+import CurrentUserName from './CurrentUserName.vue'
 
 const props = defineProps({
   field: { type: Object, required: true },

@@ -140,6 +140,7 @@
       :field="field"
       preview
     />
+    <CurrentUserName v-else-if="field.type === 'currentUser'" class="canvas-item" />
     <el-divider v-else-if="field.type === 'divider'">
       {{ field.title }}
     </el-divider>
@@ -170,6 +171,7 @@ import { computed } from 'vue'
 import { CopyDocument, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { isSelectType, widthClass } from './fieldTypes'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
+import CurrentUserName from '../form-fill/CurrentUserName.vue'
 
 const props = defineProps({
   appId: { type: Number, default: 0 },
