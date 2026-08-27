@@ -16,6 +16,7 @@
           :key="field.key"
           :app-id="appId"
           :field="field"
+          :fill-tip="fillTips[field.key]"
           :items="dictItemsByCode[field.dictCode] || []"
           :selected="selectedKey === field.key"
           :dragging="dragKey === field.key"
@@ -34,16 +35,19 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { fillInfluencerTips } from './dataSelect'
 import { fieldTypes } from './fieldTypes'
 import FormDesignCanvasField from './FormDesignCanvasField.vue'
 
-defineProps({
+const props = defineProps({
   appId: { type: Number, default: 0 },
   fields: { type: Array, required: true },
   selectedKey: { type: String, default: '' },
   dictItemsByCode: { type: Object, default: () => ({}) },
 })
+
+const fillTips = computed(() => fillInfluencerTips(props.fields))
 
 const emit = defineEmits(['select', 'copy', 'remove', 'reorder', 'add'])
 

@@ -64,3 +64,24 @@ export function hasDisplayFieldKeys(raw) {
 export function hasFillMappings(raw) {
   return cloneFillMappings(raw).some((item) => item.sourceKey && item.targetKey)
 }
+
+export function fillInfluencerTips(fields) {
+  const namesByTarget = {}
+  for (const field of fields || []) {
+    if (field.type !== 'data') continue
+    const name =
+      (typeof field.title === 'string' && field.title.trim()) || field.key
+    if (!name) continue
+    for (const item of cloneFillMappings(field.fillMappings)) {
+      if (!item.sourceKey || !item.targetKey) continue
+      const list =
+        namesByTarget[item.targetKey] || (namesByTarget[item.targetKey] = [])
+      if (!list.includes(name)) list.push(name)
+    }
+  }
+  const tips = {}
+  for (const [key, names] of Object.entries(namesByTarget)) {
+    tips[key] = `会受 [ ${names.join('、')} ] 字段影响`
+  }
+  return tips
+}

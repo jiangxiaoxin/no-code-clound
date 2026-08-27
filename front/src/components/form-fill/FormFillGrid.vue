@@ -5,6 +5,7 @@
       :key="field.key"
       :app-id="appId"
       :field="field"
+      :fill-tip="fillTips[field.key]"
       :items="itemsFor(field)"
       :model-value="values[field.key]"
       :disabled="disabled"
@@ -20,6 +21,7 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { queryFormRecordsApi } from '../../api/apps'
+import { fillInfluencerTips } from '../form-design/dataSelect'
 import { isSelectType } from '../form-design/fieldTypes'
 import FormFillField from './FormFillField.vue'
 import { buildSourceQuery, recordsToSelectItems } from './tableOptions'
@@ -33,6 +35,7 @@ const props = defineProps({
   updating: { type: Boolean, default: false },
 })
 
+const fillTips = computed(() => fillInfluencerTips(props.fields))
 const tableItemsByKey = ref({})
 const pendingQueries = new Map()
 let loadSeq = 0

@@ -6,6 +6,11 @@
       :title="fieldKeyTitle"
     >
       <span v-if="field.required" class="fill-field-required">*</span>
+      <el-tooltip v-if="fillTip" :content="fillTip" placement="top">
+        <el-icon class="fill-field-fill">
+          <Connection />
+        </el-icon>
+      </el-tooltip>
       <span class="fill-field-title-text">{{ field.title }}</span>
       <el-tooltip
         v-if="field.description?.trim()"
@@ -174,13 +179,14 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
+import { Connection, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { isSelectType, widthClass } from '../form-design/fieldTypes'
 import FormDataSelect from './FormDataSelect.vue'
 import CurrentUserName from './CurrentUserName.vue'
 
 const props = defineProps({
   field: { type: Object, required: true },
+  fillTip: { type: String, default: '' },
   items: { type: Array, default: () => [] },
   modelValue: { default: undefined },
   disabled: { type: Boolean, default: false },
@@ -283,6 +289,12 @@ const needsOptionSourceHint = computed(() => {
 .fill-field-required {
   margin-right: 4px;
   color: var(--el-color-danger);
+}
+
+.fill-field-fill {
+  margin-right: 4px;
+  color: var(--el-color-primary);
+  cursor: help;
 }
 
 .fill-field-info {

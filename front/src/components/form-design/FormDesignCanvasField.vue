@@ -27,6 +27,11 @@
       <!-- 左右布局需要设置合理的 label width ，暂时不支持-->
     <span v-if="field.type !== 'divider'" class="canvas-field-title">
       <span v-if="field.required" class="canvas-field-required">*</span>
+      <el-tooltip v-if="fillTip" :content="fillTip" placement="top">
+        <el-icon class="canvas-field-fill" @click.stop>
+          <Connection />
+        </el-icon>
+      </el-tooltip>
       <span class="canvas-field-title-text">{{ field.title }}</span>
       <el-tooltip
         v-if="field.description?.trim()"
@@ -168,7 +173,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { CopyDocument, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
+import { CopyDocument, Connection, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
 import { isSelectType, widthClass } from './fieldTypes'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import CurrentUserName from '../form-fill/CurrentUserName.vue'
@@ -176,6 +181,7 @@ import CurrentUserName from '../form-fill/CurrentUserName.vue'
 const props = defineProps({
   appId: { type: Number, default: 0 },
   field: { type: Object, required: true },
+  fillTip: { type: String, default: '' },
   items: { type: Array, default: () => [] },
   selected: { type: Boolean, default: false },
   dragging: { type: Boolean, default: false },
@@ -270,6 +276,12 @@ const needsOptionSourceHint = computed(() => {
 .canvas-field-required {
   margin-right: 4px;
   color: var(--el-color-danger);
+}
+
+.canvas-field-fill {
+  margin-right: 4px;
+  color: var(--el-color-primary);
+  cursor: help;
 }
 
 .canvas-field-info {
