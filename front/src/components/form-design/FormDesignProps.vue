@@ -121,10 +121,18 @@
       </el-form-item>
       <template v-else-if="field.type === 'select' || field.type === 'select-multiple'">
         <el-form-item label="数据源">
-          <el-radio-group v-model="field.optionSource" @change="onOptionSourceChange">
-            <el-radio value="dictionary">字典</el-radio>
-            <el-radio value="table_data">其他表数据</el-radio>
-          </el-radio-group>
+          <el-select
+            v-model="field.optionSource"
+            placeholder="请选择"
+            @change="onOptionSourceChange"
+          >
+            <el-option
+              v-for="item in optionSourceOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item v-if="field.optionSource === 'dictionary'" label="选项字典">
           <el-select v-model="field.dictCode" clearable placeholder="请选择字典">
@@ -272,6 +280,11 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:tab', 'update:width', 'update:columns'])
+
+const optionSourceOptions = [
+  { value: 'dictionary', label: '系统字典表' },
+  { value: 'table_data', label: '其他表数据' },
+]
 
 function onWidthChange(value) {
   emit('update:width', value)
