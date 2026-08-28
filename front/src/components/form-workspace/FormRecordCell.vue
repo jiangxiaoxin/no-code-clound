@@ -120,6 +120,19 @@
         <!-- 不禁用事件会继续冒泡导致打开详情抽屉 -->
       </div>
     </template>
+    <template v-else-if="field.type === 'file'">
+      <div class="record-cell-files" :title="fileTitle">
+        <span
+          v-for="item in fileItems"
+          :key="item.url"
+          class="record-cell-file"
+          :class="{ 'is-link': canDownloadFile }"
+          @click.stop="onDownloadFile(item)"
+        >
+          {{ item.name }}
+        </span>
+      </div>
+    </template>
     <template v-else>
       <span class="record-cell-text" :title="display">{{ display }}</span>
       <button
@@ -149,6 +162,11 @@ import {
   validateRequired,
   valuesEqual,
 } from '../form-fill/fillValues.js'
+import {
+  downloadFile,
+  fileDownloadable,
+  fileItemsOf,
+} from '../form-fill/fileField.js'
 import { imageUrlsOf } from '../form-fill/imageField.js'
 import FormImageViewerToolbar from '../form-fill/FormImageViewerToolbar.vue'
 
@@ -194,6 +212,19 @@ const display = computed(() =>
 )
 
 const imageUrls = computed(() => imageUrlsOf(props.row.data?.[props.field?.key]))
+
+const fileItems = computed(() => fileItemsOf(props.row.data?.[props.field?.key]))
+const fileTitle = computed(() => fileItems.value.map((item) => item.name).join('、'))
+const canDownloadFile = computed(() => fileDownloadable(props.field))
+
+async function onDownloadFile(item) {
+  if (!canDownloadFile.value) return
+  try {
+    await downloadFile(item)
+  } catch {
+    ElMessage.error('下载失败')
+  }
+}
 
 const options = computed(() => {
   const field = props.field
@@ -408,6 +439,32 @@ onUnmounted(() => {
   height: 36px;
   margin-right: 4px;
   border-radius: 4px;
+}
+
+.record-cell-files {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+}
+
+.record-cell-file {
+  max-width: 100%;
+  min-width: 0;
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-cell-file.is-link {
+  color: var(--el-color-primary);
+  cursor: pointer;
+}
+
+.record-cell-file.is-link:hover {
+  text-decoration: underline;
 }
 
 .record-cell :deep(.el-textarea),

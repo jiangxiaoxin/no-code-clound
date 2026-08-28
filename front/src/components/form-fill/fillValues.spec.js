@@ -47,12 +47,20 @@ test('create payload keeps 选择数据 source record id', () => {
   )
 })
 
-test('当前登录人 is display-only and not persisted', () => {
+test('登录人姓名 is display-only and not persisted', () => {
   const field = { key: 'me', type: 'currentUser' }
   assert.equal(isFillable(field), false)
   assert.deepEqual(emptyRecordValues([field]), {})
   assert.deepEqual(cloneRecordValues([field], { me: '张三' }), {})
   assert.deepEqual(buildRecordData([field], { me: '张三' }), {})
+})
+
+test('登录人部门 is display-only and not persisted', () => {
+  const field = { key: 'dept', type: 'currentUserDept' }
+  assert.equal(isFillable(field), false)
+  assert.deepEqual(emptyRecordValues([field]), {})
+  assert.deepEqual(cloneRecordValues([field], { dept: '研发部' }), {})
+  assert.deepEqual(buildRecordData([field], { dept: '研发部' }), {})
 })
 
 test('选择数据 id is persisted but not treated as a fillable column', () => {
@@ -192,4 +200,22 @@ test('image field is fillable, persisted as url list, and not inline editable', 
   )
   assert.equal(validateRequired([field], { pics: [] }), '请填写「图片」')
   assert.equal(validateRequired([field], { pics: ['/uploads/a.png'] }), '')
+})
+
+test('file field is fillable, persisted as url and name list, and not inline editable', () => {
+  const field = { key: 'docs', type: 'file', title: '附件', required: true }
+  const item = { url: '/uploads/files/a.docx', name: '合同.docx' }
+  assert.equal(isFillable(field), true)
+  assert.equal(isInlineEditable(field), false)
+  assert.deepEqual(emptyRecordValues([field]), { docs: [] })
+  assert.deepEqual(cloneRecordValues([field], { docs: [item] }), {
+    docs: [item],
+  })
+  assert.deepEqual(buildRecordData([field], { docs: [item] }), { docs: [item] })
+  assert.deepEqual(
+    buildRecordData([field], { docs: [] }, { clearEmpty: true }),
+    { docs: null },
+  )
+  assert.equal(validateRequired([field], { docs: [] }), '请填写「附件」')
+  assert.equal(validateRequired([field], { docs: [item] }), '')
 })

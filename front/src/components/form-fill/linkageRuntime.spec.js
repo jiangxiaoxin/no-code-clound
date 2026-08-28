@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import {
   applyLinkageResult,
   linkageConditionsReady,
+  linkageFileOverflowMessage,
   linkageImageOverflowMessage,
   linkageManyMessage,
   linkageQueryPaging,
@@ -172,6 +173,10 @@ test('value fields query two rows, select queries up to 100', () => {
     page: 1,
     pageSize: 100,
   })
+  assert.deepEqual(linkageQueryPaging({ type: 'file' }), {
+    page: 1,
+    pageSize: 100,
+  })
   assert.deepEqual(linkageQueryPaging({ type: 'select' }), {
     page: 1,
     pageSize: 100,
@@ -237,5 +242,61 @@ test('image fields collect urls up to maxCount from one or many rows', () => {
       maxCount: 2,
     }),
     '[ 照片，证件照 ] 字段联动图片超过最多 2 张',
+  )
+})
+
+test('file fields collect items up to maxCount from one or many rows', () => {
+  const field = {
+    title: '附件',
+    type: 'file',
+    maxCount: 3,
+    linkage: { ...linkage, sourceKey: 'docs' },
+  }
+  const a = { url: '/uploads/files/a.docx', name: 'a.docx' }
+  const b = { url: '/uploads/files/b.pdf', name: 'b.pdf' }
+  const c = { url: '/uploads/files/c.xlsx', name: 'c.xlsx' }
+  const d = { url: '/uploads/files/d.txt', name: 'd.txt' }
+  assert.deepEqual(applyLinkageResult(field, { items: [], total: 0 }, [a]), {
+    value: [],
+    items: [],
+    message: '',
+  })
+  assert.deepEqual(
+    applyLinkageResult(field, { items: [{ data: { docs: [a] } }], total: 1 }, []),
+    { value: [a], items: [], message: '' },
+  )
+  assert.deepEqual(
+    applyLinkageResult(
+      field,
+      {
+        items: [{ data: { docs: [a, b] } }, { data: { docs: [c] } }],
+        total: 2,
+      },
+      [],
+    ),
+    { value: [a, b, c], items: [], message: '' },
+  )
+  assert.deepEqual(
+    applyLinkageResult(
+      field,
+      {
+        items: [{ data: { docs: [a, b] } }, { data: { docs: [c, d] } }],
+        total: 2,
+      },
+      [],
+    ),
+    {
+      value: [],
+      items: [],
+      message: '[ 附件 ] 字段联动文件超过最多 3 个',
+    },
+  )
+  assert.equal(
+    linkageFileOverflowMessage({
+      title: '附件',
+      description: '合同',
+      maxCount: 2,
+    }),
+    '[ 附件，合同 ] 字段联动文件超过最多 2 个',
   )
 })

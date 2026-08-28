@@ -174,3 +174,11 @@ export function uploadAppImageApi(appId, file) {
     timeout: 120000,
   })
 }
+
+export function uploadAppFileApi(appId, file) {
+  const payload = new FormData()
+  payload.append('file', file)
+  return http.post(`/apps/${appId}/file-uploads`, payload, {
+    timeout: 120000,
+  })
+}

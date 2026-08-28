@@ -66,6 +66,11 @@ import {
   DEFAULT_IMAGE_MAX_SIZE_MB,
   defaultImageFormats,
 } from './form-fill/imageField'
+import {
+  DEFAULT_FILE_MAX_COUNT,
+  DEFAULT_FILE_MAX_SIZE_MB,
+  defaultFileFormats,
+} from './form-fill/fileField'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -172,6 +177,14 @@ function addField(item, beforeKey) {
           compress: false,
         }
       : {}),
+    ...(item.type === 'file'
+      ? {
+          maxCount: DEFAULT_FILE_MAX_COUNT,
+          maxSizeMB: DEFAULT_FILE_MAX_SIZE_MB,
+          acceptFormats: defaultFileFormats(),
+          downloadable: true,
+        }
+      : {}),
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)
@@ -252,6 +265,14 @@ function ensureOptionSource(field) {
       field.acceptFormats = defaultImageFormats()
     }
     if (typeof field.compress !== 'boolean') field.compress = false
+  }
+  if (field.type === 'file') {
+    if (!field.maxCount) field.maxCount = DEFAULT_FILE_MAX_COUNT
+    if (!field.maxSizeMB) field.maxSizeMB = DEFAULT_FILE_MAX_SIZE_MB
+    if (!Array.isArray(field.acceptFormats) || !field.acceptFormats.length) {
+      field.acceptFormats = defaultFileFormats()
+    }
+    if (typeof field.downloadable !== 'boolean') field.downloadable = true
   }
 }
 

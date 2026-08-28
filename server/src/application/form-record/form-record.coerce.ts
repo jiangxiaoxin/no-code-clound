@@ -16,10 +16,41 @@ function isEmpty(value: unknown): boolean {
   return value === undefined || value === null || value === '';
 }
 
+function fileBasename(path: string): string {
+  const cleaned = String(path || '').split(/[?#]/)[0];
+  return cleaned.split(/[\\/]/).filter(Boolean).pop() || '';
+}
+
+function coerceFileItem(item: unknown): { url: string; name: string } | null {
+  if (typeof item === 'string') {
+    const url = item.trim();
+    if (!url) return null;
+    return { url, name: fileBasename(url) || url };
+  }
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+  const row = item as { url?: unknown; name?: unknown };
+  const url = typeof row.url === 'string' ? row.url.trim() : '';
+  const name = typeof row.name === 'string' ? row.name.trim() : '';
+  if (!url || !name) return null;
+  return { url, name };
+}
+
+function coerceFileValue(value: unknown): { url: string; name: string }[] {
+  if (typeof value === 'string') {
+    const item = coerceFileItem(value);
+    return item ? [item] : invalid();
+  }
+  if (!Array.isArray(value)) invalid();
+  return value
+    .map((item) => coerceFileItem(item))
+    .filter((item): item is { url: string; name: string } => Boolean(item));
+}
+
 function coerceFieldValue(field: FormField, value: unknown): unknown {
   switch (field.type) {
     case 'divider':
     case 'currentUser':
+    case 'currentUserDept':
       return undefined;
     case 'input':
     case 'textarea':
@@ -58,7 +89,6 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
         ? value
         : invalid();
     case 'image':
-    case 'file':
       if (typeof value === 'string') return value;
       if (
         Array.isArray(value) &&
@@ -66,7 +96,9 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
       ) {
         return value;
       }
-      invalid();
+      return invalid();
+    case 'file':
+      return coerceFileValue(value);
     case 'subform':
       return Array.isArray(value) ? value : [];
     default:

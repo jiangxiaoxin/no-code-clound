@@ -26,12 +26,12 @@
         <span class="field-type-label">组件类型</span>
         <span class="field-type-text">{{ fieldTypeText }}</span>
       </div>
-      <template v-if="field.type !== 'currentUser'">
       <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
+      <template v-if="!isCurrentDisplayField">
       <template v-if="field.type !== 'divider'">
-      <el-form-item v-if="field.type !== 'divider' && field.type !== 'image'" label="占位文字">
+      <el-form-item v-if="field.type !== 'divider' && field.type !== 'image' && field.type !== 'file'" label="占位文字">
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
       <el-form-item label="字段说明">
@@ -130,6 +130,56 @@
           <div v-if="field.type === 'image'" class="required-row">
             <span>开启压缩</span>
             <el-switch v-model="field.compress" />
+          </div>
+          <div v-if="field.type === 'file'" class="required-row">
+            <span>最多上传</span>
+            <el-input-number
+              v-model="field.maxCount"
+              class="max-length-input"
+              :min="1"
+              :precision="0"
+              :step="1"
+              step-strictly
+              :controls="false"
+              size="small"
+              align="left"
+            />
+            <span>个文件</span>
+          </div>
+          <div v-if="field.type === 'file'" class="required-row">
+            <span>每个不超过</span>
+            <el-input-number
+              v-model="field.maxSizeMB"
+              class="max-length-input"
+              :min="1"
+              :precision="0"
+              :step="1"
+              step-strictly
+              :controls="false"
+              size="small"
+              align="left"
+            />
+            <span>MB</span>
+          </div>
+          <div v-if="field.type === 'file'" class="required-row">
+            <span>允许格式</span>
+            <el-select
+              v-model="field.acceptFormats"
+              class="image-format-select"
+              multiple
+              placeholder="请选择格式"
+            >
+              <el-option
+                v-for="item in FILE_FORMAT_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </div>
+          <div v-if="field.type === 'file'" class="required-row">
+            <span>是否可下载</span>
+            <el-switch v-model="field.downloadable" />
           </div>
         </div>
       </el-form-item>
@@ -356,6 +406,7 @@ import {
 } from './dataSelect'
 import { isFillable } from '../form-fill/fillValues'
 import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
+import { FILE_FORMAT_OPTIONS } from '../form-fill/fileField'
 import { listDictionaryOptionsApi, listFormFieldsApi } from '../../api/apps'
 
 const props = defineProps({
@@ -395,6 +446,11 @@ const formFields = computed(() =>
 )
 
 const fieldTypeText = computed(() => fieldTypeLabel(props.field?.type))
+const isCurrentDisplayField = computed(
+  () =>
+    props.field?.type === 'currentUser' ||
+    props.field?.type === 'currentUserDept',
+)
 
 const hasDisplayFields = computed(() =>
   hasDisplayFieldKeys(props.field?.displayFieldKeys),

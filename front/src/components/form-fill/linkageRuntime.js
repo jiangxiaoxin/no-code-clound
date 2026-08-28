@@ -1,6 +1,7 @@
 import { isSelectType } from '../form-design/fieldTypes.js'
 import { needsFilterValue } from '../form-design/optionFilters.js'
 import { emptyValue } from './fillValues.js'
+import { fileItemsOf, fileMaxCount } from './fileField.js'
 import { imageMaxCount, imageUrlsOf } from './imageField.js'
 import { recordsToSelectItems } from './tableOptions.js'
 
@@ -19,7 +20,7 @@ export function linkageConditionsReady(linkage, values) {
 }
 
 export function linkageQueryPaging(field) {
-  if (isSelectType(field?.type) || field?.type === 'image') {
+  if (isSelectType(field?.type) || field?.type === 'image' || field?.type === 'file') {
     return { page: 1, pageSize: 100 }
   }
   return { page: 1, pageSize: 2 }
@@ -53,6 +54,23 @@ export function linkageManyMessage(field) {
 
 export function linkageImageOverflowMessage(field) {
   return `[ ${fieldMessageLabel(field)} ] 字段联动图片超过最多 ${imageMaxCount(field)} 张`
+}
+
+export function linkageFileOverflowMessage(field) {
+  return `[ ${fieldMessageLabel(field)} ] 字段联动文件超过最多 ${fileMaxCount(field)} 个`
+}
+
+function collectFileItems(items, sourceKey) {
+  const files = []
+  const seen = new Set()
+  for (const row of items) {
+    for (const item of fileItemsOf(row?.data?.[sourceKey])) {
+      if (seen.has(item.url)) continue
+      seen.add(item.url)
+      files.push(item)
+    }
+  }
+  return files
 }
 
 function collectImageUrls(items, sourceKey) {
@@ -112,6 +130,24 @@ export function applyLinkageResult(field, result, currentValue) {
     }
     return {
       value: urls,
+      items: [],
+      message: '',
+    }
+  }
+
+  if (field.type === 'file') {
+    const files = collectFileItems(items, sourceKey)
+    if (!files.length) return emptyResult(field)
+    const max = fileMaxCount(field)
+    if (files.length > max) {
+      return {
+        value: emptyValue(field),
+        items: [],
+        message: linkageFileOverflowMessage(field),
+      }
+    }
+    return {
+      value: files,
       items: [],
       message: '',
     }

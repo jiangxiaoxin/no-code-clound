@@ -166,6 +166,11 @@
       class="fill-full"
       :title="fieldKeyTitle"
     />
+    <CurrentUserDept
+      v-else-if="field.type === 'currentUserDept'"
+      class="fill-full"
+      :title="fieldKeyTitle"
+    />
     <el-divider v-else-if="field.type === 'divider'" :title="fieldKeyTitle">
       {{ field.title }}
     </el-divider>
@@ -177,21 +182,21 @@
       :disabled="isDisabled"
       @update:model-value="onUpdateModelValue"
     />
-    <el-upload
+    <FormFileUpload
       v-else-if="field.type === 'file'"
-      disabled
-      :auto-upload="false"
-      :show-file-list="false"
-    >
-      <el-button disabled :icon="Upload" />
-    </el-upload>
+      :field="field"
+      :app-id="appId"
+      :model-value="modelValue"
+      :disabled="isDisabled"
+      @update:model-value="onUpdateModelValue"
+    />
     <div v-else-if="field.type === 'subform'" class="fill-subform" />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Connection, InfoFilled, Link, Upload } from '@element-plus/icons-vue'
+import { Connection, InfoFilled, Link } from '@element-plus/icons-vue'
 import { widthClass } from '../form-design/fieldTypes'
 import {
   hasLinkage,
@@ -199,7 +204,9 @@ import {
 } from '../form-design/linkage'
 import FormDataSelect from './FormDataSelect.vue'
 import FormImageUpload from './FormImageUpload.vue'
+import FormFileUpload from './FormFileUpload.vue'
 import CurrentUserName from './CurrentUserName.vue'
+import CurrentUserDept from './CurrentUserDept.vue'
 
 const props = defineProps({
   field: { type: Object, required: true },
@@ -259,7 +266,9 @@ const needsOptionSourceHint = computed(() =>
 
 const fieldClass = computed(() => {
   const width = widthClass[props.field.width] || 'is-w-full'
-  return props.field.type === 'image' ? [width, 'is-image'] : width
+  if (props.field.type === 'image') return [width, 'is-image']
+  if (props.field.type === 'file') return [width, 'is-file']
+  return width
 })
 </script>
 
@@ -294,7 +303,8 @@ const fieldClass = computed(() => {
   grid-column: span 9;
 }
 
-.fill-field.is-image {
+.fill-field.is-image,
+.fill-field.is-file {
   max-width: none;
 }
 

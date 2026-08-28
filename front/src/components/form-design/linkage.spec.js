@@ -24,6 +24,10 @@ test('option source choices: value fields get custom and linkage, select gets th
     optionSourceChoices('image').map((item) => item.value),
     ['custom', 'linkage'],
   )
+  assert.deepEqual(
+    optionSourceChoices('file').map((item) => item.value),
+    ['custom', 'linkage'],
+  )
 })
 
 test('hasLinkage requires source form, trigger field, and at least one complete condition', () => {
@@ -125,6 +129,11 @@ test('source type matching follows spec relaxations', () => {
   assert.deepEqual(sourceTypesFor('number'), ['number'])
   assert.deepEqual(sourceTypesFor('date'), ['date'])
   assert.deepEqual(sourceTypesFor('image'), ['image'])
+  assert.deepEqual(sourceTypesFor('file'), ['file'])
+  assert.deepEqual(
+    optionSourceChoices('file').map((item) => item.value),
+    ['custom', 'linkage'],
+  )
   const fields = filterLinkageSourceFields(
     [
       { key: 'name', type: 'input', title: '姓名' },
@@ -157,6 +166,16 @@ test('source type matching follows spec relaxations', () => {
       'image',
     ).map((item) => item.key),
     ['photo'],
+  )
+  assert.deepEqual(
+    filterLinkageSourceFields(
+      [
+        { key: 'doc', type: 'file', title: '附件' },
+        { key: 'name', type: 'input', title: '姓名' },
+      ],
+      'file',
+    ).map((item) => item.key),
+    ['doc'],
   )
   assert.deepEqual(
     compatibleCurrentFields(

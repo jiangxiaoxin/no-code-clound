@@ -29,9 +29,11 @@ import { ListFormFieldsDto } from './dto/list-form-fields.dto';
 import { NameDto } from './dto/name.dto';
 import { SaveFormFieldsDto } from './dto/save-form-fields.dto';
 import { SaveFormConfigDto } from './dto/save-form-config.dto';
+import { originalUploadName } from './upload-filename';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 const IMAGE_UPLOAD_DIR = join(UPLOAD_DIR, 'imgs');
+const FILE_UPLOAD_DIR = join(UPLOAD_DIR, 'files');
 const MAX_IMAGE_SIZE = 50 * 1024 * 1024;
 const IMAGE_EXT: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -39,6 +41,35 @@ const IMAGE_EXT: Record<string, string> = {
   'image/gif': '.gif',
   'image/webp': '.webp',
 };
+const FILE_FORMATS: { exts: string[]; mimes: string[] }[] = [
+  { exts: ['.pdf'], mimes: ['application/pdf'] },
+  {
+    exts: ['.doc', '.docx'],
+    mimes: [
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ],
+  },
+  {
+    exts: ['.xls', '.xlsx'],
+    mimes: [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ],
+  },
+  {
+    exts: ['.ppt', '.pptx'],
+    mimes: [
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ],
+  },
+  { exts: ['.txt'], mimes: ['text/plain'] },
+  {
+    exts: ['.zip'],
+    mimes: ['application/zip', 'application/x-zip-compressed'],
+  },
+];
 
 function localDateFolder() {
   const d = new Date();
@@ -53,8 +84,31 @@ function ensureImageUploadDir() {
   return dir;
 }
 
+function ensureFileUploadDir() {
+  const dir = join(FILE_UPLOAD_DIR, localDateFolder());
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 function publicUploadUrl(filePath: string) {
   return `/uploads/${relative(UPLOAD_DIR, filePath).split(sep).join('/')}`;
+}
+
+function uploadFileExt(name: string) {
+  const base = String(name || '').split(/[\\/]/).pop() || '';
+  const dot = base.lastIndexOf('.');
+  if (dot < 0) return '';
+  return base.slice(dot).toLowerCase();
+}
+
+function isAllowedUploadFile(file: { originalname?: string; mimetype?: string }) {
+  const ext = uploadFileExt(file.originalname || '');
+  if (!ext) return false;
+  const format = FILE_FORMATS.find((item) => item.exts.includes(ext));
+  if (!format) return false;
+  const mime = String(file.mimetype || '').trim().toLowerCase();
+  if (!mime || mime === 'application/octet-stream') return true;
+  return format.mimes.includes(mime);
 }
 
 @Controller('apps')
@@ -244,5 +298,43 @@ export class ApplicationController {
       throw new BadRequestException('请选择图片');
     }
     return { url: publicUploadUrl(file.path) };
+  }
+
+  @Post(':id/file-uploads')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => {
+          cb(null, ensureFileUploadDir());
+        },
+        filename: (_req, file, cb) => {
+          const ext = uploadFileExt(file.originalname) || '';
+          cb(null, `${randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: MAX_IMAGE_SIZE },
+      fileFilter: (_req, file, cb) => {
+        if (!isAllowedUploadFile(file)) {
+          cb(new BadRequestException('不支持该文件格式'), false);
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadFile(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile()
+    file?: { filename: string; path: string; originalname?: string },
+  ) {
+    await this.applicationService.getOne(req.user.id, id);
+    if (!file?.filename || !file.path) {
+      throw new BadRequestException('请选择文件');
+    }
+    return {
+      url: publicUploadUrl(file.path),
+      name: originalUploadName(file),
+    };
   }
 }

@@ -1,10 +1,11 @@
 import { asDate, formatTimeFieldValue, parseCalendarParts } from '../../utils/timeValue.js'
+import { fileItemsOf } from './fileField.js'
 import { imageUrlsOf } from './imageField.js'
 
 const SKIP_TYPES = new Set([
   'divider',
   'currentUser',
-  'file',
+  'currentUserDept',
   'subform',
   'member',
   'dept',
@@ -24,7 +25,8 @@ export function emptyValue(field) {
   if (
     field.type === 'checkbox' ||
     field.type === 'select-multiple' ||
-    field.type === 'image'
+    field.type === 'image' ||
+    field.type === 'file'
   ) {
     return []
   }
@@ -54,6 +56,10 @@ export function cloneRecordValues(fields, data) {
       next[field.key] = imageUrlsOf(data?.[field.key])
       continue
     }
+    if (field.type === 'file') {
+      next[field.key] = fileItemsOf(data?.[field.key])
+      continue
+    }
     if (!isFillable(field)) {
       continue
     }
@@ -67,6 +73,9 @@ export function cloneRecordValues(fields, data) {
 export function isEmptyValue(field, value) {
   if (field.type === 'image') {
     return imageUrlsOf(value).length === 0
+  }
+  if (field.type === 'file') {
+    return fileItemsOf(value).length === 0
   }
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     return !Array.isArray(value) || value.length === 0
@@ -84,6 +93,10 @@ export function serializeValue(field, value) {
   if (field.type === 'image') {
     const urls = imageUrlsOf(value)
     return urls.length ? urls : undefined
+  }
+  if (field.type === 'file') {
+    const items = fileItemsOf(value)
+    return items.length ? items : undefined
   }
   if (field.type === 'date') {
     // YYYY-MM-DD 按日历日期读，避免被当成 UTC 零点后在西时区变成前一天
@@ -197,6 +210,11 @@ export function formatCellValue(field, value, dictItemsByCode) {
   if (field.type === 'image') {
     const urls = imageUrlsOf(value)
     return urls.length ? `${urls.length} 张图片` : ''
+  }
+  if (field.type === 'file') {
+    return fileItemsOf(value)
+      .map((item) => item.name)
+      .join('、')
   }
   if (Array.isArray(value)) return value.join('、')
   return String(value)

@@ -13,6 +13,7 @@ export const LINKAGE_VALUE_TYPES = [
   'time',
   'datetime',
   'image',
+  'file',
 ]
 
 export function hasLinkageSource(type) {

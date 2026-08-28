@@ -7,8 +7,10 @@ const fields = [
   { key: 'tags', type: 'select-multiple' },
   { key: 'split', type: 'divider' },
   { key: 'me', type: 'currentUser' },
+  { key: 'myDept', type: 'currentUserDept' },
   { key: 'kids', type: 'subform' },
   { key: 'pics', type: 'image' },
+  { key: 'docs', type: 'file' },
 ];
 
 describe('coerceRecordData', () => {
@@ -19,6 +21,7 @@ describe('coerceRecordData', () => {
       tags: ['a', 'b'],
       split: 'x',
       me: '张三',
+      myDept: '研发部',
       extra: 'no',
     });
     expect(data).toEqual({
@@ -40,6 +43,21 @@ describe('coerceRecordData', () => {
     expect(
       coerceRecordData(fields, { pics: ['/uploads/a.png'] }),
     ).toEqual({ pics: ['/uploads/a.png'] });
+  });
+
+  it('stores file items as url and name objects', () => {
+    expect(
+      coerceRecordData(fields, {
+        docs: [{ url: '/uploads/files/a.docx', name: '合同.docx' }],
+      }),
+    ).toEqual({
+      docs: [{ url: '/uploads/files/a.docx', name: '合同.docx' }],
+    });
+    expect(
+      coerceRecordData(fields, { docs: ['/uploads/files/a.docx'] }),
+    ).toEqual({
+      docs: [{ url: '/uploads/files/a.docx', name: 'a.docx' }],
+    });
   });
 
   it('omits empty number', () => {

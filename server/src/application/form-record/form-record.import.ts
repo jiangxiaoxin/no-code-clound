@@ -4,6 +4,7 @@ import { coerceRecordData } from './form-record.coerce';
 export const IMPORT_SKIP_TYPES = new Set([
   'divider',
   'currentUser',
+  'currentUserDept',
   'image',
   'file',
   'subform',

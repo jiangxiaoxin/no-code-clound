@@ -8,6 +8,7 @@
         'is-dragging': dragging,
         'is-drag-over': dragOver,
         'is-image': field.type === 'image',
+        'is-file': field.type === 'file',
       },
     ]"
     draggable="true"
@@ -152,6 +153,7 @@
       preview
     />
     <CurrentUserName v-else-if="field.type === 'currentUser'" class="canvas-item" />
+    <CurrentUserDept v-else-if="field.type === 'currentUserDept'" class="canvas-item" />
     <el-divider v-else-if="field.type === 'divider'">
       {{ field.title }}
     </el-divider>
@@ -164,29 +166,28 @@
     >
       <el-icon><Plus /></el-icon>
     </el-upload>
-    <el-upload
+    <FormFileUpload
       v-else-if="field.type === 'file'"
-      disabled
       class="canvas-item"
-      :auto-upload="false"
-      :show-file-list="false"
-    >
-      <el-button disabled :icon="Upload" />
-    </el-upload>
+      :field="field"
+      disabled
+    />
     <div v-else-if="field.type === 'subform'" class="canvas-subform" />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { CopyDocument, Connection, Delete, InfoFilled, Link, Plus, Upload } from '@element-plus/icons-vue'
+import { CopyDocument, Connection, Delete, InfoFilled, Link, Plus } from '@element-plus/icons-vue'
 import { widthClass } from './fieldTypes'
 import {
   hasLinkage,
   needsOptionSourceHint as fieldNeedsOptionSourceHint,
 } from './linkage'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
+import FormFileUpload from '../form-fill/FormFileUpload.vue'
 import CurrentUserName from '../form-fill/CurrentUserName.vue'
+import CurrentUserDept from '../form-fill/CurrentUserDept.vue'
 
 const props = defineProps({
   appId: { type: Number, default: 0 },
@@ -305,7 +306,8 @@ const linked = computed(() => hasLinkage(props.field))
   max-width: 354px;
 }
 
-.canvas-field.is-image :deep(.canvas-item) {
+.canvas-field.is-image :deep(.canvas-item),
+.canvas-field.is-file :deep(.canvas-item) {
   max-width: none;
 }
 
