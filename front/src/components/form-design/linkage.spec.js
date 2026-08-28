@@ -20,6 +20,10 @@ test('option source choices: value fields get custom and linkage, select gets th
     ['dictionary', 'table_data', 'linkage'],
   )
   assert.deepEqual(optionSourceChoices('radio'), [])
+  assert.deepEqual(
+    optionSourceChoices('image').map((item) => item.value),
+    ['custom', 'linkage'],
+  )
 })
 
 test('hasLinkage requires source form, trigger field, and at least one complete condition', () => {
@@ -116,9 +120,11 @@ test('cloneLinkage copies match, conditions and trigger key', () => {
 test('source type matching follows spec relaxations', () => {
   assert.deepEqual(sourceTypesFor('input'), ['input', 'textarea', 'radio', 'select'])
   assert.deepEqual(sourceTypesFor('textarea'), ['input', 'textarea', 'radio', 'select'])
+  assert.deepEqual(sourceTypesFor('select'), ['input', 'textarea', 'radio', 'select'])
   assert.deepEqual(sourceTypesFor('select-multiple'), ['select-multiple', 'checkbox'])
   assert.deepEqual(sourceTypesFor('number'), ['number'])
   assert.deepEqual(sourceTypesFor('date'), ['date'])
+  assert.deepEqual(sourceTypesFor('image'), ['image'])
   const fields = filterLinkageSourceFields(
     [
       { key: 'name', type: 'input', title: '姓名' },
@@ -130,6 +136,27 @@ test('source type matching follows spec relaxations', () => {
   assert.deepEqual(
     fields.map((item) => item.key),
     ['name', 'city'],
+  )
+  assert.deepEqual(
+    filterLinkageSourceFields(
+      [
+        { key: 'name', type: 'input', title: '姓名' },
+        { key: 'age', type: 'number', title: '年龄' },
+        { key: 'city', type: 'select', title: '城市' },
+      ],
+      'select',
+    ).map((item) => item.key),
+    ['name', 'city'],
+  )
+  assert.deepEqual(
+    filterLinkageSourceFields(
+      [
+        { key: 'photo', type: 'image', title: '照片' },
+        { key: 'name', type: 'input', title: '姓名' },
+      ],
+      'image',
+    ).map((item) => item.key),
+    ['photo'],
   )
   assert.deepEqual(
     compatibleCurrentFields(

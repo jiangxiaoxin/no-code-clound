@@ -28,6 +28,7 @@ const OPTION_FIELD_TYPES = new Set([
   'checkbox',
   'select',
   'select-multiple',
+  'image',
 ]);
 
 const ICON_COLORS = [

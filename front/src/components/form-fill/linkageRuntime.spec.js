@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import {
   applyLinkageResult,
   linkageConditionsReady,
+  linkageImageOverflowMessage,
   linkageManyMessage,
   linkageQueryPaging,
 } from './linkageRuntime.js'
@@ -167,8 +168,74 @@ test('select-multiple keeps values that remain in the result set', () => {
 
 test('value fields query two rows, select queries up to 100', () => {
   assert.deepEqual(linkageQueryPaging({ type: 'input' }), { page: 1, pageSize: 2 })
+  assert.deepEqual(linkageQueryPaging({ type: 'image' }), {
+    page: 1,
+    pageSize: 100,
+  })
   assert.deepEqual(linkageQueryPaging({ type: 'select' }), {
     page: 1,
     pageSize: 100,
   })
+})
+
+test('image fields collect urls up to maxCount from one or many rows', () => {
+  const field = {
+    title: '照片',
+    type: 'image',
+    maxCount: 3,
+    linkage: { ...linkage, sourceKey: 'photos' },
+  }
+  assert.deepEqual(applyLinkageResult(field, { items: [], total: 0 }, ['/old.png']), {
+    value: [],
+    items: [],
+    message: '',
+  })
+  assert.deepEqual(
+    applyLinkageResult(
+      field,
+      { items: [{ data: { photos: '/a.png' } }], total: 1 },
+      [],
+    ),
+    { value: ['/a.png'], items: [], message: '' },
+  )
+  assert.deepEqual(
+    applyLinkageResult(
+      field,
+      {
+        items: [
+          { data: { photos: ['/a.png', '/b.jpg'] } },
+          { data: { photos: ['/c.png'] } },
+        ],
+        total: 2,
+      },
+      [],
+    ),
+    { value: ['/a.png', '/b.jpg', '/c.png'], items: [], message: '' },
+  )
+  assert.deepEqual(
+    applyLinkageResult(
+      field,
+      {
+        items: [
+          { data: { photos: ['/a.png', '/b.jpg'] } },
+          { data: { photos: ['/c.png', '/d.png'] } },
+        ],
+        total: 2,
+      },
+      [],
+    ),
+    {
+      value: [],
+      items: [],
+      message: '[ 照片 ] 字段联动图片超过最多 3 张',
+    },
+  )
+  assert.equal(
+    linkageImageOverflowMessage({
+      title: '照片',
+      description: '证件照',
+      maxCount: 2,
+    }),
+    '[ 照片，证件照 ] 字段联动图片超过最多 2 张',
+  )
 })

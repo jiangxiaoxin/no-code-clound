@@ -94,13 +94,16 @@ const treeData = computed(() => {
       id: `form-${form.id}`,
       label: form.name,
       disabled: true,
-      children: form.fields.map((field) => ({
-        id: `${form.id}:${field.key}`,
-        formId: form.id,
-        fieldKey: field.key,
-        label: `${field.title || field.key}（${fieldTypeLabel(field.type)}）`,
-      })),
+      children: form.fields
+        .filter((field) => field.type !== 'image')
+        .map((field) => ({
+          id: `${form.id}:${field.key}`,
+          formId: form.id,
+          fieldKey: field.key,
+          label: `${field.title || field.key}（${fieldTypeLabel(field.type)}）`,
+        })),
     }))
+    .filter((form) => form.children.length)
 })
 
 async function loadForms() {

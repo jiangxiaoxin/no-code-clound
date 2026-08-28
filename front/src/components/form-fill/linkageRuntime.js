@@ -1,6 +1,7 @@
 import { isSelectType } from '../form-design/fieldTypes.js'
 import { needsFilterValue } from '../form-design/optionFilters.js'
 import { emptyValue } from './fillValues.js'
+import { imageMaxCount, imageUrlsOf } from './imageField.js'
 import { recordsToSelectItems } from './tableOptions.js'
 
 function hasCurrentValue(value) {
@@ -18,7 +19,7 @@ export function linkageConditionsReady(linkage, values) {
 }
 
 export function linkageQueryPaging(field) {
-  if (isSelectType(field?.type)) {
+  if (isSelectType(field?.type) || field?.type === 'image') {
     return { page: 1, pageSize: 100 }
   }
   return { page: 1, pageSize: 2 }
@@ -39,12 +40,32 @@ function emptyResult(field) {
   return { value: emptyValue(field), items: [], message: '' }
 }
 
-export function linkageManyMessage(field) {
+function fieldMessageLabel(field) {
   const title = typeof field?.title === 'string' ? field.title.trim() : ''
   const desc =
     typeof field?.description === 'string' ? field.description.trim() : ''
-  const label = [title, desc].filter(Boolean).join('，')
-  return `[ ${label} ] 字段联动查询出多条数据`
+  return [title, desc].filter(Boolean).join('，')
+}
+
+export function linkageManyMessage(field) {
+  return `[ ${fieldMessageLabel(field)} ] 字段联动查询出多条数据`
+}
+
+export function linkageImageOverflowMessage(field) {
+  return `[ ${fieldMessageLabel(field)} ] 字段联动图片超过最多 ${imageMaxCount(field)} 张`
+}
+
+function collectImageUrls(items, sourceKey) {
+  const urls = []
+  const seen = new Set()
+  for (const row of items) {
+    for (const url of imageUrlsOf(row?.data?.[sourceKey])) {
+      if (seen.has(url)) continue
+      seen.add(url)
+      urls.push(url)
+    }
+  }
+  return urls
 }
 
 export function applyLinkageResult(field, result, currentValue) {
@@ -74,6 +95,24 @@ export function applyLinkageResult(field, result, currentValue) {
     return {
       value: allowed.has(currentValue) ? currentValue : undefined,
       items: options,
+      message: '',
+    }
+  }
+
+  if (field.type === 'image') {
+    const urls = collectImageUrls(items, sourceKey)
+    if (!urls.length) return emptyResult(field)
+    const max = imageMaxCount(field)
+    if (urls.length > max) {
+      return {
+        value: emptyValue(field),
+        items: [],
+        message: linkageImageOverflowMessage(field),
+      }
+    }
+    return {
+      value: urls,
+      items: [],
       message: '',
     }
   }

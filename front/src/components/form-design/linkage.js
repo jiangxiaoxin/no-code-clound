@@ -12,6 +12,7 @@ export const LINKAGE_VALUE_TYPES = [
   'date',
   'time',
   'datetime',
+  'image',
 ]
 
 export function hasLinkageSource(type) {
@@ -90,7 +91,11 @@ export function needsOptionSourceHint(field) {
 }
 
 export function sourceTypesFor(fieldType) {
-  if (fieldType === 'input' || fieldType === 'textarea') {
+  if (
+    fieldType === 'input' ||
+    fieldType === 'textarea' ||
+    fieldType === 'select'
+  ) {
     return ['input', 'textarea', 'radio', 'select']
   }
   if (fieldType === 'select-multiple') {
