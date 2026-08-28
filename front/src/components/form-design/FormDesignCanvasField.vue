@@ -172,6 +172,13 @@
       :field="field"
       disabled
     />
+    <FormAddressSelect
+      v-else-if="field.type === 'address'"
+      class="canvas-item"
+      :field="field"
+      disabled
+      preview
+    />
     <div v-else-if="field.type === 'subform'" class="canvas-subform" />
   </div>
 </template>
@@ -186,6 +193,7 @@ import {
 } from './linkage'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import FormFileUpload from '../form-fill/FormFileUpload.vue'
+import FormAddressSelect from '../form-fill/FormAddressSelect.vue'
 import CurrentUserName from '../form-fill/CurrentUserName.vue'
 import CurrentUserDept from '../form-fill/CurrentUserDept.vue'
 

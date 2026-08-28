@@ -44,6 +44,17 @@
             <span>必填</span>
             <el-switch v-model="field.required" />
           </div>
+          <div v-if="field.type === 'address'" class="required-row">
+            <span>地址格式</span>
+            <el-select v-model="field.addressFormat" class="address-format-select">
+              <el-option
+                v-for="item in ADDRESS_FORMAT_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </div>
           <div class="required-row">
             <span>是否禁用</span>
             <el-switch v-model="field.disabled" />
@@ -407,6 +418,7 @@ import {
 import { isFillable } from '../form-fill/fillValues'
 import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
 import { FILE_FORMAT_OPTIONS } from '../form-fill/fileField'
+import { ADDRESS_FORMAT_OPTIONS } from '../form-fill/addressField'
 import { listDictionaryOptionsApi, listFormFieldsApi } from '../../api/apps'
 
 const props = defineProps({
@@ -727,6 +739,11 @@ watch(
 }
 
 .image-format-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.address-format-select {
   flex: 1;
   min-width: 0;
 }

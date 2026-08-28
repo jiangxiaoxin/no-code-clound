@@ -1,4 +1,10 @@
 import { asDate, formatTimeFieldValue, parseCalendarParts } from '../../utils/timeValue.js'
+import {
+  isAddressEmpty,
+  isAddressValueReady,
+  normalizeAddressValue,
+  addressDisplay,
+} from './addressField.js'
 import { fileItemsOf } from './fileField.js'
 import { imageUrlsOf } from './imageField.js'
 
@@ -60,6 +66,17 @@ export function cloneRecordValues(fields, data) {
       next[field.key] = fileItemsOf(data?.[field.key])
       continue
     }
+    if (field.type === 'address') {
+      const raw = normalizeAddressValue(data?.[field.key])
+      next[field.key] = raw.ids.length
+        ? {
+            ids: [...raw.ids],
+            labels: [...raw.labels],
+            ...(raw.detail ? { detail: raw.detail } : {}),
+          }
+        : undefined
+      continue
+    }
     if (!isFillable(field)) {
       continue
     }
@@ -76,6 +93,9 @@ export function isEmptyValue(field, value) {
   }
   if (field.type === 'file') {
     return fileItemsOf(value).length === 0
+  }
+  if (field.type === 'address') {
+    return isAddressEmpty(value)
   }
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     return !Array.isArray(value) || value.length === 0
@@ -97,6 +117,10 @@ export function serializeValue(field, value) {
   if (field.type === 'file') {
     const items = fileItemsOf(value)
     return items.length ? items : undefined
+  }
+  if (field.type === 'address') {
+    const next = normalizeAddressValue(value)
+    return next.ids.length ? next : undefined
   }
   if (field.type === 'date') {
     // YYYY-MM-DD 按日历日期读，避免被当成 UTC 零点后在西时区变成前一天
@@ -136,6 +160,12 @@ export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
 export function validateRequired(fields, values) {
   for (const field of fields) {
     if (!isFillable(field) || !field.required) continue
+    if (field.type === 'address') {
+      if (!isAddressValueReady(field, values[field.key])) {
+        return `请填写「${field.title || '未命名'}」`
+      }
+      continue
+    }
     if (isEmptyValue(field, values[field.key])) {
       return `请填写「${field.title || '未命名'}」`
     }
@@ -154,6 +184,7 @@ const INLINE_EDIT_TYPES = new Set([
   'date',
   'time',
   'datetime',
+  'address',
 ])
 
 export function isInlineEditable(field) {
@@ -169,6 +200,15 @@ export function isInlineEditable(field) {
 export function cloneCellValue(field, value) {
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     return Array.isArray(value) ? [...value] : []
+  }
+  if (field.type === 'address') {
+    const raw = normalizeAddressValue(value)
+    if (!raw.ids.length) return undefined
+    return {
+      ids: [...raw.ids],
+      labels: [...raw.labels],
+      ...(raw.detail ? { detail: raw.detail } : {}),
+    }
   }
   return value == null ? emptyValue(field) : value
 }
@@ -215,6 +255,9 @@ export function formatCellValue(field, value, dictItemsByCode) {
     return fileItemsOf(value)
       .map((item) => item.name)
       .join('、')
+  }
+  if (field.type === 'address') {
+    return addressDisplay(value)
   }
   if (Array.isArray(value)) return value.join('、')
   return String(value)

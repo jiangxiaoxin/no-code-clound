@@ -1,5 +1,11 @@
 import { FormField } from './form-record.types';
 import { coerceRecordData } from './form-record.coerce';
+import {
+  ADDRESS_IMPORT_NOTE,
+  addressImportExample,
+  loadAddressTree,
+  parseAddressImportCell,
+} from './address-import';
 
 export const IMPORT_SKIP_TYPES = new Set([
   'divider',
@@ -15,6 +21,8 @@ export const IMPORT_SKIP_TYPES = new Set([
 ]);
 
 export const MAX_IMPORT_FILE_SIZE = 10 * 1024 * 1024;
+
+export { ADDRESS_IMPORT_NOTE, addressImportExample };
 
 type DictItem = { label?: string; value?: string };
 
@@ -103,6 +111,16 @@ function parseCell(
 ): { ok: boolean; value?: unknown } {
   const value = unwrapCell(raw);
   if (isEmptyCell(value)) return { ok: true, value: undefined };
+
+  if (field.type === 'address') {
+    const text =
+      typeof value === 'string'
+        ? value
+        : typeof value === 'number'
+          ? String(value)
+          : '';
+    return parseAddressImportCell(field, text, loadAddressTree(field));
+  }
 
   if (field.type === 'number') {
     if (typeof value === 'number' && Number.isFinite(value)) {

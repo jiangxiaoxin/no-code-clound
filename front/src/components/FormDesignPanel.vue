@@ -71,6 +71,7 @@ import {
   DEFAULT_FILE_MAX_SIZE_MB,
   defaultFileFormats,
 } from './form-fill/fileField'
+import { DEFAULT_ADDRESS_FORMAT } from './form-fill/addressField'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -166,6 +167,7 @@ function addField(item, beforeKey) {
     ...(item.type === 'select' || item.type === 'select-multiple'
       ? { optionSource: 'dictionary', dictCode: '' }
       : {}),
+    ...(item.type === 'address' ? { addressFormat: DEFAULT_ADDRESS_FORMAT } : {}),
     ...(LINKAGE_VALUE_TYPES.includes(item.type)
       ? { optionSource: 'custom' }
       : {}),

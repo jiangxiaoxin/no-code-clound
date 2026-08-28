@@ -181,6 +181,10 @@ test('value fields query two rows, select queries up to 100', () => {
     page: 1,
     pageSize: 100,
   })
+  assert.deepEqual(linkageQueryPaging({ type: 'address' }), {
+    page: 1,
+    pageSize: 2,
+  })
 })
 
 test('image fields collect urls up to maxCount from one or many rows', () => {
@@ -298,5 +302,55 @@ test('file fields collect items up to maxCount from one or many rows', () => {
       maxCount: 2,
     }),
     '[ 附件，合同 ] 字段联动文件超过最多 2 个',
+  )
+})
+
+test('address linkage writes adapted object for one row and clears when many', () => {
+  const field = {
+    title: '收货地址',
+    type: 'address',
+    addressFormat: 'province',
+    linkage: { sourceKey: 'addr' },
+  }
+  const tree = [{ id: '130000', fullname: '河北省', level: 1, districts: [] }]
+  const one = applyLinkageResult(
+    field,
+    {
+      total: 1,
+      items: [
+        {
+          data: {
+            addr: {
+              ids: ['130000', '130100'],
+              labels: ['河北省', '石家庄市'],
+              detail: '中山路',
+            },
+          },
+        },
+      ],
+    },
+    undefined,
+    { addressTree: tree },
+  )
+  assert.deepEqual(one.value, { ids: ['130000'], labels: ['河北省'] })
+  const many = applyLinkageResult(
+    field,
+    { total: 2, items: [{ data: {} }, { data: {} }] },
+    undefined,
+    { addressTree: tree },
+  )
+  assert.equal(many.message.includes('多条数据'), true)
+})
+
+test('address condition is not ready when path is empty', () => {
+  assert.equal(
+    linkageConditionsReady(
+      {
+        ...linkage,
+        conditions: [{ key: 'addr', op: 'eq', valueType: 'field', value: 'addr' }],
+      },
+      { addr: { ids: [], labels: [] } },
+    ),
+    false,
   )
 })

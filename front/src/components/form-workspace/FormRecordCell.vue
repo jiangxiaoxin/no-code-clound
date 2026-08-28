@@ -96,6 +96,14 @@
         @keydown.esc.prevent="cancel"
         @change="commit"
       />
+      <FormAddressSelect
+        v-else-if="field.type === 'address'"
+        class="record-cell-control"
+        :field="field"
+        :model-value="draft"
+        size="small"
+        @update:model-value="onAddressDraft"
+      />
     </template>
     <template v-else-if="field.type === 'image'">
       <div class="record-cell-images">
@@ -168,6 +176,8 @@ import {
   fileItemsOf,
 } from '../form-fill/fileField.js'
 import { imageUrlsOf } from '../form-fill/imageField.js'
+import { addressHasDetail } from '../form-fill/addressField.js'
+import FormAddressSelect from '../form-fill/FormAddressSelect.vue'
 import FormImageViewerToolbar from '../form-fill/FormImageViewerToolbar.vue'
 
 const props = defineProps({
@@ -291,6 +301,13 @@ function onSelectChange() {
   }
 }
 
+function onAddressDraft(value) {
+  draft.value = value
+  if (!addressHasDetail(props.field)) {
+    commit()
+  }
+}
+
 function onSelectVisible(open) {
   if (!open && isMultiSelect()) {
     commit()
@@ -304,7 +321,7 @@ function onDocMouseDown(event) {
   if (rootRef.value?.contains(target)) return
   if (
     target.closest(
-      '.el-popper, .el-select-dropdown, .el-picker-panel, .el-time-panel',
+      '.el-popper, .el-select-dropdown, .el-picker-panel, .el-time-panel, .el-cascader__dropdown',
     )
   ) {
     return
@@ -393,6 +410,16 @@ onUnmounted(() => {
   max-width: 100%;
   min-width: 0;
   min-height: 24px;
+}
+
+.record-cell.is-editing {
+  align-items: flex-start;
+}
+
+.record-cell :deep(.address-select) {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
 }
 
 .record-cell-text {

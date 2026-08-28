@@ -32,6 +32,7 @@ import {
   linkageConditionsReady,
   linkageQueryPaging,
 } from './linkageRuntime'
+import { addressFormatOf, regionJsonForFormat } from './addressField.js'
 import { buildSourceQuery, recordsToSelectItems } from './tableOptions'
 
 const props = defineProps({
@@ -77,6 +78,19 @@ function isTableSelect(field) {
 
 function isLinkageField(field) {
   return hasLinkage(field)
+}
+
+const regionLoaders = {
+  'sheng.json': () => import('@region/sheng.json'),
+  'sheng-shi.json': () => import('@region/sheng-shi.json'),
+  'sheng-shi-qu.json': () => import('@region/sheng-shi-qu.json'),
+}
+
+async function addressTreeOf(field) {
+  if (field.type !== 'address') return undefined
+  const file = regionJsonForFormat(addressFormatOf(field))
+  const mod = await regionLoaders[file]()
+  return mod.default || mod
 }
 
 function fieldLoadKey(field) {
@@ -278,6 +292,10 @@ async function loadLinkage() {
           field,
           result,
           props.values[field.key],
+          {
+            addressTree:
+              field.type === 'address' ? await addressTreeOf(field) : undefined,
+          },
         )
         if (isSelectType(field.type)) {
           next[field.key] = applied.items

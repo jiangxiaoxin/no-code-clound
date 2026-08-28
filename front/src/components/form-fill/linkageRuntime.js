@@ -1,12 +1,20 @@
 import { isSelectType } from '../form-design/fieldTypes.js'
 import { needsFilterValue } from '../form-design/optionFilters.js'
 import { emptyValue } from './fillValues.js'
+import {
+  adaptAddressToFormat,
+  addressFormatOf,
+  isAddressEmpty,
+} from './addressField.js'
 import { fileItemsOf, fileMaxCount } from './fileField.js'
 import { imageMaxCount, imageUrlsOf } from './imageField.js'
 import { recordsToSelectItems } from './tableOptions.js'
 
 function hasCurrentValue(value) {
   if (Array.isArray(value)) return value.length > 0
+  if (value && typeof value === 'object' && Array.isArray(value.ids)) {
+    return !isAddressEmpty(value)
+  }
   return value != null && value !== ''
 }
 
@@ -86,7 +94,7 @@ function collectImageUrls(items, sourceKey) {
   return urls
 }
 
-export function applyLinkageResult(field, result, currentValue) {
+export function applyLinkageResult(field, result, currentValue, extra = {}) {
   const sourceKey = field?.linkage?.sourceKey
   const items = result?.items || []
   if (isSelectType(field?.type)) {
@@ -148,6 +156,28 @@ export function applyLinkageResult(field, result, currentValue) {
     }
     return {
       value: files,
+      items: [],
+      message: '',
+    }
+  }
+
+  if (field.type === 'address') {
+    const count = recordCount(result)
+    if (count <= 0) return emptyResult(field)
+    if (count > 1) {
+      return {
+        value: emptyValue(field),
+        items: [],
+        message: linkageManyMessage(field),
+      }
+    }
+    const raw = triggerValue(items[0], sourceKey)
+    return {
+      value: adaptAddressToFormat(
+        raw,
+        addressFormatOf(field),
+        extra.addressTree || [],
+      ),
       items: [],
       message: '',
     }

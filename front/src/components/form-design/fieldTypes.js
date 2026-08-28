@@ -8,6 +8,7 @@ import {
   Finished,
   Grid,
   Link,
+  Location,
   Minus,
   Notebook,
   Odometer,
@@ -35,6 +36,7 @@ export const fieldTypes = [
   { type: 'currentUser', label: '登录人姓名', icon: UserFilled, component: 'CurrentUserName', placeholder: '' },
   { type: 'currentUserDept', label: '登录人部门', icon: OfficeBuilding, component: 'CurrentUserDept', placeholder: '' },
   { type: 'data', label: '选择数据', icon: Grid, component: 'DataSelect', placeholder: '请选择' },
+  { type: 'address', label: '地址选择', icon: Location, component: 'FormAddressSelect', placeholder: '请选择' },
   { type: 'image', label: '图片上传', icon: Picture, component: 'el-upload', placeholder: '' },
   { type: 'file', label: '文件上传', icon: Upload, component: 'FileUpload', placeholder: '' },
   // -----------以下未完成------

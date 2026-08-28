@@ -219,3 +219,48 @@ test('file field is fillable, persisted as url and name list, and not inline edi
   assert.equal(validateRequired([field], { docs: [] }), '请填写「附件」')
   assert.equal(validateRequired([field], { docs: [item] }), '')
 })
+
+test('address is fillable, persisted as object, empty omitted', () => {
+  const field = { key: 'addr', type: 'address' }
+  const value = {
+    ids: ['110000'],
+    labels: ['北京市'],
+    detail: '某街',
+  }
+  assert.equal(isFillable(field), true)
+  assert.deepEqual(buildRecordData([field], { addr: value }), { addr: value })
+  assert.deepEqual(buildRecordData([field], { addr: { ids: [], labels: [] } }), {})
+  assert.equal(
+    validateRequired([{ ...field, required: true, title: '地址' }], {}),
+    '请填写「地址」',
+  )
+  assert.equal(
+    validateRequired(
+      [
+        {
+          ...field,
+          required: true,
+          title: '地址',
+          addressFormat: 'province-city-district',
+        },
+      ],
+      { addr: { ids: ['370000'], labels: ['山东省'] } },
+    ),
+    '请填写「地址」',
+  )
+})
+
+test('address is inline editable unless disabled, locked, or linkage', () => {
+  assert.equal(
+    isInlineEditable({ key: 'addr', type: 'address', disabled: false }),
+    true,
+  )
+  assert.equal(
+    isInlineEditable({
+      key: 'addr',
+      type: 'address',
+      optionSource: 'linkage',
+    }),
+    false,
+  )
+})

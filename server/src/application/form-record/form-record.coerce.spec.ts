@@ -11,6 +11,7 @@ const fields = [
   { key: 'kids', type: 'subform' },
   { key: 'pics', type: 'image' },
   { key: 'docs', type: 'file' },
+  { key: 'addr', type: 'address' },
 ];
 
 describe('coerceRecordData', () => {
@@ -78,6 +79,31 @@ describe('coerceRecordData', () => {
   it('throws when number is not finite', () => {
     try {
       coerceRecordData(fields, { age: '18' });
+      throw new Error('expected 400');
+    } catch (e) {
+      expect(e).toBeInstanceOf(BadRequestException);
+      expect((e as BadRequestException).message).toBe('字段值类型不正确');
+    }
+  });
+
+  it('stores address objects and rejects invalid types', () => {
+    expect(
+      coerceRecordData(fields, {
+        addr: {
+          ids: ['370000', '370200'],
+          labels: ['山东省', '青岛市'],
+          detail: '  香港中路  ',
+        },
+      }),
+    ).toEqual({
+      addr: {
+        ids: ['370000', '370200'],
+        labels: ['山东省', '青岛市'],
+        detail: '香港中路',
+      },
+    });
+    try {
+      coerceRecordData(fields, { addr: '山东省 / 青岛市' });
       throw new Error('expected 400');
     } catch (e) {
       expect(e).toBeInstanceOf(BadRequestException);

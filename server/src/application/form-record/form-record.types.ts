@@ -6,4 +6,5 @@ export type FormField = {
   dictCode?: string;
   required?: boolean;
   optionSource?: string;
+  addressFormat?: string;
 };

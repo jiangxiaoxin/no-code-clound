@@ -190,6 +190,14 @@
       :disabled="isDisabled"
       @update:model-value="onUpdateModelValue"
     />
+    <FormAddressSelect
+      v-else-if="field.type === 'address'"
+      :field="field"
+      :model-value="modelValue"
+      :disabled="isDisabled"
+      :placeholder="field.placeholder"
+      @update:model-value="onUpdateModelValue"
+    />
     <div v-else-if="field.type === 'subform'" class="fill-subform" />
   </div>
 </template>
@@ -205,6 +213,7 @@ import {
 import FormDataSelect from './FormDataSelect.vue'
 import FormImageUpload from './FormImageUpload.vue'
 import FormFileUpload from './FormFileUpload.vue'
+import FormAddressSelect from './FormAddressSelect.vue'
 import CurrentUserName from './CurrentUserName.vue'
 import CurrentUserDept from './CurrentUserDept.vue'
 

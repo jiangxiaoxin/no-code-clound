@@ -16,6 +16,8 @@ import { FormField } from './form-record.types';
 import { User } from '../../user/user.entity';
 import { DictionaryService } from '../dictionary/dictionary.service';
 import {
+  ADDRESS_IMPORT_NOTE,
+  addressImportExample,
   headerFromCell,
   importableFields,
   importHeaders,
@@ -166,7 +168,20 @@ export class FormRecordService {
     const fields = importableFields(this.readFields(form));
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('数据');
-    sheet.addRow(importHeaders(fields));
+    const headers = importHeaders(fields);
+    const headerRow = sheet.addRow(headers);
+    const hasAddress = fields.some((field) => field.type === 'address');
+    if (hasAddress) {
+      fields.forEach((field, index) => {
+        if (field.type !== 'address') return;
+        headerRow.getCell(index + 1).note = ADDRESS_IMPORT_NOTE;
+      });
+      sheet.addRow(
+        fields.map((field) =>
+          field.type === 'address' ? addressImportExample(field) : '',
+        ),
+      );
+    }
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
     const name = (form.name || '表单').replace(/[\\/:*?"<>|]/g, '_').slice(0, 80);
     return { buffer, filename: `${name}-导入模版.xlsx` };

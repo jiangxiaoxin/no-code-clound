@@ -35,4 +35,42 @@ describe('form-record import', () => {
       { name: '赵六', age: 22, status: '2' },
     ]);
   });
+
+  it('imports address paths and skips example or incomplete rows', () => {
+    const withAddr = [
+      { key: 'name', type: 'input', title: '姓名', required: true },
+      {
+        key: 'addr',
+        type: 'address',
+        title: '地址',
+        addressFormat: 'province-city',
+        required: true,
+      },
+    ];
+    const rows = parseImportRows(
+      ['姓名', '地址'],
+      [
+        ['张三', '山东省 / 青岛市'],
+        ['李四', '山东省 / 青岛市'],
+        ['王五', '示例：山东省 / 青岛市'],
+        ['赵六', '山东省'],
+        ['钱七', '370000/370200'],
+      ],
+      withAddr,
+    );
+    expect(rows).toEqual([
+      {
+        name: '张三',
+        addr: { ids: ['370000', '370200'], labels: ['山东省', '青岛市'] },
+      },
+      {
+        name: '李四',
+        addr: { ids: ['370000', '370200'], labels: ['山东省', '青岛市'] },
+      },
+      {
+        name: '钱七',
+        addr: { ids: ['370000', '370200'], labels: ['山东省', '青岛市'] },
+      },
+    ]);
+  });
 });

@@ -99,6 +99,29 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
       return invalid();
     case 'file':
       return coerceFileValue(value);
+    case 'address': {
+      if (isEmpty(value)) return undefined;
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        invalid();
+      }
+      const row = value as { ids?: unknown; labels?: unknown; detail?: unknown };
+      if (!Array.isArray(row.ids) || !Array.isArray(row.labels)) invalid();
+      if (row.ids.length !== row.labels.length) invalid();
+      if (!row.ids.every((item) => typeof item === 'string')) invalid();
+      if (!row.labels.every((item) => typeof item === 'string')) invalid();
+      if (row.ids.length === 0) return undefined;
+      const next: { ids: string[]; labels: string[]; detail?: string } = {
+        ids: row.ids,
+        labels: row.labels,
+      };
+      if (typeof row.detail === 'string') {
+        const detail = row.detail.trim().slice(0, 256);
+        if (detail) next.detail = detail;
+      } else if (row.detail != null) {
+        invalid();
+      }
+      return next;
+    }
     case 'subform':
       return Array.isArray(value) ? value : [];
     default:

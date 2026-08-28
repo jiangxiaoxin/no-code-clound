@@ -95,7 +95,12 @@ const treeData = computed(() => {
       label: form.name,
       disabled: true,
       children: form.fields
-        .filter((field) => field.type !== 'image' && field.type !== 'file')
+        .filter(
+          (field) =>
+            field.type !== 'image' &&
+            field.type !== 'file' &&
+            field.type !== 'address',
+        )
         .map((field) => ({
           id: `${form.id}:${field.key}`,
           formId: form.id,

@@ -30,6 +30,7 @@ const OPTION_FIELD_TYPES = new Set([
   'select-multiple',
   'image',
   'file',
+  'address',
 ]);
 
 const ICON_COLORS = [
