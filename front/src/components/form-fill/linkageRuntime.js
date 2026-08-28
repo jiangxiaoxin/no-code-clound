@@ -39,6 +39,14 @@ function emptyResult(field) {
   return { value: emptyValue(field), items: [], message: '' }
 }
 
+export function linkageManyMessage(field) {
+  const title = typeof field?.title === 'string' ? field.title.trim() : ''
+  const desc =
+    typeof field?.description === 'string' ? field.description.trim() : ''
+  const label = [title, desc].filter(Boolean).join('，')
+  return `[ ${label} ] 字段联动查询出多条数据`
+}
+
 export function applyLinkageResult(field, result, currentValue) {
   const sourceKey = field?.linkage?.sourceKey
   const items = result?.items || []
@@ -76,7 +84,7 @@ export function applyLinkageResult(field, result, currentValue) {
     return {
       value: emptyValue(field),
       items: [],
-      message: `${field.title || ''}字段联动查询出多条数据`,
+      message: linkageManyMessage(field),
     }
   }
   return {

@@ -16,7 +16,7 @@
 - 数据联动只出现在数据源里；单选 / 复选不做联动，不改它们的选项字典入口。
 - 支持字段：`input` `textarea` `number` `date` `time` `datetime` `select` `select-multiple`。
 - 配置形状：`linkage: { sourceFormId, match, conditions, sourceKey }`；条件形状与 `optionFilters` 相同；至少一条完整条件。
-- 文本 / 数字 / 时间：0 条清空不提示；1 条写入；多条清空并用 `el-message` 提示 `{字段标题}字段联动查询出多条数据`。
+- 文本 / 数字 / 时间：0 条清空不提示；1 条写入；多条清空并用 `el-message` 提示 `[ 字段标题 ] 字段联动查询出多条数据`（有说明时为 `[ 标题，说明 ] 字段联动查询出多条数据`）。
 - 下拉：0 清空；1 自动选；多条变选项让人再选，不弹多条提示。
 - 不新增后端接口；查询 `POST .../records/query`。
 - 不跑联动：设计画布、数据管理单元格内联编辑。
@@ -118,7 +118,7 @@ Run: `node --test front/src/components/form-design/linkage.spec.js`
 规则：
 
 - 条件未就绪：调用方不请求；测试 `linkageConditionsReady` 对字段引用为空返回 false。
-- 值类型：`total > 1`（或无 total 时 `items.length > 1`）→ `value` 清空 + `message` 为 `{title}字段联动查询出多条数据`；`total === 1` 写入 `items[0].data[sourceKey]`；0 条清空、无 message。
+- 值类型：`total > 1`（或无 total 时 `items.length > 1`）→ `value` 清空 + `message` 为 `[ 标题 ] 字段联动查询出多条数据`（有说明时把说明接在标题后，用中文逗号）；`total === 1` 写入 `items[0].data[sourceKey]`；0 条清空、无 message。
 - 下拉：用 `recordsToSelectItems`；0 条空选项并清空；1 个去重选项自动选中；多个不自动选，当前值仍在选项里则保留，否则清空。下拉多选：1 个自动 `[v]`；多个则过滤已选。无 message。
 
 Run: `node --test front/src/components/form-fill/linkageRuntime.spec.js`

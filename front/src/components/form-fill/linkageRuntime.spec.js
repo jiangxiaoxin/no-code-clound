@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import {
   applyLinkageResult,
   linkageConditionsReady,
+  linkageManyMessage,
   linkageQueryPaging,
 } from './linkageRuntime.js'
 
@@ -73,7 +74,7 @@ test('value fields: 0 clears, 1 writes, many clears with message', () => {
     {
       value: undefined,
       items: [],
-      message: '姓名字段联动查询出多条数据',
+      message: '[ 姓名 ] 字段联动查询出多条数据',
     },
   )
 })
@@ -89,7 +90,18 @@ test('many records with the same trigger value still count as many for text fiel
     undefined,
   )
   assert.equal(result.value, undefined)
-  assert.equal(result.message, '姓名字段联动查询出多条数据')
+  assert.equal(result.message, '[ 姓名 ] 字段联动查询出多条数据')
+})
+
+test('many-records message includes title and description', () => {
+  assert.equal(
+    linkageManyMessage({ title: '奖金基数', description: '数字越大给的越多' }),
+    '[ 奖金基数，数字越大给的越多 ] 字段联动查询出多条数据',
+  )
+  assert.equal(
+    linkageManyMessage({ title: '姓名' }),
+    '[ 姓名 ] 字段联动查询出多条数据',
+  )
 })
 
 test('select: 0 clears, 1 auto-selects, many keeps current if still in options', () => {
