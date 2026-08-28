@@ -78,3 +78,22 @@ export function imageUrlsOf(value) {
   if (typeof value === 'string' && value) return [value]
   return []
 }
+
+export function imageDownloadName(url) {
+  const path = String(url || '').split(/[?#]/)[0]
+  const name = path.split('/').filter(Boolean).pop()
+  return name || 'image'
+}
+
+export async function downloadImage(url) {
+  if (!url) throw new Error('下载失败')
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('下载失败')
+  const blob = await response.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = objectUrl
+  link.download = imageDownloadName(url)
+  link.click()
+  URL.revokeObjectURL(objectUrl)
+}

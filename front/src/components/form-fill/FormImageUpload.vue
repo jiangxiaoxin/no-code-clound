@@ -23,7 +23,14 @@
       :initial-index="viewerIndex"
       teleported
       @close="closeViewer"
-    />
+    >
+      <template #toolbar="toolbar">
+        <FormImageViewerToolbar
+          v-bind="toolbar"
+          :urls="urls"
+        />
+      </template>
+    </el-image-viewer>
   </div>
 </template>
 
@@ -32,6 +39,7 @@ import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { uploadAppImageApi } from '../../api/apps'
+import FormImageViewerToolbar from './FormImageViewerToolbar.vue'
 import {
   imageAcceptAttr,
   imageFormatLabels,

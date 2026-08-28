@@ -8,6 +8,7 @@ import {
   imageMaxCount,
   imageMaxSizeBytes,
   imageMaxSizeMB,
+  imageDownloadName,
   imageUrlsOf,
   isAllowedImageFile,
 } from './imageField.js'
@@ -42,4 +43,13 @@ test('imageUrlsOf normalizes string or array', () => {
   assert.deepEqual(imageUrlsOf(['/uploads/a.png', '']), ['/uploads/a.png'])
   assert.deepEqual(imageUrlsOf('/uploads/a.png'), ['/uploads/a.png'])
   assert.deepEqual(imageUrlsOf(undefined), [])
+})
+
+test('imageDownloadName uses the last path segment', () => {
+  assert.equal(imageDownloadName('/uploads/imgs/2026-08-28/a.png'), 'a.png')
+  assert.equal(
+    imageDownloadName('http://localhost:5173/uploads/b.jpg?x=1'),
+    'b.jpg',
+  )
+  assert.equal(imageDownloadName(''), 'image')
 })

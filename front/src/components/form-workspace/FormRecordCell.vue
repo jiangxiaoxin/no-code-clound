@@ -109,7 +109,14 @@
           fit="cover"
           preview-teleported
           @click.prevent.stop
-        />
+        >
+          <template #toolbar="toolbar">
+            <FormImageViewerToolbar
+              v-bind="toolbar"
+              :urls="imageUrls"
+            />
+          </template>
+        </el-image>
         <!-- 不禁用事件会继续冒泡导致打开详情抽屉 -->
       </div>
     </template>
@@ -143,6 +150,7 @@ import {
   valuesEqual,
 } from '../form-fill/fillValues.js'
 import { imageUrlsOf } from '../form-fill/imageField.js'
+import FormImageViewerToolbar from '../form-fill/FormImageViewerToolbar.vue'
 
 const props = defineProps({
   appId: { type: Number, required: true },
