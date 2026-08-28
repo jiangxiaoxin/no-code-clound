@@ -30,6 +30,7 @@
     <el-input
       v-if="field.type === 'input'"
       v-model="draft"
+      clearable
       :disabled="isDisabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
@@ -53,6 +54,7 @@
       v-model="draft"
       type="textarea"
       :rows="3"
+      clearable
       :disabled="isDisabled"
       :placeholder="field.placeholder"
       :maxlength="field.maxLength || undefined"
@@ -88,6 +90,7 @@
       v-else-if="field.type === 'date'"
       class="fill-full"
       v-model="draft"
+      clearable
       :disabled="isDisabled"
       :type="field.format || 'date'"
       value-format="YYYY-MM-DD"
@@ -98,6 +101,7 @@
       v-else-if="field.type === 'time'"
       class="fill-full"
       v-model="draft"
+      clearable
       :disabled="isDisabled"
       :format="field.format || 'HH:mm:ss'"
       :value-format="field.format || 'HH:mm:ss'"
@@ -109,6 +113,7 @@
       class="fill-full"
       type="datetime"
       v-model="draft"
+      clearable
       :disabled="isDisabled"
       :format="field.format || 'YYYY-MM-DD HH:mm:ss'"
       :placeholder="field.placeholder || '请选择'"
@@ -122,6 +127,7 @@
       class="fill-full"
       :multiple="field.type === 'select-multiple'"
       :model-value="modelValue"
+      clearable
       :disabled="isDisabled"
       :placeholder="field.placeholder"
       @change="onUpdateModelValue"
