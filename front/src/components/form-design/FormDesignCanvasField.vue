@@ -19,7 +19,7 @@
   >
     <div v-if="selected" class="canvas-field-actions">
       <el-button-group>
-        <el-button size="small" :icon="CopyDocument" @click.stop="$emit('copy')" />
+        <!-- <el-button size="small" :icon="CopyDocument" @click.stop="$emit('copy')" /> -->
         <el-button size="small" :icon="Delete" @click.stop="$emit('remove')" />
       </el-button-group>
     </div>
