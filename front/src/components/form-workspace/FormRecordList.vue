@@ -67,21 +67,20 @@
             :resizable="!isTimeColumnKey(col.key)"
             :fixed="col.fixed || undefined"
             :class-name="isDataColumn(col.key) ? 'record-data-col' : undefined"
-            :show-overflow-tooltip="!isDataColumn(col.key)"
           >
             <template #default="{ row }">
-              <template v-if="col.key === CREATED_AT_KEY">
+              <span v-if="col.key === CREATED_AT_KEY" class="sys-cell" :title="formatTime(row.createdAt)">
                 {{ formatTime(row.createdAt) }}
-              </template>
-              <template v-else-if="col.key === UPDATED_AT_KEY">
+              </span>
+              <span v-else-if="col.key === UPDATED_AT_KEY" class="sys-cell" :title="formatTime(row.updatedAt)">
                 {{ formatTime(row.updatedAt) }}
-              </template>
-              <template v-else-if="col.key === CREATED_BY_KEY">
+              </span>
+              <span v-else-if="col.key === CREATED_BY_KEY" class="sys-cell" :title="row.createdByName">
                 {{ row.createdByName }}
-              </template>
-              <template v-else-if="col.key === UPDATED_BY_KEY">
+              </span>
+              <span v-else-if="col.key === UPDATED_BY_KEY" class="sys-cell" :title="row.updatedByName">
                 {{ row.updatedByName }}
-              </template>
+              </span>
               <FormRecordCell
                 v-else-if="fieldByKey[col.key]"
                 :app-id="appId"
@@ -423,5 +422,13 @@ defineExpose({ reload, upsertRecord })
 
 :deep(td.record-data-col .cell) {
   overflow: visible;
+}
+
+.sys-cell {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

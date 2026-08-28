@@ -121,7 +121,7 @@
       </div>
     </template>
     <template v-else>
-      <span class="record-cell-text">{{ display }}</span>
+      <span class="record-cell-text" :title="display">{{ display }}</span>
       <button
         v-if="editable"
         class="record-cell-edit"
@@ -358,11 +358,14 @@ onUnmounted(() => {
 .record-cell {
   display: flex;
   align-items: center;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   min-height: 24px;
 }
 
 .record-cell-text {
+  display: block;
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -371,6 +374,8 @@ onUnmounted(() => {
 }
 
 .record-cell-edit {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-shrink: 0;
   align-items: center;
