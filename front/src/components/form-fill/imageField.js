@@ -97,3 +97,76 @@ export async function downloadImage(url) {
   link.click()
   URL.revokeObjectURL(objectUrl)
 }
+
+export function imageCompressEnabled(field) {
+  return field?.compress === true
+}
+
+const IMAGE_COMPRESS_MAX_EDGE = 1920
+const IMAGE_COMPRESS_QUALITY = 0.8
+
+function compressOutputType(type) {
+  if (type === 'image/png' || type === 'image/webp' || type === 'image/jpeg') {
+    return type
+  }
+  return 'image/jpeg'
+}
+
+function replaceImageExt(name, mime) {
+  const ext =
+    mime === 'image/png' ? '.png' : mime === 'image/webp' ? '.webp' : '.jpg'
+  const base = String(name || 'image').replace(/\.[^.]+$/, '')
+  return `${base}${ext}`
+}
+
+function fitMaxEdge(width, height, maxEdge) {
+  const edge = Math.max(width, height)
+  if (!(width > 0) || !(height > 0) || edge <= maxEdge) {
+    return { width, height }
+  }
+  const ratio = maxEdge / edge
+  return {
+    width: Math.max(1, Math.round(width * ratio)),
+    height: Math.max(1, Math.round(height * ratio)),
+  }
+}
+
+function canvasToBlob(canvas, type, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) reject(new Error('compress failed'))
+      else resolve(blob)
+    }, type, quality)
+  })
+}
+
+export async function compressImageFile(file) {
+  if (!file || file.type === 'image/gif') return file
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(file)
+    const size = fitMaxEdge(
+      bitmap.width,
+      bitmap.height,
+      IMAGE_COMPRESS_MAX_EDGE,
+    )
+    const canvas = document.createElement('canvas')
+    canvas.width = size.width
+    canvas.height = size.height
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, size.width, size.height)
+    const type = compressOutputType(file.type)
+    const blob = await canvasToBlob(canvas, type, IMAGE_COMPRESS_QUALITY)
+    if (blob.size >= file.size) return file
+    return new File([blob], replaceImageExt(file.name, type), {
+      type,
+      lastModified: Date.now(),
+    })
+  } catch {
+    return file
+  } finally {
+    console.log('finally 清理');
+    bitmap?.close?.()
+  }
+}

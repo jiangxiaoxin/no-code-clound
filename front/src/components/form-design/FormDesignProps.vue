@@ -127,6 +127,10 @@
               />
             </el-select>
           </div>
+          <div v-if="field.type === 'image'" class="required-row">
+            <span>开启压缩</span>
+            <el-switch v-model="field.compress" />
+          </div>
         </div>
       </el-form-item>
       <el-form-item v-if="field.type === 'number'" label="格式">

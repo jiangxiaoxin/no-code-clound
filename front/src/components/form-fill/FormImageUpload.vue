@@ -41,7 +41,9 @@ import { Plus } from '@element-plus/icons-vue'
 import { uploadAppImageApi } from '../../api/apps'
 import FormImageViewerToolbar from './FormImageViewerToolbar.vue'
 import {
+  compressImageFile,
   imageAcceptAttr,
+  imageCompressEnabled,
   imageFormatLabels,
   imageMaxCount,
   imageMaxSizeBytes,
@@ -107,17 +109,21 @@ async function beforeUpload(file) {
     onExceed()
     return false
   }
-  const maxBytes = imageMaxSizeBytes(props.field)
-  if (file.size > maxBytes) {
-    ElMessage.warning(`每张图片不能超过 ${imageMaxSizeMB(props.field)}MB`)
-    return false
-  }
   if (!isAllowedImageFile(props.field, file)) {
     ElMessage.warning(`请上传 ${imageFormatLabels(props.field)} 图片`)
     return false
   }
+  let uploadFile = file
+  if (imageCompressEnabled(props.field)) {
+    uploadFile = await compressImageFile(file)
+  }
+  const maxBytes = imageMaxSizeBytes(props.field)
+  if (uploadFile.size > maxBytes) {
+    ElMessage.warning(`每张图片不能超过 ${imageMaxSizeMB(props.field)}MB`)
+    return false
+  }
   try {
-    const result = await uploadAppImageApi(props.appId, file)
+    const result = await uploadAppImageApi(props.appId, uploadFile)
     const url = result?.url
     if (!url) {
       ElMessage.error('上传失败')

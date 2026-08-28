@@ -169,6 +169,7 @@ function addField(item, beforeKey) {
           maxCount: DEFAULT_IMAGE_MAX_COUNT,
           maxSizeMB: DEFAULT_IMAGE_MAX_SIZE_MB,
           acceptFormats: defaultImageFormats(),
+          compress: false,
         }
       : {}),
   }
@@ -250,6 +251,7 @@ function ensureOptionSource(field) {
     if (!Array.isArray(field.acceptFormats) || !field.acceptFormats.length) {
       field.acceptFormats = defaultImageFormats()
     }
+    if (typeof field.compress !== 'boolean') field.compress = false
   }
 }
 

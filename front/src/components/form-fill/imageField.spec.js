@@ -11,6 +11,8 @@ import {
   imageDownloadName,
   imageUrlsOf,
   isAllowedImageFile,
+  imageCompressEnabled,
+  compressImageFile,
 } from './imageField.js'
 
 test('image limits fall back to default count and 10MB', () => {
@@ -52,4 +54,17 @@ test('imageDownloadName uses the last path segment', () => {
     'b.jpg',
   )
   assert.equal(imageDownloadName(''), 'image')
+})
+
+test('image compress is off unless explicitly enabled', () => {
+  assert.equal(imageCompressEnabled({}), false)
+  assert.equal(imageCompressEnabled({ compress: false }), false)
+  assert.equal(imageCompressEnabled({ compress: true }), true)
+})
+
+test('compressImageFile keeps gif and falls back when canvas is unavailable', async () => {
+  const gif = new File(['gif'], 'a.gif', { type: 'image/gif' })
+  assert.equal(await compressImageFile(gif), gif)
+  const jpeg = new File(['x'], 'a.jpg', { type: 'image/jpeg' })
+  assert.equal(await compressImageFile(jpeg), jpeg)
 })
