@@ -177,6 +177,7 @@ import {
 } from '../form-fill/fileField.js'
 import { imageUrlsOf } from '../form-fill/imageField.js'
 import { addressHasDetail } from '../form-fill/addressField.js'
+import { buildSourceQuery, recordsToSelectItems } from '../form-fill/tableOptions'
 import FormAddressSelect from '../form-fill/FormAddressSelect.vue'
 import FormImageViewerToolbar from '../form-fill/FormImageViewerToolbar.vue'
 
