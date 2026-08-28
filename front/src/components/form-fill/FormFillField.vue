@@ -6,6 +6,11 @@
       :title="fieldKeyTitle"
     >
       <span v-if="field.required" class="fill-field-required">*</span>
+      <el-tooltip v-if="linked" content="设置了数据联动" placement="top">
+        <el-icon class="fill-field-fill">
+          <Link />
+        </el-icon>
+      </el-tooltip>
       <el-tooltip v-if="fillTip" :content="fillTip" placement="top">
         <el-icon class="fill-field-fill">
           <Connection />
@@ -180,9 +185,12 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Connection, InfoFilled, Upload } from '@element-plus/icons-vue'
+import { Connection, InfoFilled, Link, Upload } from '@element-plus/icons-vue'
 import { widthClass } from '../form-design/fieldTypes'
-import { needsOptionSourceHint as fieldNeedsOptionSourceHint } from '../form-design/linkage'
+import {
+  hasLinkage,
+  needsOptionSourceHint as fieldNeedsOptionSourceHint,
+} from '../form-design/linkage'
 import FormDataSelect from './FormDataSelect.vue'
 import FormImageUpload from './FormImageUpload.vue'
 import CurrentUserName from './CurrentUserName.vue'
@@ -217,6 +225,8 @@ watch(
 const fieldKeyTitle = computed(() =>
   import.meta.env.DEV ? props.field.key || undefined : undefined,
 )
+
+const linked = computed(() => hasLinkage(props.field))
 
 const isDisabled = computed(
   () =>

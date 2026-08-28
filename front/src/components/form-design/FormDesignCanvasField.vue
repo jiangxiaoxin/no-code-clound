@@ -28,6 +28,11 @@
       <!-- 左右布局需要设置合理的 label width ，暂时不支持-->
     <span v-if="field.type !== 'divider'" class="canvas-field-title">
       <span v-if="field.required" class="canvas-field-required">*</span>
+      <el-tooltip v-if="linked" content="设置了数据联动" placement="top">
+        <el-icon class="canvas-field-fill" @click.stop>
+          <Link />
+        </el-icon>
+      </el-tooltip>
       <el-tooltip v-if="fillTip" :content="fillTip" placement="top">
         <el-icon class="canvas-field-fill" @click.stop>
           <Connection />
@@ -174,9 +179,12 @@
 
 <script setup>
 import { computed } from 'vue'
-import { CopyDocument, Connection, Delete, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
+import { CopyDocument, Connection, Delete, InfoFilled, Link, Plus, Upload } from '@element-plus/icons-vue'
 import { widthClass } from './fieldTypes'
-import { needsOptionSourceHint as fieldNeedsOptionSourceHint } from './linkage'
+import {
+  hasLinkage,
+  needsOptionSourceHint as fieldNeedsOptionSourceHint,
+} from './linkage'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import CurrentUserName from '../form-fill/CurrentUserName.vue'
 
@@ -195,6 +203,8 @@ defineEmits(['select', 'copy', 'remove', 'dragstart', 'dragover', 'drop', 'drage
 const needsOptionSourceHint = computed(() =>
   fieldNeedsOptionSourceHint(props.field),
 )
+
+const linked = computed(() => hasLinkage(props.field))
 </script>
 
 <style scoped lang="less">
