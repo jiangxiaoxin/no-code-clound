@@ -63,7 +63,7 @@
             <span>是否可修改</span>
             <el-switch :model-value="field.editable !== false" @change="onEditableChange" />
           </div>
-          <div v-if="field.type === 'input'" class="required-row">
+          <div v-if="field.type === 'input' || field.type === 'number'" class="required-row">
             <span>不允许重复值</span>
             <el-switch v-model="field.unique" />
           </div>
@@ -231,7 +231,7 @@
         </el-select>
       </el-form-item>
       <template v-else-if="hasLinkageSource(field.type)">
-        <el-form-item label="数据源">
+        <el-form-item :label="optionSourceLabel">
           <el-select
             v-model="field.optionSource"
             placeholder="请选择"
@@ -395,7 +395,7 @@
 import { computed, ref, watch } from 'vue'
 import { CircleClose } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
-import { formatOptions, formColumnOptions, fieldTypeLabel } from './fieldTypes'
+import { formatOptions, formColumnOptions, fieldTypeLabel, isSelectType } from './fieldTypes'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
 import FormSourcePicker from './FormSourcePicker.vue'
 import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
@@ -458,6 +458,9 @@ const formFields = computed(() =>
 )
 
 const fieldTypeText = computed(() => fieldTypeLabel(props.field?.type))
+const optionSourceLabel = computed(() =>
+  isSelectType(props.field?.type) ? '选项来源' : '取值来源',
+)
 const isCurrentDisplayField = computed(
   () =>
     props.field?.type === 'currentUser' ||

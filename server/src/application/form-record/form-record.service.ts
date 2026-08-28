@@ -244,13 +244,12 @@ export class FormRecordService {
     const parsed = parseImportRows(headers, rows, fields, dictItemsByCode);
     const now = new Date();
     const docs: Omit<FormRecordDoc, '_id'>[] = [];
-    const seen = new Map<string, Set<string>>();
+    const seen = new Map<string, Set<string | number>>();
     for (const data of parsed) {
       let skip = false;
       for (const field of fields ?? []) {
-        if (field.type !== 'input' || !field.unique) continue;
-        const value = data[field.key];
-        if (typeof value !== 'string' || !value) continue;
+        const value = uniqueComparableValue(field, data[field.key]);
+        if (value === undefined) continue;
         let bucket = seen.get(field.key);
         if (!bucket) {
           bucket = new Set();
@@ -287,12 +286,9 @@ export class FormRecordService {
     excludeRecordId?: string,
   ) {
     for (const field of fields ?? []) {
-      if (field.type !== 'input' || !field.unique) {
-        continue;
-      }
       // 目前进对[单行文本]进行重复值检测
-      const value = data[field.key];
-      if (typeof value !== 'string' || value === '') {
+      const value = uniqueComparableValue(field, data[field.key]);
+      if (value === undefined) {
         continue;
       }
       const exists = await this.store.existsByDataValue(
@@ -381,4 +377,20 @@ export class FormRecordService {
       data: doc.data ?? {},
     };
   }
+}
+
+function uniqueComparableValue(
+  field: FormField,
+  value: unknown,
+): string | number | undefined {
+  if (!field.unique) return undefined;
+  if (field.type === 'input') {
+    if (typeof value !== 'string' || value === '') return undefined;
+    return value;
+  }
+  if (field.type === 'number') {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+    return value;
+  }
+  return undefined;
 }

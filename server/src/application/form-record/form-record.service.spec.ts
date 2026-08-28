@@ -172,6 +172,56 @@ describe('FormRecordService', () => {
     );
   });
 
+  it('rejects create when a unique number value already exists', async () => {
+    appRepo.findOne.mockResolvedValue(ownedApp);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [{ key: 'code', type: 'number', title: '编号', unique: true }],
+    });
+    store.existsByDataValue.mockResolvedValue(true);
+
+    await expect(service.create(1, 8, 12, { code: 100 })).rejects.toEqual(
+      expect.objectContaining({
+        constructor: ConflictException,
+        message: '[编号]不允许重复值',
+      }),
+    );
+    expect(store.existsByDataValue).toHaveBeenCalledWith(
+      12,
+      'code',
+      100,
+      undefined,
+    );
+    expect(store.insert).not.toHaveBeenCalled();
+  });
+
+  it('checks unique number zero and skips empty number', async () => {
+    appRepo.findOne.mockResolvedValue(ownedApp);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [{ key: 'code', type: 'number', title: '编号', unique: true }],
+    });
+    store.existsByDataValue.mockResolvedValue(false);
+    store.insert.mockResolvedValue({ id: doc._id.toHexString() });
+    store.findById.mockResolvedValue({ ...doc, data: { code: 0 } });
+    userRepo.find.mockResolvedValue([{ id: 1, displayName: '李四' }]);
+
+    await service.create(1, 8, 12, { code: 0 });
+    expect(store.existsByDataValue).toHaveBeenCalledWith(
+      12,
+      'code',
+      0,
+      undefined,
+    );
+
+    store.existsByDataValue.mockClear();
+    store.insert.mockClear();
+    store.findById.mockResolvedValue({ ...doc, data: {} });
+    await service.create(1, 8, 12, {});
+    expect(store.existsByDataValue).not.toHaveBeenCalled();
+    expect(store.insert).toHaveBeenCalled();
+  });
+
   it('throws when record id is missing', async () => {
     appRepo.findOne.mockResolvedValue(ownedApp);
     formRepo.findOne.mockResolvedValue(form);
