@@ -7,6 +7,7 @@
         'is-selected': selected,
         'is-dragging': dragging,
         'is-drag-over': dragOver,
+        'is-image': field.type === 'image',
       },
     ]"
     draggable="true"
@@ -292,6 +293,10 @@ const needsOptionSourceHint = computed(() =>
 :deep(.canvas-item) {
   width: 100%;
   max-width: 354px;
+}
+
+.canvas-field.is-image :deep(.canvas-item) {
+  max-width: none;
 }
 
 :deep(.canvas-item.el-date-editor) {

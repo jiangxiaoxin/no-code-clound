@@ -1,0 +1,24 @@
+---
+description: 日期时间处理优先使用 dayjs，不要自行实现解析和格式化
+globs: front/**/*.{js,vue}
+alwaysApply: true
+---
+
+# 日期时间优先用 dayjs
+
+写或改 `front/` 里日期、时间的解析、格式化、加减和起止计算时，**优先用 dayjs**。不要再手写 `pad`、`getFullYear` 拼接，或直接 `new Date('YYYY-MM-DD')` 当日历日期。
+
+项目已在 `front/src/utils/timeValue.js` 里配置了 dayjs 插件。能复用 `asDate`、`formatTimeFieldValue`、`formatQueryTimeValue`、`formatDateTime`、`parseCalendarParts` 时，不要再复制一套。
+
+```js
+// ❌ BAD
+const d = new Date(value)
+return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+
+// ✅ GOOD
+import { dayjs, formatDateTime } from '../utils/timeValue.js'
+return formatDateTime(value)
+// 或 dayjs(value).format('YYYY-MM-DD')
+```
+
+`YYYY-MM-DD` 必须按日历日期读，用 `asDate` / `parseCalendarParts` / dayjs 指定格式，不要依赖浏览器把日期字符串当成 UTC。

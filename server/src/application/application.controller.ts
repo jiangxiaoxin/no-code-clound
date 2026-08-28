@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -11,8 +12,15 @@ import {
   Put,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { randomUUID } from 'crypto';
+import { mkdirSync } from 'fs';
+import { join, relative, sep } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApplicationService } from './application.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
@@ -21,6 +29,33 @@ import { ListFormFieldsDto } from './dto/list-form-fields.dto';
 import { NameDto } from './dto/name.dto';
 import { SaveFormFieldsDto } from './dto/save-form-fields.dto';
 import { SaveFormConfigDto } from './dto/save-form-config.dto';
+
+const UPLOAD_DIR = join(process.cwd(), 'uploads');
+const IMAGE_UPLOAD_DIR = join(UPLOAD_DIR, 'imgs');
+const MAX_IMAGE_SIZE = 50 * 1024 * 1024;
+const IMAGE_EXT: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
+};
+
+function localDateFolder() {
+  const d = new Date();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
+}
+
+function ensureImageUploadDir() {
+  const dir = join(IMAGE_UPLOAD_DIR, localDateFolder());
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function publicUploadUrl(filePath: string) {
+  return `/uploads/${relative(UPLOAD_DIR, filePath).split(sep).join('/')}`;
+}
 
 @Controller('apps')
 @UseGuards(JwtAuthGuard)
@@ -175,5 +210,39 @@ export class ApplicationController {
     @Param('formId', ParseIntPipe) formId: number,
   ) {
     return this.applicationService.deleteForm(req.user.id, id, formId);
+  }
+
+  @Post(':id/uploads')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (_req, _file, cb) => {
+          cb(null, ensureImageUploadDir());
+        },
+        filename: (_req, file, cb) => {
+          const ext = IMAGE_EXT[file.mimetype] || '.jpg';
+          cb(null, `${randomUUID()}${ext}`);
+        },
+      }),
+      limits: { fileSize: MAX_IMAGE_SIZE },
+      fileFilter: (_req, file, cb) => {
+        if (!IMAGE_EXT[file.mimetype]) {
+          cb(new BadRequestException('只支持 jpg、png、gif、webp 图片'), false);
+          return;
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  async uploadImage(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file?: { filename: string; path: string },
+  ) {
+    await this.applicationService.getOne(req.user.id, id);
+    if (!file?.filename || !file.path) {
+      throw new BadRequestException('请选择图片');
+    }
+    return { url: publicUploadUrl(file.path) };
   }
 }

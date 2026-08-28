@@ -8,6 +8,7 @@ const fields = [
   { key: 'split', type: 'divider' },
   { key: 'me', type: 'currentUser' },
   { key: 'kids', type: 'subform' },
+  { key: 'pics', type: 'image' },
 ];
 
 describe('coerceRecordData', () => {
@@ -33,6 +34,12 @@ describe('coerceRecordData', () => {
 
   it('stores empty array when subform is not an array', () => {
     expect(coerceRecordData(fields, { kids: 'nope' })).toEqual({ kids: [] });
+  });
+
+  it('stores image urls as an array', () => {
+    expect(
+      coerceRecordData(fields, { pics: ['/uploads/a.png'] }),
+    ).toEqual({ pics: ['/uploads/a.png'] });
   });
 
   it('omits empty number', () => {

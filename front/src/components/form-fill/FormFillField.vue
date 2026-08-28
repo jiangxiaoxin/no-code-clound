@@ -1,5 +1,5 @@
 <template>
-  <div class="fill-field" :class="widthClass[field.width] || 'is-w-full'">
+  <div class="fill-field" :class="fieldClass">
     <span
       v-if="field.type !== 'divider'"
       class="fill-field-title"
@@ -158,14 +158,14 @@
     <el-divider v-else-if="field.type === 'divider'" :title="fieldKeyTitle">
       {{ field.title }}
     </el-divider>
-    <el-upload
+    <FormImageUpload
       v-else-if="field.type === 'image'"
-      disabled
-      list-type="picture-card"
-      :auto-upload="false"
-    >
-      <el-icon><Plus /></el-icon>
-    </el-upload>
+      :field="field"
+      :app-id="appId"
+      :model-value="modelValue"
+      :disabled="isDisabled"
+      @update:model-value="onUpdateModelValue"
+    />
     <el-upload
       v-else-if="field.type === 'file'"
       disabled
@@ -180,10 +180,11 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Connection, InfoFilled, Plus, Upload } from '@element-plus/icons-vue'
+import { Connection, InfoFilled, Upload } from '@element-plus/icons-vue'
 import { widthClass } from '../form-design/fieldTypes'
 import { needsOptionSourceHint as fieldNeedsOptionSourceHint } from '../form-design/linkage'
 import FormDataSelect from './FormDataSelect.vue'
+import FormImageUpload from './FormImageUpload.vue'
 import CurrentUserName from './CurrentUserName.vue'
 
 const props = defineProps({
@@ -239,6 +240,11 @@ function onFill(patches) {
 const needsOptionSourceHint = computed(() =>
   fieldNeedsOptionSourceHint(props.field),
 )
+
+const fieldClass = computed(() => {
+  const width = widthClass[props.field.width] || 'is-w-full'
+  return props.field.type === 'image' ? [width, 'is-image'] : width
+})
 </script>
 
 <style scoped lang="less">
@@ -270,6 +276,10 @@ const needsOptionSourceHint = computed(() =>
 
 .fill-field.is-w-three-quarters {
   grid-column: span 9;
+}
+
+.fill-field.is-image {
+  max-width: none;
 }
 
 .fill-field-title {

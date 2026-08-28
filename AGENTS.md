@@ -25,6 +25,7 @@
 - 新增或修改 `el-dialog` 时默认开启 `draggable`，除非需求明确不需要拖拽。
 - 模板和 HTML 属性中不写行内 JavaScript（JavaScript，脚本语言）；事件逻辑抽到 `script setup` 函数中。
 - 使用图标前必须确认 `@element-plus/icons-vue` 中有对应导出，再导入后使用；不要用 `Number`、`Document` 等 JavaScript（JavaScript，脚本语言）或浏览器全局名当作图标。
+- 日期、时间的解析、格式化和起止计算优先使用 dayjs；复用 `front/src/utils/timeValue.js`，不要手写补零拼接或把 `YYYY-MM-DD` 交给 `new Date` 当 UTC。
 - 改动相关代码时，保留用户已有的注释、`console.log` 等日志输出；除非用户明确点名删除或修改。
 
 ## 日志文件

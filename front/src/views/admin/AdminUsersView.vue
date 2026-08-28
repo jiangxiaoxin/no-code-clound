@@ -183,6 +183,7 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
+import { formatDateTime } from '../../utils/timeValue.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminUserForm from '../../components/admin/AdminUserForm.vue'
 import {
@@ -243,10 +244,7 @@ const resetRules = {
 }
 
 function formatTime(value) {
-  if (!value) {
-    return '-'
-  }
-  return new Date(value).toLocaleString()
+  return formatDateTime(value, '-')
 }
 
 async function loadUsers() {

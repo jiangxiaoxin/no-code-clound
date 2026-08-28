@@ -1,71 +1,94 @@
-export function pad(n) {
-  return String(n).padStart(2, '0')
-}
+import dayjs from 'dayjs'
+import customParseFormat from 'dayjs/plugin/customParseFormat.js'
+import isoWeek from 'dayjs/plugin/isoWeek.js'
+import quarterOfYear from 'dayjs/plugin/quarterOfYear.js'
+
+dayjs.extend(customParseFormat)
+dayjs.extend(isoWeek)
+dayjs.extend(quarterOfYear)
+
+export { dayjs }
+
+const DATE_ONLY = ['YYYY', 'YYYY-MM', 'YYYY-MM-DD']
+const WALL_CLOCK = [
+  'YYYY-MM-DD HH:mm:ss',
+  'YYYY-MM-DD HH:mm',
+  'YYYY-MM-DDTHH:mm:ss',
+]
+const CLOCK = ['HH:mm:ss', 'HH:mm']
 
 export function asDate(value) {
   if (value instanceof Date) {
     return Number.isNaN(value.getTime()) ? null : value
   }
   if (typeof value === 'string' && value !== '') {
-    if (/^\d{4}$/.test(value)) return new Date(Number(value), 0, 1)
-    if (/^\d{4}-\d{2}$/.test(value)) {
-      const [year, month] = value.split('-').map(Number)
-      return new Date(year, month - 1, 1)
+    if (/^\d{4}$/.test(value) || /^\d{4}-\d{2}$/.test(value) || /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const parsed = dayjs(value, DATE_ONLY, true)
+      return parsed.isValid() ? parsed.toDate() : null
     }
-    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-      const [year, month, day] = value.split('-').map(Number)
-      return new Date(year, month - 1, day)
-    }
-    const wall = value.match(
-      /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?$/,
-    )
-    if (wall) {
-      return new Date(
-        Number(wall[1]),
-        Number(wall[2]) - 1,
-        Number(wall[3]),
-        Number(wall[4]),
-        Number(wall[5]),
-        Number(wall[6] || 0),
-      )
-    }
-    const clock = value.match(/^(\d{2}):(\d{2})(?::(\d{2}))?$/)
-    if (clock) {
-      return new Date(
-        1970,
-        0,
-        1,
-        Number(clock[1]),
-        Number(clock[2]),
-        Number(clock[3] || 0),
-      )
+    const wall = dayjs(value, WALL_CLOCK, true)
+    if (wall.isValid()) return wall.toDate()
+    if (/^\d{2}:\d{2}(?::\d{2})?$/.test(value)) {
+      const clock = dayjs(`1970-01-01 ${value}`, [
+        'YYYY-MM-DD HH:mm:ss',
+        'YYYY-MM-DD HH:mm',
+      ], true)
+      return clock.isValid() ? clock.toDate() : null
     }
   }
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? null : d
+  const parsed = dayjs(value)
+  return parsed.isValid() ? parsed.toDate() : null
 }
 
 export function formatTimeFieldValue(type, format, d) {
+  const t = dayjs(d)
+  if (!t.isValid()) return ''
   if (type === 'time') {
-    const clock = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-    return (format || 'HH:mm:ss') === 'HH:mm' ? clock.slice(0, 5) : clock
+    return t.format((format || 'HH:mm:ss') === 'HH:mm' ? 'HH:mm' : 'HH:mm:ss')
   }
   if (type === 'datetime') {
-    const text = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-    return (format || 'YYYY-MM-DD HH:mm:ss') === 'YYYY-MM-DD HH:mm'
-      ? text.slice(0, 16)
-      : text
+    return t.format(format || 'YYYY-MM-DD HH:mm:ss')
   }
-  const year = d.getFullYear()
-  const month = pad(d.getMonth() + 1)
-  const day = pad(d.getDate())
-  if (format === 'year') return String(year)
-  if (format === 'month') return `${year}-${month}`
-  return `${year}-${month}-${day}`
+  if (format === 'year') return t.format('YYYY')
+  if (format === 'month') return t.format('YYYY-MM')
+  return t.format('YYYY-MM-DD')
 }
 
 export function formatQueryTimeValue(type, format, value) {
   const d = asDate(value)
   if (!d) return ''
   return formatTimeFieldValue(type, format, d)
+}
+
+export function formatDateTime(value, emptyText = '') {
+  if (value == null || value === '') return emptyText
+  const t = dayjs(value)
+  return t.isValid() ? t.format('YYYY-MM-DD HH:mm:ss') : String(value)
+}
+
+export function parseCalendarParts(value) {
+  if (typeof value === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
+      const day = dayjs(value.slice(0, 10), 'YYYY-MM-DD', true)
+      if (day.isValid()) {
+        return { y: day.format('YYYY'), m: day.format('MM'), d: day.format('DD') }
+      }
+    }
+    if (/^\d{4}-\d{2}$/.test(value)) {
+      const month = dayjs(value, 'YYYY-MM', true)
+      if (month.isValid()) {
+        return { y: month.format('YYYY'), m: month.format('MM'), d: '01' }
+      }
+    }
+    if (/^\d{4}$/.test(value)) {
+      const year = dayjs(value, 'YYYY', true)
+      if (year.isValid()) {
+        return { y: year.format('YYYY'), m: '01', d: '01' }
+      }
+    }
+  }
+  const d = asDate(value)
+  if (!d) return null
+  const t = dayjs(d)
+  return { y: t.format('YYYY'), m: t.format('MM'), d: t.format('DD') }
 }

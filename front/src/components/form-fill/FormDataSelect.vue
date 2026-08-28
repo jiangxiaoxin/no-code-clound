@@ -85,6 +85,7 @@ import {
 } from '../form-workspace/columnPrefs'
 import { cloneDisplayFieldKeys, displayFieldTitle, findDisplaySourceField } from '../form-design/dataSelect'
 import { formatCellValue, isFillable } from './fillValues'
+import { formatDateTime } from '../../utils/timeValue.js'
 import { buildSourceQuery, mergeFilterQueries } from './tableOptions'
 import { buildQuickSearchQuery } from '../form-workspace/quickSearch'
 import { PAGE_SIZES } from '../../utils/pagination'
@@ -195,9 +196,7 @@ const triggerText = computed(() => {
 })
 
 function formatSystemTime(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
+  return formatDateTime(value)
 }
 
 function formatRecordField(col, row) {

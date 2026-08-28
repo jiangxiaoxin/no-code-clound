@@ -1,4 +1,4 @@
-import { formatTimeFieldValue } from '../../utils/timeValue.js'
+import { dayjs, formatTimeFieldValue } from '../../utils/timeValue.js'
 
 export const FILTER_OPS = [
   { value: 'eq', label: '等于' },
@@ -153,75 +153,30 @@ export function mapDictFilterValue(value, items) {
   return found ? found.value : value
 }
 
-function startOfDay(d) {
-  const next = new Date(d)
-  next.setHours(0, 0, 0, 0)
-  return next
-}
-
-function endOfDay(d) {
-  const next = new Date(d)
-  next.setHours(23, 59, 59, 999)
-  return next
-}
-
-function startOfWeek(d) {
-  const next = startOfDay(d)
-  const day = next.getDay()
-  next.setDate(next.getDate() - (day === 0 ? 6 : day - 1))
-  return next
-}
-
-function endOfWeek(d) {
-  const next = startOfWeek(d)
-  next.setDate(next.getDate() + 6)
-  return endOfDay(next)
-}
-
-function startOfMonth(d) {
-  return startOfDay(new Date(d.getFullYear(), d.getMonth(), 1))
-}
-
-function endOfMonth(d) {
-  return endOfDay(new Date(d.getFullYear(), d.getMonth() + 1, 0))
-}
-
-function startOfQuarter(d) {
-  const month = Math.floor(d.getMonth() / 3) * 3
-  return startOfDay(new Date(d.getFullYear(), month, 1))
-}
-
-function endOfQuarter(d) {
-  const month = Math.floor(d.getMonth() / 3) * 3
-  return endOfDay(new Date(d.getFullYear(), month + 3, 0))
-}
-
-function startOfYear(d) {
-  return startOfDay(new Date(d.getFullYear(), 0, 1))
-}
-
-function endOfYear(d) {
-  return endOfDay(new Date(d.getFullYear(), 11, 31))
-}
-
 function periodOf(d, unit) {
-  if (unit === 'week') return { start: startOfWeek(d), end: endOfWeek(d) }
-  if (unit === 'month') return { start: startOfMonth(d), end: endOfMonth(d) }
-  if (unit === 'quarter') {
-    return { start: startOfQuarter(d), end: endOfQuarter(d) }
+  const t = dayjs(d)
+  if (unit === 'week') {
+    return { start: t.startOf('isoWeek').toDate(), end: t.endOf('isoWeek').toDate() }
   }
-  if (unit === 'year') return { start: startOfYear(d), end: endOfYear(d) }
-  return { start: startOfDay(d), end: endOfDay(d) }
+  if (unit === 'month') {
+    return { start: t.startOf('month').toDate(), end: t.endOf('month').toDate() }
+  }
+  if (unit === 'quarter') {
+    return { start: t.startOf('quarter').toDate(), end: t.endOf('quarter').toDate() }
+  }
+  if (unit === 'year') {
+    return { start: t.startOf('year').toDate(), end: t.endOf('year').toDate() }
+  }
+  return { start: t.startOf('day').toDate(), end: t.endOf('day').toDate() }
 }
 
 function shiftByUnit(d, amount, unit) {
-  const next = new Date(d)
-  if (unit === 'week') next.setDate(next.getDate() + amount * 7)
-  else if (unit === 'month') next.setMonth(next.getMonth() + amount)
-  else if (unit === 'quarter') next.setMonth(next.getMonth() + amount * 3)
-  else if (unit === 'year') next.setFullYear(next.getFullYear() + amount)
-  else next.setDate(next.getDate() + amount)
-  return next
+  const t = dayjs(d)
+  if (unit === 'week') return t.add(amount, 'week').toDate()
+  if (unit === 'month') return t.add(amount, 'month').toDate()
+  if (unit === 'quarter') return t.add(amount, 'quarter').toDate()
+  if (unit === 'year') return t.add(amount, 'year').toDate()
+  return t.add(amount, 'day').toDate()
 }
 
 export function resolveDynamicPath(path, bound, fieldType, now = new Date(), format) {

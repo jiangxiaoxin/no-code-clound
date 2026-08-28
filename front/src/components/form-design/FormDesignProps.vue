@@ -31,7 +31,7 @@
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
       <template v-if="field.type !== 'divider'">
-      <el-form-item label="占位文字">
+      <el-form-item v-if="field.type !== 'divider' && field.type !== 'image'" label="占位文字">
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
       <el-form-item label="字段说明">
@@ -80,6 +80,36 @@
             <el-input-number v-model="field.min" :controls="false" placeholder="最小值" size="small" align="left"/>
             <span>~</span>
             <el-input-number v-model="field.max" :controls="false" placeholder="最大值" size="small" align="left"/>
+          </div>
+          <div v-if="field.type === 'image'" class="required-row">
+            <span>最多上传</span>
+            <el-input-number
+              v-model="field.maxCount"
+              class="max-length-input"
+              :min="1"
+              :precision="0"
+              :step="1"
+              step-strictly
+              :controls="false"
+              size="small"
+              align="left"
+            />
+            <span>张图片</span>
+          </div>
+          <div v-if="field.type === 'image'" class="required-row">
+            <span>每张不超过</span>
+            <el-input-number
+              v-model="field.maxSizeMB"
+              class="max-length-input"
+              :min="1"
+              :precision="0"
+              :step="1"
+              step-strictly
+              :controls="false"
+              size="small"
+              align="left"
+            />
+            <span>MB</span>
           </div>
         </div>
       </el-form-item>

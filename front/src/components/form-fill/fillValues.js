@@ -1,9 +1,9 @@
-import { asDate, formatTimeFieldValue, pad } from '../../utils/timeValue.js'
+import { asDate, formatTimeFieldValue, parseCalendarParts } from '../../utils/timeValue.js'
+import { imageUrlsOf } from './imageField.js'
 
 const SKIP_TYPES = new Set([
   'divider',
   'currentUser',
-  'image',
   'file',
   'subform',
   'member',
@@ -21,7 +21,11 @@ function persistsValue(field) {
 }
 
 export function emptyValue(field) {
-  if (field.type === 'checkbox' || field.type === 'select-multiple') {
+  if (
+    field.type === 'checkbox' ||
+    field.type === 'select-multiple' ||
+    field.type === 'image'
+  ) {
     return []
   }
   return undefined
@@ -46,6 +50,10 @@ export function cloneRecordValues(fields, data) {
         typeof value === 'string' && value ? value : undefined
       continue
     }
+    if (field.type === 'image') {
+      next[field.key] = imageUrlsOf(data?.[field.key])
+      continue
+    }
     if (!isFillable(field)) {
       continue
     }
@@ -57,6 +65,9 @@ export function cloneRecordValues(fields, data) {
 }
 
 export function isEmptyValue(field, value) {
+  if (field.type === 'image') {
+    return imageUrlsOf(value).length === 0
+  }
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     return !Array.isArray(value) || value.length === 0
   }
@@ -66,31 +77,17 @@ export function isEmptyValue(field, value) {
   return value == null || value === ''
 }
 
-// YYYY-MM-DD 按日历日期读，避免 `new Date('2026-08-27')` 被当成 UTC 零点后在西时区变成前一天
-function calendarDateParts(value) {
-  if (typeof value === 'string') {
-    const day = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
-    if (day) return { y: day[1], m: day[2], d: day[3] }
-    const month = value.match(/^(\d{4})-(\d{2})$/)
-    if (month) return { y: month[1], m: month[2], d: '01' }
-    const year = value.match(/^(\d{4})$/)
-    if (year) return { y: year[1], m: '01', d: '01' }
-  }
-  const d = asDate(value)
-  if (!d) return null
-  return {
-    y: String(d.getFullYear()),
-    m: pad(d.getMonth() + 1),
-    d: pad(d.getDate()),
-  }
-}
-
 export function serializeValue(field, value) {
   if (isEmptyValue(field, value)) {
     return undefined
   }
+  if (field.type === 'image') {
+    const urls = imageUrlsOf(value)
+    return urls.length ? urls : undefined
+  }
   if (field.type === 'date') {
-    const parts = calendarDateParts(value)
+    // YYYY-MM-DD 按日历日期读，避免被当成 UTC 零点后在西时区变成前一天
+    const parts = parseCalendarParts(value)
     if (!parts) return undefined
     if (field.format === 'year') return `${parts.y}-01-01`
     if (field.format === 'month') return `${parts.y}-${parts.m}-01`
@@ -104,8 +101,7 @@ export function serializeValue(field, value) {
     if (typeof value === 'string') return value
     const d = asDate(value)
     if (!d) return undefined
-    const clock = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-    return (field.format || 'HH:mm:ss') === 'HH:mm' ? clock.slice(0, 5) : clock
+    return formatTimeFieldValue('time', field.format, d)
   }
   return value
 }
@@ -197,6 +193,10 @@ export function formatCellValue(field, value, dictItemsByCode) {
     const d = asDate(value)
     if (!d) return String(value)
     return formatTimeFieldValue(field.type, field.format, d)
+  }
+  if (field.type === 'image') {
+    const urls = imageUrlsOf(value)
+    return urls.length ? `${urls.length} 张图片` : ''
   }
   if (Array.isArray(value)) return value.join('、')
   return String(value)

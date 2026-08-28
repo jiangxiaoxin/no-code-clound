@@ -22,5 +22,6 @@
 - 不使用 `el-text`、`el-space`；按钮容器不重复设置 `gap`。
 - `el-dialog` 默认可拖拽，模板中不写行内 JavaScript（JavaScript，脚本语言）。
 - 使用图标前必须查验 `@element-plus/icons-vue` 是否有对应导出。
+- 日期时间处理优先使用 dayjs，复用 `front/src/utils/timeValue.js`。
 - 保留用户注释、日志和日志文件。
 - Git 提交信息使用具体、清晰的中文描述。

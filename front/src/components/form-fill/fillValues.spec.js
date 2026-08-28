@@ -173,3 +173,23 @@ test('serializeValue normalizes year and month formats from calendar strings', (
     '2026-08-01',
   )
 })
+
+test('image field is fillable, persisted as url list, and not inline editable', () => {
+  const field = { key: 'pics', type: 'image', title: '图片', required: true }
+  assert.equal(isFillable(field), true)
+  assert.equal(isInlineEditable(field), false)
+  assert.deepEqual(emptyRecordValues([field]), { pics: [] })
+  assert.deepEqual(cloneRecordValues([field], { pics: '/uploads/a.png' }), {
+    pics: ['/uploads/a.png'],
+  })
+  assert.deepEqual(
+    buildRecordData([field], { pics: ['/uploads/a.png'] }),
+    { pics: ['/uploads/a.png'] },
+  )
+  assert.deepEqual(
+    buildRecordData([field], { pics: [] }, { clearEmpty: true }),
+    { pics: null },
+  )
+  assert.equal(validateRequired([field], { pics: [] }), '请填写「图片」')
+  assert.equal(validateRequired([field], { pics: ['/uploads/a.png'] }), '')
+})

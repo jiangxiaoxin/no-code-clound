@@ -61,6 +61,10 @@ import {
   cloneDisplayFieldLabels,
   cloneFillMappings,
 } from './form-design/dataSelect'
+import {
+  DEFAULT_IMAGE_MAX_COUNT,
+  DEFAULT_IMAGE_MAX_SIZE_MB,
+} from './form-fill/imageField'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -159,6 +163,9 @@ function addField(item, beforeKey) {
     ...(LINKAGE_VALUE_TYPES.includes(item.type)
       ? { optionSource: 'custom' }
       : {}),
+    ...(item.type === 'image'
+      ? { maxCount: DEFAULT_IMAGE_MAX_COUNT, maxSizeMB: DEFAULT_IMAGE_MAX_SIZE_MB }
+      : {}),
   }
   if (beforeKey) {
     const index = fields.value.findIndex((entry) => entry.key === beforeKey)
@@ -228,6 +235,10 @@ function ensureOptionSource(field) {
   }
   if (LINKAGE_VALUE_TYPES.includes(field.type) && !field.optionSource) {
     field.optionSource = 'custom'
+  }
+  if (field.type === 'image') {
+    if (!field.maxCount) field.maxCount = DEFAULT_IMAGE_MAX_COUNT
+    if (!field.maxSizeMB) field.maxSizeMB = DEFAULT_IMAGE_MAX_SIZE_MB
   }
 }
 

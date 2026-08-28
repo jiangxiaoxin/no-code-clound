@@ -1,20 +1,25 @@
 .el-dropdown-menu {
-    padding: 4px;
-  }
-  
-  .el-input-number.is-without-controls .el-input__wrapper {
-    padding-left: 11px;
-    padding-right: 11px;
-  }
-  
-  .el-date-editor {
-    --el-date-editor-width: 100%;
-  }
-  
-  .el-drawer__header {
-    margin-bottom: 0;
-  }
-  
-  .my-dialog-body {
-    min-height: 300px;
-  }
+  padding: 4px;
+}
+
+.el-input-number.is-without-controls .el-input__wrapper {
+  padding-left: 11px;
+  padding-right: 11px;
+}
+
+.el-date-editor {
+  --el-date-editor-width: 100%;
+}
+
+.el-drawer__header {
+  margin-bottom: 0;
+}
+
+.my-dialog-body {
+  min-height: 300px;
+}
+
+// 上传图片后，预览，关闭预览，就会出现删除的tip。关掉它，不好看
+.el-upload-list__item .el-icon--close-tip {
+  display: none !important;
+}

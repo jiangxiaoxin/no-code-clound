@@ -128,6 +128,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { deleteFormRecordApi, downloadRecordImportTemplateApi, queryFormRecordsApi } from '../../api/apps'
 import { isFillable } from '../form-fill/fillValues.js'
+import { formatDateTime } from '../../utils/timeValue.js'
 import FormRecordCell from './FormRecordCell.vue'
 import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
 import FormRecordImportDialog from './FormRecordImportDialog.vue'
@@ -198,9 +199,7 @@ const { sortRules, sortOptions, saveSortRules } = useSortPrefs({
 })
 
 function formatTime(value) {
-  if (!value) return ''
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
+  return formatDateTime(value)
 }
 
 function isDataColumn(key) {

@@ -166,3 +166,11 @@ export function importFormRecordsApi(appId, formId, file) {
     timeout: 120000,
   })
 }
+
+export function uploadAppImageApi(appId, file) {
+  const payload = new FormData()
+  payload.append('file', file)
+  return http.post(`/apps/${appId}/uploads`, payload, {
+    timeout: 120000,
+  })
+}

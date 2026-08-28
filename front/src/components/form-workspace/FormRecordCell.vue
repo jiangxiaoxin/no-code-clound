@@ -97,6 +97,20 @@
         @change="commit"
       />
     </template>
+    <template v-else-if="field.type === 'image'">
+      <div class="record-cell-images">
+        <el-image
+          v-for="(url, index) in imageUrls"
+          :key="url"
+          class="record-cell-thumb"
+          :src="url"
+          :preview-src-list="imageUrls"
+          :initial-index="index"
+          fit="cover"
+          preview-teleported
+        />
+      </div>
+    </template>
     <template v-else>
       <span class="record-cell-text">{{ display }}</span>
       <button
@@ -104,7 +118,7 @@
         class="record-cell-edit"
         type="button"
         title="编辑"
-        @click.stop="$emit('start')"
+        @click.stop="startEdit"
       >
         <el-icon><EditPen /></el-icon>
       </button>
@@ -126,7 +140,7 @@ import {
   validateRequired,
   valuesEqual,
 } from '../form-fill/fillValues.js'
-import { buildSourceQuery, recordsToSelectItems } from '../form-fill/tableOptions'
+import { imageUrlsOf } from '../form-fill/imageField.js'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -168,6 +182,8 @@ const display = computed(() =>
     props.dictItemsByCode,
   ),
 )
+
+const imageUrls = computed(() => imageUrlsOf(props.row.data?.[props.field?.key]))
 
 const options = computed(() => {
   const field = props.field
@@ -211,6 +227,10 @@ async function loadTableItems() {
   } catch {
     tableItems.value = []
   }
+}
+
+function startEdit() {
+  emit('start')
 }
 
 function onCellClick(event) {
@@ -361,10 +381,18 @@ onUnmounted(() => {
   opacity: 1;
 }
 
-.record-cell-control {
-  flex: 1;
+.record-cell-images {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   min-width: 0;
-  width: 100%;
+}
+
+.record-cell-thumb {
+  width: 36px;
+  height: 36px;
+  margin-right: 4px;
+  border-radius: 4px;
 }
 
 .record-cell :deep(.el-textarea),
