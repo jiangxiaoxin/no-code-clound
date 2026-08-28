@@ -1,0 +1,2163 @@
+[
+    {
+        "id": "110000",
+        "fullname": "北京市",
+        "level": 1
+    },
+    {
+        "id": "120000",
+        "fullname": "天津市",
+        "level": 1
+    },
+    {
+        "id": "130000",
+        "fullname": "河北省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "130100",
+                "fullname": "石家庄市",
+                "level": 2
+            },
+            {
+                "id": "130200",
+                "fullname": "唐山市",
+                "level": 2
+            },
+            {
+                "id": "130300",
+                "fullname": "秦皇岛市",
+                "level": 2
+            },
+            {
+                "id": "130400",
+                "fullname": "邯郸市",
+                "level": 2
+            },
+            {
+                "id": "130500",
+                "fullname": "邢台市",
+                "level": 2
+            },
+            {
+                "id": "130600",
+                "fullname": "保定市",
+                "level": 2
+            },
+            {
+                "id": "130700",
+                "fullname": "张家口市",
+                "level": 2
+            },
+            {
+                "id": "130800",
+                "fullname": "承德市",
+                "level": 2
+            },
+            {
+                "id": "130900",
+                "fullname": "沧州市",
+                "level": 2
+            },
+            {
+                "id": "131000",
+                "fullname": "廊坊市",
+                "level": 2
+            },
+            {
+                "id": "131100",
+                "fullname": "衡水市",
+                "level": 2
+            },
+            {
+                "id": "133100",
+                "fullname": "雄安新区",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "140000",
+        "fullname": "山西省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "140100",
+                "fullname": "太原市",
+                "level": 2
+            },
+            {
+                "id": "140200",
+                "fullname": "大同市",
+                "level": 2
+            },
+            {
+                "id": "140300",
+                "fullname": "阳泉市",
+                "level": 2
+            },
+            {
+                "id": "140400",
+                "fullname": "长治市",
+                "level": 2
+            },
+            {
+                "id": "140500",
+                "fullname": "晋城市",
+                "level": 2
+            },
+            {
+                "id": "140600",
+                "fullname": "朔州市",
+                "level": 2
+            },
+            {
+                "id": "140700",
+                "fullname": "晋中市",
+                "level": 2
+            },
+            {
+                "id": "140800",
+                "fullname": "运城市",
+                "level": 2
+            },
+            {
+                "id": "140900",
+                "fullname": "忻州市",
+                "level": 2
+            },
+            {
+                "id": "141000",
+                "fullname": "临汾市",
+                "level": 2
+            },
+            {
+                "id": "141100",
+                "fullname": "吕梁市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "150000",
+        "fullname": "内蒙古自治区",
+        "level": 1,
+        "districts": [
+            {
+                "id": "150100",
+                "fullname": "呼和浩特市",
+                "level": 2
+            },
+            {
+                "id": "150200",
+                "fullname": "包头市",
+                "level": 2
+            },
+            {
+                "id": "150300",
+                "fullname": "乌海市",
+                "level": 2
+            },
+            {
+                "id": "150400",
+                "fullname": "赤峰市",
+                "level": 2
+            },
+            {
+                "id": "150500",
+                "fullname": "通辽市",
+                "level": 2
+            },
+            {
+                "id": "150600",
+                "fullname": "鄂尔多斯市",
+                "level": 2
+            },
+            {
+                "id": "150700",
+                "fullname": "呼伦贝尔市",
+                "level": 2
+            },
+            {
+                "id": "150800",
+                "fullname": "巴彦淖尔市",
+                "level": 2
+            },
+            {
+                "id": "150900",
+                "fullname": "乌兰察布市",
+                "level": 2
+            },
+            {
+                "id": "152200",
+                "fullname": "兴安盟",
+                "level": 2
+            },
+            {
+                "id": "152500",
+                "fullname": "锡林郭勒盟",
+                "level": 2
+            },
+            {
+                "id": "152900",
+                "fullname": "阿拉善盟",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "210000",
+        "fullname": "辽宁省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "210100",
+                "fullname": "沈阳市",
+                "level": 2
+            },
+            {
+                "id": "210200",
+                "fullname": "大连市",
+                "level": 2
+            },
+            {
+                "id": "210300",
+                "fullname": "鞍山市",
+                "level": 2
+            },
+            {
+                "id": "210400",
+                "fullname": "抚顺市",
+                "level": 2
+            },
+            {
+                "id": "210500",
+                "fullname": "本溪市",
+                "level": 2
+            },
+            {
+                "id": "210600",
+                "fullname": "丹东市",
+                "level": 2
+            },
+            {
+                "id": "210700",
+                "fullname": "锦州市",
+                "level": 2
+            },
+            {
+                "id": "210800",
+                "fullname": "营口市",
+                "level": 2
+            },
+            {
+                "id": "210900",
+                "fullname": "阜新市",
+                "level": 2
+            },
+            {
+                "id": "211000",
+                "fullname": "辽阳市",
+                "level": 2
+            },
+            {
+                "id": "211100",
+                "fullname": "盘锦市",
+                "level": 2
+            },
+            {
+                "id": "211200",
+                "fullname": "铁岭市",
+                "level": 2
+            },
+            {
+                "id": "211300",
+                "fullname": "朝阳市",
+                "level": 2
+            },
+            {
+                "id": "211400",
+                "fullname": "葫芦岛市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "220000",
+        "fullname": "吉林省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "220100",
+                "fullname": "长春市",
+                "level": 2
+            },
+            {
+                "id": "220200",
+                "fullname": "吉林市",
+                "level": 2
+            },
+            {
+                "id": "220300",
+                "fullname": "四平市",
+                "level": 2
+            },
+            {
+                "id": "220400",
+                "fullname": "辽源市",
+                "level": 2
+            },
+            {
+                "id": "220500",
+                "fullname": "通化市",
+                "level": 2
+            },
+            {
+                "id": "220600",
+                "fullname": "白山市",
+                "level": 2
+            },
+            {
+                "id": "220700",
+                "fullname": "松原市",
+                "level": 2
+            },
+            {
+                "id": "220800",
+                "fullname": "白城市",
+                "level": 2
+            },
+            {
+                "id": "222400",
+                "fullname": "延边朝鲜族自治州",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "230000",
+        "fullname": "黑龙江省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "230100",
+                "fullname": "哈尔滨市",
+                "level": 2
+            },
+            {
+                "id": "230200",
+                "fullname": "齐齐哈尔市",
+                "level": 2
+            },
+            {
+                "id": "230300",
+                "fullname": "鸡西市",
+                "level": 2
+            },
+            {
+                "id": "230400",
+                "fullname": "鹤岗市",
+                "level": 2
+            },
+            {
+                "id": "230500",
+                "fullname": "双鸭山市",
+                "level": 2
+            },
+            {
+                "id": "230600",
+                "fullname": "大庆市",
+                "level": 2
+            },
+            {
+                "id": "230700",
+                "fullname": "伊春市",
+                "level": 2
+            },
+            {
+                "id": "230800",
+                "fullname": "佳木斯市",
+                "level": 2
+            },
+            {
+                "id": "230900",
+                "fullname": "七台河市",
+                "level": 2
+            },
+            {
+                "id": "231000",
+                "fullname": "牡丹江市",
+                "level": 2
+            },
+            {
+                "id": "231100",
+                "fullname": "黑河市",
+                "level": 2
+            },
+            {
+                "id": "231200",
+                "fullname": "绥化市",
+                "level": 2
+            },
+            {
+                "id": "232700",
+                "fullname": "大兴安岭地区",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "310000",
+        "fullname": "上海市",
+        "level": 1
+    },
+    {
+        "id": "320000",
+        "fullname": "江苏省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "320100",
+                "fullname": "南京市",
+                "level": 2
+            },
+            {
+                "id": "320200",
+                "fullname": "无锡市",
+                "level": 2
+            },
+            {
+                "id": "320300",
+                "fullname": "徐州市",
+                "level": 2
+            },
+            {
+                "id": "320400",
+                "fullname": "常州市",
+                "level": 2
+            },
+            {
+                "id": "320500",
+                "fullname": "苏州市",
+                "level": 2
+            },
+            {
+                "id": "320600",
+                "fullname": "南通市",
+                "level": 2
+            },
+            {
+                "id": "320700",
+                "fullname": "连云港市",
+                "level": 2
+            },
+            {
+                "id": "320800",
+                "fullname": "淮安市",
+                "level": 2
+            },
+            {
+                "id": "320900",
+                "fullname": "盐城市",
+                "level": 2
+            },
+            {
+                "id": "321000",
+                "fullname": "扬州市",
+                "level": 2
+            },
+            {
+                "id": "321100",
+                "fullname": "镇江市",
+                "level": 2
+            },
+            {
+                "id": "321200",
+                "fullname": "泰州市",
+                "level": 2
+            },
+            {
+                "id": "321300",
+                "fullname": "宿迁市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "330000",
+        "fullname": "浙江省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "330100",
+                "fullname": "杭州市",
+                "level": 2
+            },
+            {
+                "id": "330200",
+                "fullname": "宁波市",
+                "level": 2
+            },
+            {
+                "id": "330300",
+                "fullname": "温州市",
+                "level": 2
+            },
+            {
+                "id": "330400",
+                "fullname": "嘉兴市",
+                "level": 2
+            },
+            {
+                "id": "330500",
+                "fullname": "湖州市",
+                "level": 2
+            },
+            {
+                "id": "330600",
+                "fullname": "绍兴市",
+                "level": 2
+            },
+            {
+                "id": "330700",
+                "fullname": "金华市",
+                "level": 2
+            },
+            {
+                "id": "330800",
+                "fullname": "衢州市",
+                "level": 2
+            },
+            {
+                "id": "330900",
+                "fullname": "舟山市",
+                "level": 2
+            },
+            {
+                "id": "331000",
+                "fullname": "台州市",
+                "level": 2
+            },
+            {
+                "id": "331100",
+                "fullname": "丽水市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "340000",
+        "fullname": "安徽省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "340100",
+                "fullname": "合肥市",
+                "level": 2
+            },
+            {
+                "id": "340200",
+                "fullname": "芜湖市",
+                "level": 2
+            },
+            {
+                "id": "340300",
+                "fullname": "蚌埠市",
+                "level": 2
+            },
+            {
+                "id": "340400",
+                "fullname": "淮南市",
+                "level": 2
+            },
+            {
+                "id": "340500",
+                "fullname": "马鞍山市",
+                "level": 2
+            },
+            {
+                "id": "340600",
+                "fullname": "淮北市",
+                "level": 2
+            },
+            {
+                "id": "340700",
+                "fullname": "铜陵市",
+                "level": 2
+            },
+            {
+                "id": "340800",
+                "fullname": "安庆市",
+                "level": 2
+            },
+            {
+                "id": "341000",
+                "fullname": "黄山市",
+                "level": 2
+            },
+            {
+                "id": "341100",
+                "fullname": "滁州市",
+                "level": 2
+            },
+            {
+                "id": "341200",
+                "fullname": "阜阳市",
+                "level": 2
+            },
+            {
+                "id": "341300",
+                "fullname": "宿州市",
+                "level": 2
+            },
+            {
+                "id": "341500",
+                "fullname": "六安市",
+                "level": 2
+            },
+            {
+                "id": "341600",
+                "fullname": "亳州市",
+                "level": 2
+            },
+            {
+                "id": "341700",
+                "fullname": "池州市",
+                "level": 2
+            },
+            {
+                "id": "341800",
+                "fullname": "宣城市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "350000",
+        "fullname": "福建省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "350100",
+                "fullname": "福州市",
+                "level": 2
+            },
+            {
+                "id": "350200",
+                "fullname": "厦门市",
+                "level": 2
+            },
+            {
+                "id": "350300",
+                "fullname": "莆田市",
+                "level": 2
+            },
+            {
+                "id": "350400",
+                "fullname": "三明市",
+                "level": 2
+            },
+            {
+                "id": "350500",
+                "fullname": "泉州市",
+                "level": 2
+            },
+            {
+                "id": "350600",
+                "fullname": "漳州市",
+                "level": 2
+            },
+            {
+                "id": "350700",
+                "fullname": "南平市",
+                "level": 2
+            },
+            {
+                "id": "350800",
+                "fullname": "龙岩市",
+                "level": 2
+            },
+            {
+                "id": "350900",
+                "fullname": "宁德市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "360000",
+        "fullname": "江西省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "360100",
+                "fullname": "南昌市",
+                "level": 2
+            },
+            {
+                "id": "360200",
+                "fullname": "景德镇市",
+                "level": 2
+            },
+            {
+                "id": "360300",
+                "fullname": "萍乡市",
+                "level": 2
+            },
+            {
+                "id": "360400",
+                "fullname": "九江市",
+                "level": 2
+            },
+            {
+                "id": "360500",
+                "fullname": "新余市",
+                "level": 2
+            },
+            {
+                "id": "360600",
+                "fullname": "鹰潭市",
+                "level": 2
+            },
+            {
+                "id": "360700",
+                "fullname": "赣州市",
+                "level": 2
+            },
+            {
+                "id": "360800",
+                "fullname": "吉安市",
+                "level": 2
+            },
+            {
+                "id": "360900",
+                "fullname": "宜春市",
+                "level": 2
+            },
+            {
+                "id": "361000",
+                "fullname": "抚州市",
+                "level": 2
+            },
+            {
+                "id": "361100",
+                "fullname": "上饶市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "370000",
+        "fullname": "山东省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "370100",
+                "fullname": "济南市",
+                "level": 2
+            },
+            {
+                "id": "370200",
+                "fullname": "青岛市",
+                "level": 2
+            },
+            {
+                "id": "370300",
+                "fullname": "淄博市",
+                "level": 2
+            },
+            {
+                "id": "370400",
+                "fullname": "枣庄市",
+                "level": 2
+            },
+            {
+                "id": "370500",
+                "fullname": "东营市",
+                "level": 2
+            },
+            {
+                "id": "370600",
+                "fullname": "烟台市",
+                "level": 2
+            },
+            {
+                "id": "370700",
+                "fullname": "潍坊市",
+                "level": 2
+            },
+            {
+                "id": "370800",
+                "fullname": "济宁市",
+                "level": 2
+            },
+            {
+                "id": "370900",
+                "fullname": "泰安市",
+                "level": 2
+            },
+            {
+                "id": "371000",
+                "fullname": "威海市",
+                "level": 2
+            },
+            {
+                "id": "371100",
+                "fullname": "日照市",
+                "level": 2
+            },
+            {
+                "id": "371300",
+                "fullname": "临沂市",
+                "level": 2
+            },
+            {
+                "id": "371400",
+                "fullname": "德州市",
+                "level": 2
+            },
+            {
+                "id": "371500",
+                "fullname": "聊城市",
+                "level": 2
+            },
+            {
+                "id": "371600",
+                "fullname": "滨州市",
+                "level": 2
+            },
+            {
+                "id": "371700",
+                "fullname": "菏泽市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "410000",
+        "fullname": "河南省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "410100",
+                "fullname": "郑州市",
+                "level": 2
+            },
+            {
+                "id": "410200",
+                "fullname": "开封市",
+                "level": 2
+            },
+            {
+                "id": "410300",
+                "fullname": "洛阳市",
+                "level": 2
+            },
+            {
+                "id": "410400",
+                "fullname": "平顶山市",
+                "level": 2
+            },
+            {
+                "id": "410500",
+                "fullname": "安阳市",
+                "level": 2
+            },
+            {
+                "id": "410600",
+                "fullname": "鹤壁市",
+                "level": 2
+            },
+            {
+                "id": "410700",
+                "fullname": "新乡市",
+                "level": 2
+            },
+            {
+                "id": "410800",
+                "fullname": "焦作市",
+                "level": 2
+            },
+            {
+                "id": "410900",
+                "fullname": "濮阳市",
+                "level": 2
+            },
+            {
+                "id": "411000",
+                "fullname": "许昌市",
+                "level": 2
+            },
+            {
+                "id": "411100",
+                "fullname": "漯河市",
+                "level": 2
+            },
+            {
+                "id": "411200",
+                "fullname": "三门峡市",
+                "level": 2
+            },
+            {
+                "id": "411300",
+                "fullname": "南阳市",
+                "level": 2
+            },
+            {
+                "id": "411400",
+                "fullname": "商丘市",
+                "level": 2
+            },
+            {
+                "id": "411500",
+                "fullname": "信阳市",
+                "level": 2
+            },
+            {
+                "id": "411600",
+                "fullname": "周口市",
+                "level": 2
+            },
+            {
+                "id": "411700",
+                "fullname": "驻马店市",
+                "level": 2
+            },
+            {
+                "id": "419001",
+                "fullname": "济源市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "420000",
+        "fullname": "湖北省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "420100",
+                "fullname": "武汉市",
+                "level": 2
+            },
+            {
+                "id": "420200",
+                "fullname": "黄石市",
+                "level": 2
+            },
+            {
+                "id": "420300",
+                "fullname": "十堰市",
+                "level": 2
+            },
+            {
+                "id": "420500",
+                "fullname": "宜昌市",
+                "level": 2
+            },
+            {
+                "id": "420600",
+                "fullname": "襄阳市",
+                "level": 2
+            },
+            {
+                "id": "420700",
+                "fullname": "鄂州市",
+                "level": 2
+            },
+            {
+                "id": "420800",
+                "fullname": "荆门市",
+                "level": 2
+            },
+            {
+                "id": "420900",
+                "fullname": "孝感市",
+                "level": 2
+            },
+            {
+                "id": "421000",
+                "fullname": "荆州市",
+                "level": 2
+            },
+            {
+                "id": "421100",
+                "fullname": "黄冈市",
+                "level": 2
+            },
+            {
+                "id": "421200",
+                "fullname": "咸宁市",
+                "level": 2
+            },
+            {
+                "id": "421300",
+                "fullname": "随州市",
+                "level": 2
+            },
+            {
+                "id": "422800",
+                "fullname": "恩施土家族苗族自治州",
+                "level": 2
+            },
+            {
+                "id": "429004",
+                "fullname": "仙桃市",
+                "level": 2
+            },
+            {
+                "id": "429005",
+                "fullname": "潜江市",
+                "level": 2
+            },
+            {
+                "id": "429006",
+                "fullname": "天门市",
+                "level": 2
+            },
+            {
+                "id": "429021",
+                "fullname": "神农架林区",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "430000",
+        "fullname": "湖南省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "430100",
+                "fullname": "长沙市",
+                "level": 2
+            },
+            {
+                "id": "430200",
+                "fullname": "株洲市",
+                "level": 2
+            },
+            {
+                "id": "430300",
+                "fullname": "湘潭市",
+                "level": 2
+            },
+            {
+                "id": "430400",
+                "fullname": "衡阳市",
+                "level": 2
+            },
+            {
+                "id": "430500",
+                "fullname": "邵阳市",
+                "level": 2
+            },
+            {
+                "id": "430600",
+                "fullname": "岳阳市",
+                "level": 2
+            },
+            {
+                "id": "430700",
+                "fullname": "常德市",
+                "level": 2
+            },
+            {
+                "id": "430800",
+                "fullname": "张家界市",
+                "level": 2
+            },
+            {
+                "id": "430900",
+                "fullname": "益阳市",
+                "level": 2
+            },
+            {
+                "id": "431000",
+                "fullname": "郴州市",
+                "level": 2
+            },
+            {
+                "id": "431100",
+                "fullname": "永州市",
+                "level": 2
+            },
+            {
+                "id": "431200",
+                "fullname": "怀化市",
+                "level": 2
+            },
+            {
+                "id": "431300",
+                "fullname": "娄底市",
+                "level": 2
+            },
+            {
+                "id": "433100",
+                "fullname": "湘西土家族苗族自治州",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "440000",
+        "fullname": "广东省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "440100",
+                "fullname": "广州市",
+                "level": 2
+            },
+            {
+                "id": "440200",
+                "fullname": "韶关市",
+                "level": 2
+            },
+            {
+                "id": "440300",
+                "fullname": "深圳市",
+                "level": 2
+            },
+            {
+                "id": "440400",
+                "fullname": "珠海市",
+                "level": 2
+            },
+            {
+                "id": "440500",
+                "fullname": "汕头市",
+                "level": 2
+            },
+            {
+                "id": "440600",
+                "fullname": "佛山市",
+                "level": 2
+            },
+            {
+                "id": "440700",
+                "fullname": "江门市",
+                "level": 2
+            },
+            {
+                "id": "440800",
+                "fullname": "湛江市",
+                "level": 2
+            },
+            {
+                "id": "440900",
+                "fullname": "茂名市",
+                "level": 2
+            },
+            {
+                "id": "441200",
+                "fullname": "肇庆市",
+                "level": 2
+            },
+            {
+                "id": "441300",
+                "fullname": "惠州市",
+                "level": 2
+            },
+            {
+                "id": "441400",
+                "fullname": "梅州市",
+                "level": 2
+            },
+            {
+                "id": "441500",
+                "fullname": "汕尾市",
+                "level": 2
+            },
+            {
+                "id": "441600",
+                "fullname": "河源市",
+                "level": 2
+            },
+            {
+                "id": "441700",
+                "fullname": "阳江市",
+                "level": 2
+            },
+            {
+                "id": "441800",
+                "fullname": "清远市",
+                "level": 2
+            },
+            {
+                "id": "441900",
+                "fullname": "东莞市",
+                "level": 2
+            },
+            {
+                "id": "442000",
+                "fullname": "中山市",
+                "level": 2
+            },
+            {
+                "id": "445100",
+                "fullname": "潮州市",
+                "level": 2
+            },
+            {
+                "id": "445200",
+                "fullname": "揭阳市",
+                "level": 2
+            },
+            {
+                "id": "445300",
+                "fullname": "云浮市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "450000",
+        "fullname": "广西壮族自治区",
+        "level": 1,
+        "districts": [
+            {
+                "id": "450100",
+                "fullname": "南宁市",
+                "level": 2
+            },
+            {
+                "id": "450200",
+                "fullname": "柳州市",
+                "level": 2
+            },
+            {
+                "id": "450300",
+                "fullname": "桂林市",
+                "level": 2
+            },
+            {
+                "id": "450400",
+                "fullname": "梧州市",
+                "level": 2
+            },
+            {
+                "id": "450500",
+                "fullname": "北海市",
+                "level": 2
+            },
+            {
+                "id": "450600",
+                "fullname": "防城港市",
+                "level": 2
+            },
+            {
+                "id": "450700",
+                "fullname": "钦州市",
+                "level": 2
+            },
+            {
+                "id": "450800",
+                "fullname": "贵港市",
+                "level": 2
+            },
+            {
+                "id": "450900",
+                "fullname": "玉林市",
+                "level": 2
+            },
+            {
+                "id": "451000",
+                "fullname": "百色市",
+                "level": 2
+            },
+            {
+                "id": "451100",
+                "fullname": "贺州市",
+                "level": 2
+            },
+            {
+                "id": "451200",
+                "fullname": "河池市",
+                "level": 2
+            },
+            {
+                "id": "451300",
+                "fullname": "来宾市",
+                "level": 2
+            },
+            {
+                "id": "451400",
+                "fullname": "崇左市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "460000",
+        "fullname": "海南省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "460100",
+                "fullname": "海口市",
+                "level": 2
+            },
+            {
+                "id": "460200",
+                "fullname": "三亚市",
+                "level": 2
+            },
+            {
+                "id": "460300",
+                "fullname": "三沙市",
+                "level": 2
+            },
+            {
+                "id": "460400",
+                "fullname": "儋州市",
+                "level": 2
+            },
+            {
+                "id": "469001",
+                "fullname": "五指山市",
+                "level": 2
+            },
+            {
+                "id": "469002",
+                "fullname": "琼海市",
+                "level": 2
+            },
+            {
+                "id": "469005",
+                "fullname": "文昌市",
+                "level": 2
+            },
+            {
+                "id": "469006",
+                "fullname": "万宁市",
+                "level": 2
+            },
+            {
+                "id": "469007",
+                "fullname": "东方市",
+                "level": 2
+            },
+            {
+                "id": "469021",
+                "fullname": "定安县",
+                "level": 2
+            },
+            {
+                "id": "469022",
+                "fullname": "屯昌县",
+                "level": 2
+            },
+            {
+                "id": "469023",
+                "fullname": "澄迈县",
+                "level": 2
+            },
+            {
+                "id": "469024",
+                "fullname": "临高县",
+                "level": 2
+            },
+            {
+                "id": "469025",
+                "fullname": "白沙黎族自治县",
+                "level": 2
+            },
+            {
+                "id": "469026",
+                "fullname": "昌江黎族自治县",
+                "level": 2
+            },
+            {
+                "id": "469027",
+                "fullname": "乐东黎族自治县",
+                "level": 2
+            },
+            {
+                "id": "469028",
+                "fullname": "陵水黎族自治县",
+                "level": 2
+            },
+            {
+                "id": "469029",
+                "fullname": "保亭黎族苗族自治县",
+                "level": 2
+            },
+            {
+                "id": "469030",
+                "fullname": "琼中黎族苗族自治县",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "500000",
+        "fullname": "重庆市",
+        "level": 1
+    },
+    {
+        "id": "510000",
+        "fullname": "四川省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "510100",
+                "fullname": "成都市",
+                "level": 2
+            },
+            {
+                "id": "510300",
+                "fullname": "自贡市",
+                "level": 2
+            },
+            {
+                "id": "510400",
+                "fullname": "攀枝花市",
+                "level": 2
+            },
+            {
+                "id": "510500",
+                "fullname": "泸州市",
+                "level": 2
+            },
+            {
+                "id": "510600",
+                "fullname": "德阳市",
+                "level": 2
+            },
+            {
+                "id": "510700",
+                "fullname": "绵阳市",
+                "level": 2
+            },
+            {
+                "id": "510800",
+                "fullname": "广元市",
+                "level": 2
+            },
+            {
+                "id": "510900",
+                "fullname": "遂宁市",
+                "level": 2
+            },
+            {
+                "id": "511000",
+                "fullname": "内江市",
+                "level": 2
+            },
+            {
+                "id": "511100",
+                "fullname": "乐山市",
+                "level": 2
+            },
+            {
+                "id": "511300",
+                "fullname": "南充市",
+                "level": 2
+            },
+            {
+                "id": "511400",
+                "fullname": "眉山市",
+                "level": 2
+            },
+            {
+                "id": "511500",
+                "fullname": "宜宾市",
+                "level": 2
+            },
+            {
+                "id": "511600",
+                "fullname": "广安市",
+                "level": 2
+            },
+            {
+                "id": "511700",
+                "fullname": "达州市",
+                "level": 2
+            },
+            {
+                "id": "511800",
+                "fullname": "雅安市",
+                "level": 2
+            },
+            {
+                "id": "511900",
+                "fullname": "巴中市",
+                "level": 2
+            },
+            {
+                "id": "512000",
+                "fullname": "资阳市",
+                "level": 2
+            },
+            {
+                "id": "513200",
+                "fullname": "阿坝藏族羌族自治州",
+                "level": 2
+            },
+            {
+                "id": "513300",
+                "fullname": "甘孜藏族自治州",
+                "level": 2
+            },
+            {
+                "id": "513400",
+                "fullname": "凉山彝族自治州",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "520000",
+        "fullname": "贵州省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "520100",
+                "fullname": "贵阳市",
+                "level": 2
+            },
+            {
+                "id": "520200",
+                "fullname": "六盘水市",
+                "level": 2
+            },
+            {
+                "id": "520300",
+                "fullname": "遵义市",
+                "level": 2
+            },
+            {
+                "id": "520400",
+                "fullname": "安顺市",
+                "level": 2
+            },
+            {
+                "id": "520500",
+                "fullname": "毕节市",
+                "level": 2
+            },
+            {
+                "id": "520600",
+                "fullname": "铜仁市",
+                "level": 2
+            },
+            {
+                "id": "522300",
+                "fullname": "黔西南布依族苗族自治州",
+                "level": 2
+            },
+            {
+                "id": "522600",
+                "fullname": "黔东南苗族侗族自治州",
+                "level": 2
+            },
+            {
+                "id": "522700",
+                "fullname": "黔南布依族苗族自治州",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "530000",
+        "fullname": "云南省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "530100",
+                "fullname": "昆明市",
+                "level": 2
+            },
+            {
+                "id": "530300",
+                "fullname": "曲靖市",
+                "level": 2
+            },
+            {
+                "id": "530400",
+                "fullname": "玉溪市",
+                "level": 2
+            },
+            {
+                "id": "530500",
+                "fullname": "保山市",
+                "level": 2
+            },
+            {
+                "id": "530600",
+                "fullname": "昭通市",
+                "level": 2
+            },
+            {
+                "id": "530700",
+                "fullname": "丽江市",
+                "level": 2
+            },
+            {
+                "id": "530800",
+                "fullname": "普洱市",
+                "level": 2
+            },
+            {
+                "id": "530900",
+                "fullname": "临沧市",
+                "level": 2
+            },
+            {
+                "id": "532300",
+                "fullname": "楚雄彝族自治州",
+                "level": 2
+            },
+            {
+                "id": "532500",
+                "fullname": "红河哈尼族彝族自治州",
+                "level": 2
+            },
+            {
+                "id": "532600",
+                "fullname": "文山壮族苗族自治州",
+                "level": 2
+            },
+            {
+                "id": "532800",
+                "fullname": "西双版纳傣族自治州",
+                "level": 2
+            },
+            {
+                "id": "532900",
+                "fullname": "大理白族自治州",
+                "level": 2
+            },
+            {
+                "id": "533100",
+                "fullname": "德宏傣族景颇族自治州",
+                "level": 2
+            },
+            {
+                "id": "533300",
+                "fullname": "怒江傈僳族自治州",
+                "level": 2
+            },
+            {
+                "id": "533400",
+                "fullname": "迪庆藏族自治州",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "540000",
+        "fullname": "西藏自治区",
+        "level": 1,
+        "districts": [
+            {
+                "id": "540100",
+                "fullname": "拉萨市",
+                "level": 2
+            },
+            {
+                "id": "540200",
+                "fullname": "日喀则市",
+                "level": 2
+            },
+            {
+                "id": "540300",
+                "fullname": "昌都市",
+                "level": 2
+            },
+            {
+                "id": "540400",
+                "fullname": "林芝市",
+                "level": 2
+            },
+            {
+                "id": "540500",
+                "fullname": "山南市",
+                "level": 2
+            },
+            {
+                "id": "540600",
+                "fullname": "那曲市",
+                "level": 2
+            },
+            {
+                "id": "542500",
+                "fullname": "阿里地区",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "610000",
+        "fullname": "陕西省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "610100",
+                "fullname": "西安市",
+                "level": 2
+            },
+            {
+                "id": "610200",
+                "fullname": "铜川市",
+                "level": 2
+            },
+            {
+                "id": "610300",
+                "fullname": "宝鸡市",
+                "level": 2
+            },
+            {
+                "id": "610400",
+                "fullname": "咸阳市",
+                "level": 2
+            },
+            {
+                "id": "610500",
+                "fullname": "渭南市",
+                "level": 2
+            },
+            {
+                "id": "610600",
+                "fullname": "延安市",
+                "level": 2
+            },
+            {
+                "id": "610700",
+                "fullname": "汉中市",
+                "level": 2
+            },
+            {
+                "id": "610800",
+                "fullname": "榆林市",
+                "level": 2
+            },
+            {
+                "id": "610900",
+                "fullname": "安康市",
+                "level": 2
+            },
+            {
+                "id": "611000",
+                "fullname": "商洛市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "620000",
+        "fullname": "甘肃省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "620100",
+                "fullname": "兰州市",
+                "level": 2
+            },
+            {
+                "id": "620200",
+                "fullname": "嘉峪关市",
+                "level": 2
+            },
+            {
+                "id": "620300",
+                "fullname": "金昌市",
+                "level": 2
+            },
+            {
+                "id": "620400",
+                "fullname": "白银市",
+                "level": 2
+            },
+            {
+                "id": "620500",
+                "fullname": "天水市",
+                "level": 2
+            },
+            {
+                "id": "620600",
+                "fullname": "武威市",
+                "level": 2
+            },
+            {
+                "id": "620700",
+                "fullname": "张掖市",
+                "level": 2
+            },
+            {
+                "id": "620800",
+                "fullname": "平凉市",
+                "level": 2
+            },
+            {
+                "id": "620900",
+                "fullname": "酒泉市",
+                "level": 2
+            },
+            {
+                "id": "621000",
+                "fullname": "庆阳市",
+                "level": 2
+            },
+            {
+                "id": "621100",
+                "fullname": "定西市",
+                "level": 2
+            },
+            {
+                "id": "621200",
+                "fullname": "陇南市",
+                "level": 2
+            },
+            {
+                "id": "622900",
+                "fullname": "临夏回族自治州",
+                "level": 2
+            },
+            {
+                "id": "623000",
+                "fullname": "甘南藏族自治州",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "630000",
+        "fullname": "青海省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "630100",
+                "fullname": "西宁市",
+                "level": 2
+            },
+            {
+                "id": "630200",
+                "fullname": "海东市",
+                "level": 2
+            },
+            {
+                "id": "632200",
+                "fullname": "海北藏族自治州",
+                "level": 2
+            },
+            {
+                "id": "632300",
+                "fullname": "黄南藏族自治州",
+                "level": 2
+            },
+            {
+                "id": "632500",
+                "fullname": "海南藏族自治州",
+                "level": 2
+            },
+            {
+                "id": "632600",
+                "fullname": "果洛藏族自治州",
+                "level": 2
+            },
+            {
+                "id": "632700",
+                "fullname": "玉树藏族自治州",
+                "level": 2
+            },
+            {
+                "id": "632800",
+                "fullname": "海西蒙古族藏族自治州",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "640000",
+        "fullname": "宁夏回族自治区",
+        "level": 1,
+        "districts": [
+            {
+                "id": "640100",
+                "fullname": "银川市",
+                "level": 2
+            },
+            {
+                "id": "640200",
+                "fullname": "石嘴山市",
+                "level": 2
+            },
+            {
+                "id": "640300",
+                "fullname": "吴忠市",
+                "level": 2
+            },
+            {
+                "id": "640400",
+                "fullname": "固原市",
+                "level": 2
+            },
+            {
+                "id": "640500",
+                "fullname": "中卫市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "650000",
+        "fullname": "新疆维吾尔自治区",
+        "level": 1,
+        "districts": [
+            {
+                "id": "650100",
+                "fullname": "乌鲁木齐市",
+                "level": 2
+            },
+            {
+                "id": "650200",
+                "fullname": "克拉玛依市",
+                "level": 2
+            },
+            {
+                "id": "650400",
+                "fullname": "吐鲁番市",
+                "level": 2
+            },
+            {
+                "id": "650500",
+                "fullname": "哈密市",
+                "level": 2
+            },
+            {
+                "id": "652300",
+                "fullname": "昌吉回族自治州",
+                "level": 2
+            },
+            {
+                "id": "652700",
+                "fullname": "博尔塔拉蒙古自治州",
+                "level": 2
+            },
+            {
+                "id": "652800",
+                "fullname": "巴音郭楞蒙古自治州",
+                "level": 2
+            },
+            {
+                "id": "652900",
+                "fullname": "阿克苏地区",
+                "level": 2
+            },
+            {
+                "id": "653000",
+                "fullname": "克孜勒苏柯尔克孜自治州",
+                "level": 2
+            },
+            {
+                "id": "653100",
+                "fullname": "喀什地区",
+                "level": 2
+            },
+            {
+                "id": "653200",
+                "fullname": "和田地区",
+                "level": 2
+            },
+            {
+                "id": "654000",
+                "fullname": "伊犁哈萨克自治州",
+                "level": 2
+            },
+            {
+                "id": "654200",
+                "fullname": "塔城地区",
+                "level": 2
+            },
+            {
+                "id": "654300",
+                "fullname": "阿勒泰地区",
+                "level": 2
+            },
+            {
+                "id": "659001",
+                "fullname": "石河子市",
+                "level": 2
+            },
+            {
+                "id": "659002",
+                "fullname": "阿拉尔市",
+                "level": 2
+            },
+            {
+                "id": "659003",
+                "fullname": "图木舒克市",
+                "level": 2
+            },
+            {
+                "id": "659004",
+                "fullname": "五家渠市",
+                "level": 2
+            },
+            {
+                "id": "659005",
+                "fullname": "北屯市",
+                "level": 2
+            },
+            {
+                "id": "659006",
+                "fullname": "铁门关市",
+                "level": 2
+            },
+            {
+                "id": "659007",
+                "fullname": "双河市",
+                "level": 2
+            },
+            {
+                "id": "659008",
+                "fullname": "可克达拉市",
+                "level": 2
+            },
+            {
+                "id": "659009",
+                "fullname": "昆玉市",
+                "level": 2
+            },
+            {
+                "id": "659010",
+                "fullname": "胡杨河市",
+                "level": 2
+            },
+            {
+                "id": "659011",
+                "fullname": "新星市",
+                "level": 2
+            },
+            {
+                "id": "659012",
+                "fullname": "白杨市",
+                "level": 2
+            },
+            {
+                "id": "659013",
+                "fullname": "草湖市",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "710000",
+        "fullname": "台湾省",
+        "level": 1,
+        "districts": [
+            {
+                "id": "711000",
+                "fullname": "台北市",
+                "level": 2
+            },
+            {
+                "id": "711100",
+                "fullname": "台中市",
+                "level": 2
+            },
+            {
+                "id": "711200",
+                "fullname": "基隆市",
+                "level": 2
+            },
+            {
+                "id": "711300",
+                "fullname": "台南市",
+                "level": 2
+            },
+            {
+                "id": "711400",
+                "fullname": "高雄市",
+                "level": 2
+            },
+            {
+                "id": "711500",
+                "fullname": "新北市",
+                "level": 2
+            },
+            {
+                "id": "711600",
+                "fullname": "宜兰县",
+                "level": 2
+            },
+            {
+                "id": "711700",
+                "fullname": "桃园市",
+                "level": 2
+            },
+            {
+                "id": "711800",
+                "fullname": "嘉义市",
+                "level": 2
+            },
+            {
+                "id": "711900",
+                "fullname": "新竹县",
+                "level": 2
+            },
+            {
+                "id": "712000",
+                "fullname": "苗栗县",
+                "level": 2
+            },
+            {
+                "id": "712200",
+                "fullname": "南投县",
+                "level": 2
+            },
+            {
+                "id": "712300",
+                "fullname": "彰化县",
+                "level": 2
+            },
+            {
+                "id": "712400",
+                "fullname": "新竹市",
+                "level": 2
+            },
+            {
+                "id": "712500",
+                "fullname": "云林县",
+                "level": 2
+            },
+            {
+                "id": "712600",
+                "fullname": "嘉义县",
+                "level": 2
+            },
+            {
+                "id": "712900",
+                "fullname": "屏东县",
+                "level": 2
+            },
+            {
+                "id": "713000",
+                "fullname": "花莲县",
+                "level": 2
+            },
+            {
+                "id": "713100",
+                "fullname": "台东县",
+                "level": 2
+            },
+            {
+                "id": "713200",
+                "fullname": "澎湖县",
+                "level": 2
+            }
+        ]
+    },
+    {
+        "id": "810000",
+        "fullname": "香港特别行政区",
+        "level": 1
+    },
+    {
+        "id": "820000",
+        "fullname": "澳门特别行政区",
+        "level": 1
+    }
+]
