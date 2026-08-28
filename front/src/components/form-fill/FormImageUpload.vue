@@ -5,7 +5,7 @@
   >
     <el-upload
       list-type="picture-card"
-      accept="image/jpeg,image/png,image/gif,image/webp,.jpg,.jpeg,.png,.gif,.webp"
+      :accept="acceptAttr"
       :file-list="fileList"
       :auto-upload="true"
       :limit="maxCount"
@@ -33,10 +33,13 @@ import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { uploadAppImageApi } from '../../api/apps'
 import {
+  imageAcceptAttr,
+  imageFormatLabels,
   imageMaxCount,
   imageMaxSizeBytes,
   imageMaxSizeMB,
   imageUrlsOf,
+  isAllowedImageFile,
 } from './imageField.js'
 
 const props = defineProps({
@@ -54,6 +57,7 @@ const viewerIndex = ref(0)
 const urls = computed(() => imageUrlsOf(props.modelValue))
 const maxCount = computed(() => imageMaxCount(props.field))
 const isFull = computed(() => urls.value.length >= maxCount.value)
+const acceptAttr = computed(() => imageAcceptAttr(props.field))
 
 const fileList = computed(() =>
   urls.value.map((url, index) => ({
@@ -100,8 +104,8 @@ async function beforeUpload(file) {
     ElMessage.warning(`每张图片不能超过 ${imageMaxSizeMB(props.field)}MB`)
     return false
   }
-  if (!/^image\/(jpeg|png|gif|webp)$/.test(file.type)) {
-    ElMessage.warning('请上传 jpg、png、gif 或 webp 图片')
+  if (!isAllowedImageFile(props.field, file)) {
+    ElMessage.warning(`请上传 ${imageFormatLabels(props.field)} 图片`)
     return false
   }
   try {

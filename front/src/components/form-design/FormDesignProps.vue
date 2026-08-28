@@ -39,7 +39,7 @@
           placeholder="填写后，标题右侧会显示说明" />
       </el-form-item>
       <el-form-item label="校验设置">
-        <div>
+        <div style="width: 100%;">
           <div class="required-row">
             <span>必填</span>
             <el-switch v-model="field.required" />
@@ -110,6 +110,22 @@
               align="left"
             />
             <span>MB</span>
+          </div>
+          <div v-if="field.type === 'image'" class="required-row">
+            <span>允许格式</span>
+            <el-select
+              v-model="field.acceptFormats"
+              class="image-format-select"
+              multiple
+              placeholder="请选择格式"
+            >
+              <el-option
+                v-for="item in IMAGE_FORMAT_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
           </div>
         </div>
       </el-form-item>
@@ -335,6 +351,7 @@ import {
   hasFillMappings,
 } from './dataSelect'
 import { isFillable } from '../form-fill/fillValues'
+import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
 import { listDictionaryOptionsApi, listFormFieldsApi } from '../../api/apps'
 
 const props = defineProps({
@@ -647,6 +664,11 @@ watch(
 
 .max-length-input {
   width: 96px;
+}
+
+.image-format-select {
+  flex: 1;
+  min-width: 0;
 }
 
 .range-inputs {

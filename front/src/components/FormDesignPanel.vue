@@ -64,6 +64,7 @@ import {
 import {
   DEFAULT_IMAGE_MAX_COUNT,
   DEFAULT_IMAGE_MAX_SIZE_MB,
+  defaultImageFormats,
 } from './form-fill/imageField'
 
 const props = defineProps({
@@ -164,7 +165,11 @@ function addField(item, beforeKey) {
       ? { optionSource: 'custom' }
       : {}),
     ...(item.type === 'image'
-      ? { maxCount: DEFAULT_IMAGE_MAX_COUNT, maxSizeMB: DEFAULT_IMAGE_MAX_SIZE_MB }
+      ? {
+          maxCount: DEFAULT_IMAGE_MAX_COUNT,
+          maxSizeMB: DEFAULT_IMAGE_MAX_SIZE_MB,
+          acceptFormats: defaultImageFormats(),
+        }
       : {}),
   }
   if (beforeKey) {
@@ -195,6 +200,9 @@ function copyField(field) {
   }
   if (field.fillMappings) {
     copied.fillMappings = cloneFillMappings(field.fillMappings)
+  }
+  if (field.acceptFormats) {
+    copied.acceptFormats = [...field.acceptFormats]
   }
   const index = fields.value.findIndex((item) => item.key === field.key)
   fields.value.splice(index + 1, 0, copied)
@@ -239,6 +247,9 @@ function ensureOptionSource(field) {
   if (field.type === 'image') {
     if (!field.maxCount) field.maxCount = DEFAULT_IMAGE_MAX_COUNT
     if (!field.maxSizeMB) field.maxSizeMB = DEFAULT_IMAGE_MAX_SIZE_MB
+    if (!Array.isArray(field.acceptFormats) || !field.acceptFormats.length) {
+      field.acceptFormats = defaultImageFormats()
+    }
   }
 }
 
