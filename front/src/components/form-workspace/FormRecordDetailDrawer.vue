@@ -5,7 +5,7 @@
     direction="rtl"
     size="800px"
     destroy-on-close
-    @update:model-value="$emit('update:modelValue', $event)"
+    @update:model-value="onVisibleChange"
     @closed="resetDetail"
   >
     <div v-if="record" class="fill-drawer-body">
@@ -21,7 +21,7 @@
     <template #footer>
       <div class="record-detail-footer">
         <div>
-          <el-button v-if="!editing" type="primary" @click="editing = true">
+          <el-button v-if="!editing && canEdit" type="primary" @click="startEdit">
             编辑
           </el-button>
         </div>
@@ -32,7 +32,7 @@
               保存
             </el-button>
           </template>
-          <el-button v-else @click="$emit('update:modelValue', false)">关闭</el-button>
+          <el-button v-else @click="closeDrawer">关闭</el-button>
         </div>
       </div>
     </template>
@@ -53,6 +53,8 @@ const props = defineProps({
   dictItemsByCode: { type: Object, default: () => ({}) },
   appId: { type: Number, required: true },
   formId: { type: Number, default: null },
+  canEdit: { type: Boolean, default: true },
+  startEditing: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue', 'saved'])
@@ -68,6 +70,18 @@ function applyValues(data) {
   }
   Object.assign(detailValues, cloneRecordValues(props.fields, data))
   snapshot.value = cloneRecordValues(props.fields, data)
+}
+
+function onVisibleChange(value) {
+  emit('update:modelValue', value)
+}
+
+function closeDrawer() {
+  emit('update:modelValue', false)
+}
+
+function startEdit() {
+  editing.value = true
 }
 
 function resetDetail() {
@@ -112,10 +126,10 @@ async function saveDetail() {
 }
 
 watch(
-  () => [props.modelValue, props.record, props.fields],
+  () => [props.modelValue, props.record?.id, props.startEditing],
   () => {
     if (props.modelValue && props.record) {
-      editing.value = false
+      editing.value = Boolean(props.startEditing && props.canEdit)
       applyValues(props.record.data)
     }
   },

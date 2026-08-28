@@ -1,5 +1,6 @@
 export type FormRecordActions = {
   create: boolean;
+  edit: boolean;
   delete: boolean;
   import: boolean;
   export: boolean;
@@ -8,6 +9,7 @@ export type FormRecordActions = {
 
 export const RECORD_ACTION_KEYS = [
   'create',
+  'edit',
   'delete',
   'import',
   'export',
@@ -21,6 +23,7 @@ export function normalizeRecordActions(raw: unknown): FormRecordActions {
       : {};
   return {
     create: src.create !== false,
+    edit: src.edit !== false,
     delete: src.delete !== false,
     import: src.import !== false,
     export: src.export !== false,

@@ -10,6 +10,7 @@
       :schema-loading="schemaLoading"
       :record-actions="recordActions"
       @create="openCreate"
+      @edit="openEdit"
       @row-click="openDetail"
     />
     <FormRecordDetailDrawer
@@ -19,6 +20,8 @@
       :dict-items-by-code="dictItemsByCode"
       :app-id="appId"
       :form-id="form?.id"
+      :can-edit="recordActions.edit"
+      :start-editing="detailStartEditing"
       @saved="onDetailSaved"
     />
     <FormRecordCreateDrawer
@@ -71,6 +74,7 @@ const recordActions = ref(normalizeRecordActions())
 const createVisible = ref(false)
 const detailVisible = ref(false)
 const detailRecord = ref(null)
+const detailStartEditing = ref(false)
 // 切换表单时作废进行中的请求，避免把上一张表的字段写进来
 const loadSession = ref(0)
 
@@ -166,6 +170,13 @@ function openCreate() {
 }
 
 function openDetail(row) {
+  detailStartEditing.value = false
+  detailRecord.value = row
+  detailVisible.value = true
+}
+
+function openEdit(row) {
+  detailStartEditing.value = true
   detailRecord.value = row
   detailVisible.value = true
 }
@@ -209,6 +220,7 @@ watch(
     createVisible.value = false
     detailVisible.value = false
     detailRecord.value = null
+    detailStartEditing.value = false
     loadSchema()
     loadConfig()
   },

@@ -7,22 +7,30 @@
     <template v-else>
       <div class="list-toolbar">
         <div class="list-toolbar-actions">
-          <el-button v-if="actions.create" type="primary" @click="onCreateClick">
+          <el-button v-if="actions.create" link @click="onCreateClick">
             新增
           </el-button>
           <el-button
+            v-if="actions.edit"
+            :disabled="selectedRecords.length !== 1"
+            @click="onEditClick"
+            link
+          >
+            编辑
+          </el-button>
+          <el-button
             v-if="actions.delete"
-            type="danger"
+            link
             :disabled="!selectedRecords.length"
             @click="onDeleteSelected"
           >
             删除
           </el-button>
-          <el-button v-if="actions.import" @click="openImport" type="info">导入</el-button>
+          <el-button v-if="actions.import" @click="openImport" link>导入</el-button>
           <el-button
             v-if="actions.downloadTemplate"
             @click="onDownloadTemplate"
-            type="info"
+            link
           >
             下载导入模版
           </el-button>
@@ -56,7 +64,12 @@
           @row-click="onRecordRowClick"
           @selection-change="onSelectionChange"
         >
-          <el-table-column v-if="actions.delete" type="selection" width="42" fixed="left" />
+          <el-table-column
+            v-if="actions.delete || actions.edit"
+            type="selection"
+            width="42"
+            fixed="left"
+          />
           <el-table-column type="index" width="55" label="序号" fixed="left" />
           <el-table-column
             v-for="col in visibleColumns"
@@ -157,7 +170,7 @@ const props = defineProps({
   recordActions: { type: Object, default: () => normalizeRecordActions() },
 })
 
-const emit = defineEmits(['create', 'row-click'])
+const emit = defineEmits(['create', 'edit', 'row-click'])
 
 const listLoading = ref(false)
 const records = ref([])
@@ -279,6 +292,14 @@ function onPageSizeChange(next) {
 
 function onCreateClick() {
   emit('create')
+}
+
+function onEditClick() {
+  if (selectedRecords.value.length !== 1) {
+    ElMessage.warning('请选择一条要编辑的数据')
+    return
+  }
+  emit('edit', selectedRecords.value[0])
 }
 
 function onSelectionChange(rows) {

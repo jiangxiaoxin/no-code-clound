@@ -33,6 +33,7 @@
           <p class="publish-desc">默认全部开启，关闭后数据管理页不显示对应按钮。导出暂未开放。</p>
           <div class="action-list">
             <el-checkbox v-model="actions.create">新增</el-checkbox>
+            <el-checkbox v-model="actions.edit">编辑</el-checkbox>
             <el-checkbox v-model="actions.delete">删除</el-checkbox>
             <el-checkbox v-model="actions.import">导入</el-checkbox>
             <el-checkbox v-model="actions.export">导出</el-checkbox>

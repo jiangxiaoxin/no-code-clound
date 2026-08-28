@@ -1,5 +1,6 @@
 export const RECORD_ACTION_KEYS = [
   'create',
+  'edit',
   'delete',
   'import',
   'export',
