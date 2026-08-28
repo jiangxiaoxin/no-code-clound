@@ -108,7 +108,9 @@
           :initial-index="index"
           fit="cover"
           preview-teleported
+          @click.prevent.stop
         />
+        <!-- 不禁用事件会继续冒泡导致打开详情抽屉 -->
       </div>
     </template>
     <template v-else>

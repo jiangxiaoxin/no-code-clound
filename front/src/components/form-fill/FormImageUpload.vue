@@ -13,6 +13,7 @@
       :on-exceed="onExceed"
       :on-preview="onPreview"
       :on-remove="onRemove"
+      :disabled="disabled"
     >
       <el-icon><Plus /></el-icon>
     </el-upload>
@@ -123,12 +124,8 @@ async function beforeUpload(file) {
   width: 100%;
 }
 
-.image-upload.is-full :deep(.el-upload--picture-card),
-.image-upload.is-disabled :deep(.el-upload--picture-card) {
+.image-upload.is-full :deep(.el-upload--picture-card) {
   display: none;
 }
 
-.image-upload.is-disabled :deep(.el-upload-list__item-delete) {
-  display: none;
-}
 </style>
