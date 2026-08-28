@@ -4,6 +4,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserDepartment } from '../admin/department/user-department.entity';
+import { Department } from '../admin/department/department.entity';
 import { RolePermission } from '../admin/role/role-permission.entity';
 import { Role } from '../admin/role/role.entity';
 import { UserRole } from '../admin/role/user-role.entity';
@@ -21,6 +22,7 @@ import { RevokedToken } from './revoked-token.entity';
       User,
       RevokedToken,
       UserDepartment,
+      Department,
       UserRole,
       Role,
       RolePermission,

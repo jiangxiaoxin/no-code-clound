@@ -4,8 +4,9 @@
     :title="user ? '编辑人员' : '新建人员'"
     width="560px"
     align-center
+    draggable
     destroy-on-close
-    @close="$emit('update:visible', false)"
+    @close="onClose"
   >
     <el-form
       ref="formRef"
@@ -44,15 +45,14 @@
           placeholder="请输入初始密码"
         />
       </el-form-item>
-      <el-form-item label="部门" prop="departmentIds">
+      <el-form-item label="部门" prop="departmentId">
         <el-tree-select
-          v-model="form.departmentIds"
+          v-model="form.departmentId"
           class="field-full"
           :data="activeDepartments"
           :props="{ label: 'name', value: 'id', children: 'children' }"
-          multiple
-          show-checkbox
           check-strictly
+          clearable
           :disabled="!canAssignDepartments"
           placeholder="请选择部门"
         />
@@ -75,7 +75,7 @@
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="$emit('update:visible', false)">取消</el-button>
+      <el-button @click="onClose">取消</el-button>
       <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>
     </template>
   </el-dialog>
@@ -101,7 +101,7 @@ const form = reactive({
   username: '',
   email: '',
   password: '',
-  departmentIds: [],
+  departmentId: null,
   roleIds: [],
 })
 
@@ -140,7 +140,7 @@ watch(
     form.username = props.user?.username || ''
     form.email = props.user?.email || ''
     form.password = ''
-    form.departmentIds = (props.user?.departments || []).map((item) => item.id)
+    form.departmentId = props.user?.departments?.[0]?.id ?? null
     form.roleIds = (props.user?.roles || []).map((item) => item.id)
   },
 )
@@ -154,6 +154,10 @@ function filterActiveTree(nodes) {
     }))
 }
 
+function onClose() {
+  emit('update:visible', false)
+}
+
 async function onSubmit() {
   await formRef.value.validate()
   const payload = {
@@ -163,11 +167,11 @@ async function onSubmit() {
   }
   if (!props.user) {
     payload.password = form.password
-    payload.departmentIds = props.canAssignDepartments ? [...form.departmentIds] : []
+    payload.departmentId = props.canAssignDepartments ? form.departmentId : null
     payload.roleIds = props.canAssignRoles ? [...form.roleIds] : []
   } else {
     if (props.canAssignDepartments) {
-      payload.departmentIds = [...form.departmentIds]
+      payload.departmentId = form.departmentId
     }
     if (props.canAssignRoles) {
       payload.roleIds = [...form.roleIds]

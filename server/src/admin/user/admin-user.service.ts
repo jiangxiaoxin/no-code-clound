@@ -106,9 +106,11 @@ export class AdminUserService {
     const email = dto.email.trim().toLowerCase();
     await this.assertUsernameUnique(username);
     await this.assertEmailUnique(email);
-    const departmentIds = [...new Set(dto.departmentIds)];
+    const departmentId = dto.departmentId ?? null;
     const roleIds = [...new Set(dto.roleIds)];
-    await this.departmentService.requireAssignable(departmentIds);
+    await this.departmentService.requireAssignable(
+      departmentId == null ? [] : [departmentId],
+    );
     await this.roleService.requireAssignable(roleIds);
 
     const password = await bcrypt.hash(dto.password, 10);
@@ -123,7 +125,7 @@ export class AdminUserService {
           status: 'active',
         }),
       );
-      await this.replaceRelations(manager, user.id, departmentIds, roleIds);
+      await this.replaceRelations(manager, user.id, departmentId, roleIds);
       return user;
     });
     return this.toItem(saved);
@@ -137,7 +139,7 @@ export class AdminUserService {
   ): Promise<AdminUserItem> {
     const user = await this.requireOne(userId);
     if (
-      dto.departmentIds &&
+      dto.departmentId !== undefined &&
       !actorPermissions.includes(PERMISSIONS.USERS_ASSIGN_DEPARTMENTS)
     ) {
       throw new ForbiddenException();
@@ -162,21 +164,19 @@ export class AdminUserService {
       await this.assertEmailUnique(email, userId);
     }
 
-    const departmentIds =
-      dto.departmentIds === undefined
-        ? undefined
-        : [...new Set(dto.departmentIds)];
+    const departmentId = dto.departmentId;
     const roleIds =
       dto.roleIds === undefined ? undefined : [...new Set(dto.roleIds)];
-    if (departmentIds) {
+    if (departmentId !== undefined) {
       const current = await this.userDepartmentRepo.find({
         where: { userId },
       });
-      await this.departmentService.requireAssignable(
-        departmentIds.filter(
-          (id) => !current.some((link) => link.departmentId === id),
-        ),
-      );
+      if (
+        departmentId != null &&
+        !current.some((link) => link.departmentId === departmentId)
+      ) {
+        await this.departmentService.requireAssignable([departmentId]);
+      }
     }
     if (roleIds) {
       const current = await this.userRoleRepo.find({ where: { userId } });
@@ -191,7 +191,7 @@ export class AdminUserService {
       user.displayName = displayName;
       user.email = email;
       await manager.save(User, user);
-      await this.replaceRelations(manager, userId, departmentIds, roleIds);
+      await this.replaceRelations(manager, userId, departmentId, roleIds);
       return user;
     });
     return this.toItem(saved);
@@ -229,17 +229,15 @@ export class AdminUserService {
       save: (entity: unknown, value: object | object[]) => Promise<unknown>;
     },
     userId: number,
-    departmentIds?: number[],
+    departmentId?: number | null,
     roleIds?: number[],
   ): Promise<void> {
-    if (departmentIds) {
+    if (departmentId !== undefined) {
       await manager.delete(UserDepartment, { userId });
-      if (departmentIds.length) {
+      if (departmentId != null) {
         await manager.save(
           UserDepartment,
-          departmentIds.map((departmentId) =>
-            manager.create(UserDepartment, { userId, departmentId }),
-          ),
+          manager.create(UserDepartment, { userId, departmentId }),
         );
       }
     }

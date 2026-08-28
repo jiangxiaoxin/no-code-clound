@@ -5,6 +5,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 import { UserDepartment } from '../admin/department/user-department.entity';
+import { Department } from '../admin/department/department.entity';
 import { RolePermission } from '../admin/role/role-permission.entity';
 import { Role } from '../admin/role/role.entity';
 import { UserRole } from '../admin/role/user-role.entity';
@@ -31,6 +32,9 @@ describe('AuthService', () => {
   const userDepartmentRepo = {
     find: jest.fn(),
   };
+  const departmentRepo = {
+    findOne: jest.fn(),
+  };
   const userRoleRepo = {
     find: jest.fn(),
   };
@@ -50,6 +54,7 @@ describe('AuthService', () => {
   beforeEach(async () => {
     jest.resetAllMocks();
     userDepartmentRepo.find.mockResolvedValue([]);
+    departmentRepo.findOne.mockResolvedValue(null);
     userRoleRepo.find.mockResolvedValue([]);
     roleRepo.find.mockResolvedValue([]);
     rolePermissionRepo.find.mockResolvedValue([]);
@@ -59,6 +64,7 @@ describe('AuthService', () => {
         { provide: getRepositoryToken(User), useValue: repo },
         { provide: getRepositoryToken(RevokedToken), useValue: revokedRepo },
         { provide: getRepositoryToken(UserDepartment), useValue: userDepartmentRepo },
+        { provide: getRepositoryToken(Department), useValue: departmentRepo },
         { provide: getRepositoryToken(UserRole), useValue: userRoleRepo },
         { provide: getRepositoryToken(Role), useValue: roleRepo },
         { provide: getRepositoryToken(RolePermission), useValue: rolePermissionRepo },
@@ -320,9 +326,9 @@ describe('AuthService', () => {
     it('returns departments, enabled role codes and unique sorted permissions', async () => {
       repo.findOne.mockResolvedValue(activeUser);
       userDepartmentRepo.find.mockResolvedValue([
-        { userId: 1, departmentId: 3 },
         { userId: 1, departmentId: 1 },
       ]);
+      departmentRepo.findOne.mockResolvedValue({ id: 1, name: '研发部' });
       userRoleRepo.find.mockResolvedValue([
         { userId: 1, roleId: 2 },
         { userId: 1, roleId: 4 },
@@ -344,7 +350,8 @@ describe('AuthService', () => {
         email: 'alice@example.com',
         displayName: '张三',
         status: 'active',
-        departmentIds: [1, 3],
+        departmentIds: [1],
+        departmentName: '研发部',
         roleCodes: ['dept_admin', 'user_admin'],
         permissions: ['departments.read', 'users.read', 'users.update'],
       });

@@ -144,12 +144,9 @@ describe('AdminUserService', () => {
     expect(result.items[0]).not.toHaveProperty('password');
   });
 
-  it('hashes password and saves multiple departments and roles', async () => {
+  it('hashes password and saves one department and roles', async () => {
     userRepo.findOne.mockResolvedValue(null);
-    departmentService.requireAssignable.mockResolvedValue([
-      { id: 1 },
-      { id: 2 },
-    ]);
+    departmentService.requireAssignable.mockResolvedValue([{ id: 1 }]);
     roleService.requireAssignable.mockResolvedValue([{ id: 3 }, { id: 4 }]);
 
     const result = await service.create({
@@ -157,7 +154,7 @@ describe('AdminUserService', () => {
       displayName: '张三',
       email: 'alice@example.com',
       password: 'secret1',
-      departmentIds: [1, 2, 2],
+      departmentId: 1,
       roleIds: [3, 4, 3],
     });
 
@@ -165,7 +162,7 @@ describe('AdminUserService', () => {
     const savedUser = manager.save.mock.calls[0][1] as { password: string };
     expect(savedUser.password).not.toBe('secret1');
     expect(await bcrypt.compare('secret1', savedUser.password)).toBe(true);
-    expect(departmentService.requireAssignable).toHaveBeenCalledWith([1, 2]);
+    expect(departmentService.requireAssignable).toHaveBeenCalledWith([1]);
     expect(roleService.requireAssignable).toHaveBeenCalledWith([3, 4]);
   });
 
@@ -177,7 +174,7 @@ describe('AdminUserService', () => {
         displayName: '张三',
         email: 'alice@example.com',
         password: 'secret1',
-        departmentIds: [],
+        departmentId: null,
         roleIds: [],
       }),
     ).rejects.toMatchObject({
@@ -198,7 +195,7 @@ describe('AdminUserService', () => {
         displayName: '张三',
         email: 'alice@example.com',
         password: 'secret1',
-        departmentIds: [9],
+        departmentId: 9,
         roleIds: [],
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -260,7 +257,7 @@ describe('AdminUserService', () => {
         displayName: '张三',
         email: 'alice@example.com',
         password: 'secret1',
-        departmentIds: [1],
+        departmentId: 1,
         roleIds: [2],
       }),
     ).rejects.toThrow('db fail');

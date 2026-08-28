@@ -7,8 +7,7 @@ import {
 } from 'typeorm';
 
 @Entity('user_department')
-@Index('uk_user_department', ['userId', 'departmentId'], { unique: true })
-@Index('IDX_user_department_userId', ['userId'])
+@Index('uk_user_department_userId', ['userId'], { unique: true })
 @Index('IDX_user_department_departmentId', ['departmentId'])
 export class UserDepartment {
   @PrimaryGeneratedColumn()

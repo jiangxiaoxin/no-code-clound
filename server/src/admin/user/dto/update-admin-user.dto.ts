@@ -36,12 +36,14 @@ export class UpdateAdminUserDto {
   email?: string;
 
   @IsOptional()
-  @IsArray()
-  @ArrayUnique()
-  @Type(() => Number)
-  @IsInt({ each: true })
-  @Min(1, { each: true })
-  departmentIds?: number[];
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined) return undefined;
+    if (value === null) return null;
+    return Number(value);
+  })
+  @IsInt()
+  @Min(1)
+  departmentId?: number | null;
 
   @IsOptional()
   @IsArray()

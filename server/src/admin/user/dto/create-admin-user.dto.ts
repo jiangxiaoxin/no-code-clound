@@ -4,6 +4,7 @@ import {
   IsArray,
   IsEmail,
   IsInt,
+  IsOptional,
   IsString,
   Length,
   Matches,
@@ -37,12 +38,15 @@ export class CreateAdminUserDto {
   @MaxLength(72, { message: '密码最多 72 位' })
   password: string;
 
-  @IsArray()
-  @ArrayUnique()
-  @Type(() => Number)
-  @IsInt({ each: true })
-  @Min(1, { each: true })
-  departmentIds: number[];
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined) return undefined;
+    if (value === null) return null;
+    return Number(value);
+  })
+  @IsInt()
+  @Min(1)
+  departmentId?: number | null;
 
   @IsArray()
   @ArrayUnique()

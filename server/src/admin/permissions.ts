@@ -29,6 +29,7 @@ export interface AuthPrincipal {
   displayName: string;
   status: 'active';
   departmentIds: number[];
+  departmentName: string | null;
   roleCodes: string[];
   permissions: string[];
 }

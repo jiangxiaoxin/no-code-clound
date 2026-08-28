@@ -10,6 +10,7 @@ import { createHash } from 'crypto';
 import { In, Repository } from 'typeorm';
 import { AuthPrincipal } from '../admin/permissions';
 import { UserDepartment } from '../admin/department/user-department.entity';
+import { Department } from '../admin/department/department.entity';
 import { RolePermission } from '../admin/role/role-permission.entity';
 import { Role } from '../admin/role/role.entity';
 import { UserRole } from '../admin/role/user-role.entity';
@@ -29,6 +30,8 @@ export class AuthService {
     private readonly revokedRepo: Repository<RevokedToken>,
     @InjectRepository(UserDepartment)
     private readonly userDepartmentRepo: Repository<UserDepartment>,
+    @InjectRepository(Department)
+    private readonly departmentRepo: Repository<Department>,
     @InjectRepository(UserRole)
     private readonly userRoleRepo: Repository<UserRole>,
     @InjectRepository(Role)
@@ -114,6 +117,12 @@ export class AuthService {
     const departmentIds = [
       ...new Set(userDepts.map((row) => row.departmentId)),
     ].sort((a, b) => a - b);
+    const departmentId = departmentIds[0] ?? null;
+    const department =
+      departmentId == null
+        ? null
+        : await this.departmentRepo.findOne({ where: { id: departmentId } });
+    const departmentName = department?.name || null;
 
     const userRoles = await this.userRoleRepo.find({ where: { userId } });
     const roleIds = userRoles.map((row) => row.roleId);
@@ -145,6 +154,7 @@ export class AuthService {
       displayName: user.displayName,
       status: 'active',
       departmentIds,
+      departmentName,
       roleCodes,
       permissions,
     };
