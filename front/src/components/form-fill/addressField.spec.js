@@ -12,6 +12,7 @@ import {
   isAddressEmpty,
   labelsOfPath,
   normalizeAddressValue,
+  resolveAddressLabels,
 } from './addressField.js'
 
 const hebeiTree = [
@@ -124,5 +125,30 @@ test('adapt drops extra levels and detail when target format is shallower', () =
   assert.deepEqual(
     adaptAddressToFormat(beijingDistrict, 'province-city', beijingCityTree),
     { ids: ['110000'], labels: ['北京市'] },
+  )
+})
+
+test('resolveAddressLabels keeps existing labels when region tree is not loaded yet', () => {
+  const ids = ['130000', '130100', '130102']
+  const previous = {
+    ids,
+    labels: ['河北省', '石家庄市', '长安区'],
+  }
+  assert.deepEqual(resolveAddressLabels([], ids, previous), previous.labels)
+  assert.deepEqual(resolveAddressLabels(hebeiTree, ids, previous), [
+    '河北省',
+    '石家庄市',
+    '长安区',
+  ])
+})
+
+test('resolveAddressLabels does not reuse old labels after the path changes', () => {
+  const previous = {
+    ids: ['130000', '130100', '130102'],
+    labels: ['河北省', '石家庄市', '长安区'],
+  }
+  assert.deepEqual(
+    resolveAddressLabels([], ['110000'], previous),
+    [],
   )
 })
