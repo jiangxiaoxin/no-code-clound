@@ -83,6 +83,22 @@ export function labelsOfPath(tree, ids) {
   return labels
 }
 
+export function resolveAddressLabels(tree, ids, previous = emptyAddress()) {
+  const nextIds = (ids || []).map((id) => String(id))
+  const walked = labelsOfPath(tree, nextIds)
+  if (walked.length === nextIds.length) return walked
+  const prevIds = (previous.ids || []).map((id) => String(id))
+  if (
+    nextIds.length &&
+    nextIds.length === prevIds.length &&
+    nextIds.every((id, i) => id === prevIds[i]) &&
+    previous.labels?.length === nextIds.length
+  ) {
+    return [...previous.labels]
+  }
+  return walked
+}
+
 function formatDepthCap(format) {
   if (format === 'province') return 1
   if (format === 'province-city') return 2

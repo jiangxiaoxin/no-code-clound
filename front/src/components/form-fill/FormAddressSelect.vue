@@ -35,9 +35,9 @@ import {
   addressFormatOf,
   addressHasDetail,
   cascaderProps,
-  labelsOfPath,
   normalizeAddressValue,
   regionJsonForFormat,
+  resolveAddressLabels,
 } from './addressField.js'
 
 const props = defineProps({
@@ -82,9 +82,10 @@ function emitAddress(ids, detail) {
     emit('update:modelValue', undefined)
     return
   }
+  const nextIds = ids.map((id) => String(id))
   const next = {
-    ids: ids.map((id) => String(id)),
-    labels: labelsOfPath(options.value, ids),
+    ids: nextIds,
+    labels: resolveAddressLabels(options.value, nextIds, normalized.value),
   }
   if (showDetail.value) {
     const text = String(detail ?? '')
