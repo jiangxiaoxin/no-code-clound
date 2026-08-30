@@ -7,6 +7,7 @@
 - 始终在 `master` 分支开发。
 - 不创建功能分支、Git worktree 或 Cursor worktree。
 - 如果当前不在 `master`，继续工作前先切回 `master`；不要擅自合并或删除其他分支。
+- Cursor 云端 / Agent 已经开好的修 bug 分支（如 `origin/cursor/critical-bug-management-*`），合进本地 `master` 时优先 `git merge --no-ff`，保留来源分支和 merge 记录；不要 cherry-pick。使用者给的是 commit SHA 时，先找到包含它的远程分支再 merge。未要求时不要删除远程分支，也不要 push。
 
 ## 实现原则
 

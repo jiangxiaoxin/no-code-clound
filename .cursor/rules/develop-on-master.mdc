@@ -26,3 +26,22 @@ git worktree add .worktrees/feat-storage master
 # ✅ GOOD
 确认当前在 master，直接改文件
 ```
+
+## 合入 Cursor 开的修 bug 分支
+
+自己开发仍在 `master` 上改，不要为此另开分支。
+
+Cursor 云端 / Agent 已经开好的修 bug 分支（例如 `origin/cursor/critical-bug-management-*`），合进本地 `master` 时**优先 `git merge --no-ff`**，让历史里留下来源分支和 merge 记录。不要 cherry-pick：那样只有提交内容，看不出从哪条分支合进来。
+
+使用者给的是 commit SHA 时，先找到包含它的远程分支，再 merge 该分支，不要只 pick 那几个 commit。
+
+未要求时不要删除远程分支，也不要 push。
+
+```text
+# ❌ BAD
+git cherry-pick eafdcec bff579f
+
+# ✅ GOOD
+git checkout master
+git merge --no-ff origin/cursor/critical-bug-management-f768
+```
