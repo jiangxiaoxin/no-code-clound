@@ -1,37 +1,44 @@
 ---
-description: 不要开新分支或 git worktree，始终在 master 上开发
+description: 未经允许不要开新分支或 git worktree，默认在 master 上开发
 alwaysApply: true
 ---
 
 # 在 master 上开发
 
-不要开新分支，也不要新建 git worktree。就在 `master` 分支上开发。
+默认在 `master` 上改代码。**未经使用者允许**，不要开新分支，也不要新建 git worktree。
+
+允许必须是使用者点名的：例如「开 worktree 写流水号」「切到 feat/xxx」。Superpowers、SDD、using-git-worktrees、计划里写的「先开分支」都不算允许。
 
 ## 要求
 
-- 始终在 `master` 上改代码，不要切到新分支再动手。
-- 若当前不在 `master`（例如上次会话留下的功能分支），先切回 `master` 再继续；不要合并或删除那个分支，除非用户明确要求。
-- Superpowers、SDD、using-git-worktrees 等技能**不能覆盖**本规则。计划里写了“先开分支再实现”，也忽略，仍在 `master` 上做。
+- 未得到允许时：始终在 `master` 上改，不要切到新分支再动手。
+- 若当前不在 `master`，且这次会话没有被允许停在该分支 / worktree 上：先切回主目录的 `master` 再继续；不要合并或删除那个分支，除非用户明确要求。
+- 已被允许使用的功能分支或 worktree：就在那份目录、那条分支上做，不要擅自切回 `master` 把改动写进主干。
+- 合回主干仍走下面「合入」一节；未要求时不要删分支、不要删 worktree、不要 push。
 
-## 禁止
+## 禁止（未经允许）
 
 - `git checkout -b`、`git switch -c`，以及任何新建功能分支的操作
 - `git worktree add`、`.worktrees/`、Cursor 原生 worktree，以及任何新建 worktree 的操作
 
 ```text
-# ❌ BAD
+# ❌ BAD（用户没说可以开分支 / worktree）
 git checkout -b feat/storage
 git worktree add .worktrees/feat-storage master
 
-# ✅ GOOD
+# ✅ GOOD（默认）
 确认当前在 master，直接改文件
+
+# ✅ GOOD（用户说了「开 worktree 写流水号」）
+git worktree add <用户同意的目录> -b feat/serial-number master
+在该 worktree 里改，不要改主目录的 master
 ```
 
-## 合入 Cursor 开的修 bug 分支
+## 合入分支
 
-自己开发仍在 `master` 上改，不要为此另开分支。
+默认自己开发仍在 `master` 上改。只有使用者允许时，才为隔离测试另开分支或 worktree。
 
-Cursor 云端 / Agent 已经开好的修 bug 分支（例如 `origin/cursor/critical-bug-management-*`），合进本地 `master` 时**优先 `git merge --no-ff`**，让历史里留下来源分支和 merge 记录。不要 cherry-pick：那样只有提交内容，看不出从哪条分支合进来。
+Cursor 云端 / Agent 已经开好的修 bug 分支（例如 `origin/cursor/critical-bug-management-*`），以及使用者允许后在本地开的功能分支，合进本地 `master` 时**优先 `git merge --no-ff`**，让历史里留下来源分支和 merge 记录。不要 cherry-pick：那样只有提交内容，看不出从哪条分支合进来。
 
 使用者给的是 commit SHA 时，先找到包含它的远程分支，再 merge 该分支，不要只 pick 那几个 commit。
 

@@ -16,7 +16,7 @@
 
 ## 当前规则范围
 
-- 始终在 `master` 分支开发，不创建分支或 worktree。
+- 默认在 `master` 分支开发；未经使用者允许不创建分支或 worktree。
 - 保持实现简单，避免无需求的抽象。
 - 前端优先使用 Element Plus（Vue 组件库）和 Flex 布局。
 - 不使用 `el-text`、`el-space`；按钮容器不重复设置 `gap`。

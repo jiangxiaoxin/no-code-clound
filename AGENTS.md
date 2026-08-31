@@ -4,16 +4,23 @@
 
 ## 开发分支
 
-- 始终在 `master` 分支开发。
-- 不创建功能分支、Git worktree 或 Cursor worktree。
-- 如果当前不在 `master`，继续工作前先切回 `master`；不要擅自合并或删除其他分支。
-- Cursor 云端 / Agent 已经开好的修 bug 分支（如 `origin/cursor/critical-bug-management-*`），合进本地 `master` 时优先 `git merge --no-ff`，保留来源分支和 merge 记录；不要 cherry-pick。使用者给的是 commit SHA 时，先找到包含它的远程分支再 merge。未要求时不要删除远程分支，也不要 push。
+- 默认在 `master` 分支开发。
+- **未经使用者允许**，不创建功能分支、Git worktree 或 Cursor worktree。Superpowers、SDD、计划里的「先开分支」都不算允许；必须使用者点名（例如「开 worktree 写流水号」）。
+- 未获允许且当前不在 `master` 时，继续工作前先切回主目录的 `master`；不要擅自合并或删除其他分支。
+- 已被允许使用的功能分支或 worktree：就在那份目录、那条分支上改，不要擅自把改动写进主干。
+- Cursor 云端 / Agent 已经开好的修 bug 分支（如 `origin/cursor/critical-bug-management-*`），以及使用者允许后在本地开的功能分支，合进本地 `master` 时优先 `git merge --no-ff`，保留来源分支和 merge 记录；不要 cherry-pick。使用者给的是 commit SHA 时，先找到包含它的远程分支再 merge。未要求时不要删除远程分支、不要删除 worktree，也不要 push。
 
 ## 实现原则
 
 - 只实现当前需求，保持代码简单、直接，避免提前设计无用的抽象和扩展点。
 - 能复用现有模块就优先复用；只有在代码确实变大或职责明确时才拆分新层。
 - 注释只说明不明显的原因，不重复描述代码行为。
+
+## 编码与中文
+
+- 文档和代码一律使用 UTF-8（无 BOM），不要按系统默认的 GBK / ANSI 读写。
+- 新建、修改、从计划拆 brief、生成 diff 之后，检查中文是否仍是正常汉字；`docs/`、规则文件、源码字符串和注释、`.superpowers/sdd/` 都要查。
+- 出现 `鏍囩`、`璇峰～鍐`、`å¤æ` 这类字，或中文读不通，就是乱码：以正确中文源（计划、规格、现有源码）为准改回来，不要把乱码写进实现。纠正编码，不要为此删文件。
 
 ## 前端规则（`front/`）
 
@@ -28,6 +35,13 @@
 - 使用图标前必须确认 `@element-plus/icons-vue` 中有对应导出，再导入后使用；不要用 `Number`、`Document` 等 JavaScript（JavaScript，脚本语言）或浏览器全局名当作图标。
 - 日期、时间的解析、格式化和起止计算优先使用 dayjs；复用 `front/src/utils/timeValue.js`，不要手写补零拼接或把 `YYYY-MM-DD` 交给 `new Date` 当 UTC。
 - 改动相关代码时，保留用户已有的注释、`console.log` 等日志输出；除非用户明确点名删除或修改。
+
+## 删除文件
+
+- 删除任何文件之前，必须先列出具体路径并得到使用者确认。没有确认就不能删。
+- 包括 Delete 工具、`rm`、`del`、`Remove-Item`、`git rm`、移入回收站。
+- 「清理一下」「这些没用了」「乱码文件不该留」不够；确认必须点名路径。
+- `.superpowers/`、其他 agent 的工作区文件、未跟踪文件同样要先问，不能因为「临时文件」或「编码错误」就直接删。
 
 ## 日志文件
 
