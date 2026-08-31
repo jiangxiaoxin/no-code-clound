@@ -5,21 +5,23 @@
       widthClass[field.width] || 'is-w-full',
       {
         'is-selected': selected,
+        'is-child-selected': childSelected,
         'is-dragging': dragging,
         'is-drag-over': dragOver,
         'is-image': field.type === 'image',
         'is-file': field.type === 'file',
         'is-tabs': field.type === 'tabs',
+        'is-embedded': embedded,
       },
     ]"
-    draggable="true"
+    :draggable="!embedded"
     @click.stop="onSelect"
     @dragstart.stop="onDragStart"
     @dragover.prevent="onDragOver"
     @drop.prevent.stop="onDrop"
     @dragend="onDragEnd"
   >
-    <div v-if="selected" class="canvas-field-actions">
+    <div v-if="selected && !embedded" class="canvas-field-actions">
       <el-button-group>
         <!-- <el-button size="small" :icon="CopyDocument" @click.stop="$emit('copy')" /> -->
         <el-button size="small" :icon="Delete" @click.stop="onRemove" />
@@ -28,7 +30,7 @@
     <!-- el-divider 会自己显示title，不需要再添加标题  -->
      <!-- 其余的组件标题都显示到上面 -->
       <!-- 左右布局需要设置合理的 label width ，暂时不支持-->
-    <span v-if="field.type !== 'divider' && field.type !== 'tabs'" class="canvas-field-title">
+    <span v-if="field.type !== 'divider' && field.type !== 'tabs' && !embedded" class="canvas-field-title">
       <span v-if="field.required" class="canvas-field-required">*</span>
       <el-tooltip v-if="linked" content="设置了数据联动" placement="top">
         <el-icon class="canvas-field-fill" @click.stop>
@@ -205,13 +207,19 @@
             :app-id="appId"
             :field="child"
             :fill-tip="fillTips[child.key]"
+            :fill-tips="fillTips"
             :items="dictItemsByCode[child.dictCode] || []"
+            :dict-items-by-code="dictItemsByCode"
             :selected="selectedKey === child.key"
+            :selected-key="selectedKey"
             :dragging="innerDragKey === child.key"
             :drag-over="innerDragOverKey === child.key"
             @select="onForwardSelect"
             @copy="onForwardCopy"
             @remove="onForwardRemove"
+            @add="onForwardAdd"
+            @add-child="onForwardAddChild"
+            @reorder="onForwardReorder"
             @dragstart="onChildDragStart"
             @dragover="onChildDragOver"
             @drop="onChildDrop"
@@ -223,7 +231,82 @@
         </div>
       </div>
     </div>
-    <div v-else-if="field.type === 'subform'" class="canvas-subform" />
+    <div v-else-if="field.type === 'subform'" class="canvas-subform">
+      <div class="canvas-subform-table">
+        <div class="canvas-subform-head">
+          <div
+            v-for="child in childFields"
+            :key="child.key"
+            class="canvas-subform-col"
+            :class="{ 'is-selected': selectedKey === child.key }"
+            @click.stop="onSelectChild(child)"
+          >
+            <span v-if="child.required" class="canvas-field-required">*</span>
+            <el-tooltip v-if="hasLinkage(child)" content="设置了数据联动" placement="top">
+              <el-icon class="canvas-field-fill">
+                <Link />
+              </el-icon>
+            </el-tooltip>
+            <el-tooltip v-if="fillTips[child.key]" :content="fillTips[child.key]" placement="top">
+              <el-icon class="canvas-field-fill">
+                <Connection />
+              </el-icon>
+            </el-tooltip>
+            <span>{{ child.title }}</span>
+          </div>
+          <div class="canvas-subform-col is-add" @click.stop>
+            <el-dropdown
+              trigger="click"
+              popper-class="canvas-subform-type-menu"
+              @command="onAddChildType"
+            >
+              <el-icon class="canvas-subform-plus"><Plus /></el-icon>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    v-for="item in childTypeOptions"
+                    :key="item.type"
+                    :command="item.type"
+                    :icon="item.icon"
+                  >
+                    {{ item.label }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
+        <div class="canvas-subform-body">
+          <div
+            v-if="!childFields.length"
+            class="canvas-subform-cell is-hint"
+          >
+            从左侧拖入字段到子表单
+          </div>
+          <div
+            v-for="child in childFields"
+            :key="`${child.key}-preview`"
+            class="canvas-subform-cell"
+            :class="{
+              'is-image': child.type === 'image',
+              'is-file': child.type === 'file',
+            }"
+            @click.stop="onSelectChild(child)"
+          >
+            <FormDesignCanvasField
+              :app-id="appId"
+              :field="child"
+              :fill-tip="fillTips[child.key]"
+              :items="dictItemsByCode[child.dictCode] || []"
+              :selected="selectedKey === child.key"
+              embedded
+            />
+          </div>
+          <div class="canvas-subform-cell is-add" />
+        </div>
+      </div>
+      <el-button class="canvas-subform-add" disabled size="small" type="primary">添加</el-button>
+    </div>
   </div>
 </template>
 
@@ -233,9 +316,11 @@ import { CopyDocument, Connection, Delete, InfoFilled, Link, Plus } from '@eleme
 import { fieldTypes, widthClass } from './fieldTypes'
 import {
   hasLinkage,
+  hasSubformLinkage,
   needsOptionSourceHint as fieldNeedsOptionSourceHint,
 } from './linkage'
 import { isTabsField } from './tabsField.js'
+import { SUBFORM_CHILD_TYPES } from '../form-fill/subformField.js'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import FormFileUpload from '../form-fill/FormFileUpload.vue'
 import FormAddressSelect from '../form-fill/FormAddressSelect.vue'
@@ -256,6 +341,7 @@ const props = defineProps({
   activePaneId: { type: String, default: '' },
   dragging: { type: Boolean, default: false },
   dragOver: { type: Boolean, default: false },
+  embedded: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -267,6 +353,7 @@ const emit = defineEmits([
   'drop',
   'dragend',
   'add',
+  'add-child',
   'reorder',
   'update:activePaneId',
 ])
@@ -274,11 +361,27 @@ const emit = defineEmits([
 const innerDragKey = ref('')
 const innerDragOverKey = ref('')
 
+const childFields = computed(() =>
+  Array.isArray(props.field.fields) ? props.field.fields : [],
+)
+
+const childSelected = computed(
+  () =>
+    props.field.type === 'subform' &&
+    childFields.value.some((child) => child.key === props.selectedKey),
+)
+
+const childTypeOptions = computed(() =>
+  fieldTypes.filter((item) => SUBFORM_CHILD_TYPES.includes(item.type)),
+)
+
 const needsOptionSourceHint = computed(() =>
   fieldNeedsOptionSourceHint(props.field),
 )
 
-const linked = computed(() => hasLinkage(props.field))
+const linked = computed(
+  () => hasLinkage(props.field) || hasSubformLinkage(props.field),
+)
 
 const currentPane = computed(() => {
   const panes = props.field.panes || []
@@ -305,15 +408,48 @@ function onRemove() {
   emit('remove', props.field)
 }
 
+function onSelectChild(child) {
+  emit('select', child)
+}
+
+function onAddChildType(type) {
+  const item = fieldTypes.find((entry) => entry.type === type)
+  if (!item) {
+    return
+  }
+  emit('add-child', props.field, item)
+}
+
+function onForwardAdd(item, beforeKey, paneId) {
+  emit('add', item, beforeKey, paneId)
+}
+
+function onForwardAddChild(parentField, item) {
+  emit('add-child', parentField, item)
+}
+
+function onForwardReorder(fromKey, toKey) {
+  emit('reorder', fromKey, toKey)
+}
+
 function onDragStart(event) {
+  if (props.embedded) {
+    return
+  }
   emit('dragstart', event, props.field)
 }
 
 function onDragOver() {
+  if (props.embedded) {
+    return
+  }
   emit('dragover', props.field)
 }
 
 function onDrop(event) {
+  if (props.embedded) {
+    return
+  }
   if (isTabsField(props.field)) {
     onPaneDrop(event)
     return
@@ -374,6 +510,10 @@ function onChildDrop(event, child) {
   const data = event.dataTransfer.getData('text/plain')
   const item = paletteItem(data)
   if (item) {
+    if (child.type === 'subform') {
+      emit('add-child', child, item)
+      return
+    }
     emit('add', item, child.key, pane?.id)
     return
   }
@@ -494,11 +634,117 @@ function onChildDragEnd() {
 }
 
 .canvas-subform {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  max-width: 354px;
+  max-width: none;
+  min-width: 0;
   min-height: 88px;
+}
+
+.canvas-subform-empty {
+  padding: 20px 8px;
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
+  text-align: center;
   border: 1px dashed var(--el-border-color);
   border-radius: 4px;
+}
+
+.canvas-field.is-child-selected {
+  border-color: var(--el-color-primary-light-5);
+}
+
+.canvas-field.is-embedded {
+  padding: 0;
+  cursor: default;
+  border-color: transparent;
+  background: transparent;
+}
+
+.canvas-field.is-embedded:hover,
+.canvas-field.is-embedded.is-selected {
+  background: transparent;
+  border-color: transparent;
+}
+
+.canvas-subform-table {
+  min-width: 100%;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.canvas-subform-head,
+.canvas-subform-body {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 100%;
+}
+
+.canvas-subform-col,
+.canvas-subform-cell {
+  box-sizing: border-box;
+  flex: 0 0 160px;
+  width: 160px;
+  min-width: 160px;
+  padding: 8px;
+  border-right: 1px solid var(--el-border-color-lighter);
+}
+
+.canvas-subform-col:last-child,
+.canvas-subform-cell:last-child {
+  border-right: none;
+}
+
+.canvas-subform-col {
+  display: flex;
+  align-items: center;
+  background: var(--el-fill-color-light);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.canvas-subform-col.is-add,
+.canvas-subform-cell.is-add {
+  flex: 1 0 80px;
+  width: auto;
+  min-width: 80px;
+  justify-content: center;
+}
+
+.canvas-subform-cell.is-hint {
+  color: var(--el-text-color-placeholder);
+  font-size: 13px;
+}
+
+.canvas-subform-plus {
+  color: var(--el-color-primary);
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.canvas-subform-col.is-selected {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.canvas-subform-body {
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.canvas-subform-add {
+  margin-top: 8px;
+  align-self: flex-start;
+}
+
+.canvas-field.is-embedded :deep(.canvas-item) {
+  max-width: none;
+}
+
+.canvas-subform-cell :deep(.canvas-item) {
+  width: 100%;
+  max-width: 100%;
 }
 
 .canvas-field.is-tabs {
@@ -545,5 +791,12 @@ function onChildDragEnd() {
   color: var(--el-text-color-placeholder);
   font-size: 13px;
   line-height: 32px;
+}
+</style>
+
+<style lang="less">
+.canvas-subform-type-menu .el-dropdown-menu {
+  max-height: 280px;
+  overflow-y: auto;
 }
 </style>

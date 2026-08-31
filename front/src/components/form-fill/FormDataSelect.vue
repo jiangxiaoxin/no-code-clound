@@ -16,7 +16,7 @@
           <ArrowDown />
         </el-icon>
       </div>
-      <div v-if="previewRows.length" class="data-select-preview">
+      <div v-if="previewRows.length && !compact" class="data-select-preview">
         <div v-for="item in previewRows" :key="item.key" class="data-select-preview-row">
           {{ item.title }}：{{ item.text || '—' }}
         </div>
@@ -34,7 +34,8 @@
           </el-input>
         </div>
         <el-table ref="tableRef" v-loading="listLoading" :data="records" border stripe size="small" height="360"
-          row-key="id" highlight-current-row class="data-select-table" @row-click="onRowClick" @select="onSelect"
+          row-key="id" highlight-current-row class="data-select-table" :class="{ 'is-single': !multiple }"
+          @row-click="onRowClick" @select="onSelect"
           @select-all="onSelectAll">
           <el-table-column type="selection" width="42" />
           <el-table-column type="index" width="55" label="序号" />
@@ -98,9 +99,11 @@ const props = defineProps({
   modelValue: { default: undefined },
   recordValues: { type: Object, default: () => ({}) },
   formFields: { type: Array, default: () => [] },
+  multiple: { type: Boolean, default: false },
+  compact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['fill', 'update:modelValue'])
+const emit = defineEmits(['fill', 'update:modelValue', 'fill-rows'])
 
 onMounted(() => {
   console.log('form data select 组件', props.preview);
@@ -123,7 +126,12 @@ const dictItemsByCode = ref({})
 const selected = ref(null)
 const tableRef = ref(null)
 const draftRow = ref(null)
-const canConfirm = computed(() => Boolean(draftRow.value?.id))
+const draftRows = ref([])
+const canConfirm = computed(() =>
+  props.multiple
+    ? draftRows.value.some((row) => row?.id)
+    : Boolean(draftRow.value?.id),
+)
 let selectedSeq = 0
 let loadedKey = ''
 
@@ -331,15 +339,27 @@ async function onPickerOpen() {
   page.value = 1
   keyword.value = ''
   draftRow.value = selected.value
+  draftRows.value = selected.value ? [selected.value] : []
   await loadSource()
   await loadRecords()
 }
 
 function restoreDraftSelection() {
   const table = tableRef.value
-  const id = draftRow.value?.id
   if (!table) return
   table.clearSelection()
+  if (props.multiple) {
+    const ids = new Set(draftRows.value.map((item) => item?.id).filter(Boolean))
+    const next = []
+    for (const row of records.value) {
+      if (!ids.has(row.id)) continue
+      table.toggleRowSelection(row, true)
+      next.push(row)
+    }
+    draftRows.value = next.length ? next : draftRows.value
+    return
+  }
+  const id = draftRow.value?.id
   if (!id) return
   const row = records.value.find((item) => item.id === id)
   if (!row) return
@@ -348,6 +368,11 @@ function restoreDraftSelection() {
 }
 
 function onSelect(selection, row) {
+  if (props.multiple) {
+    draftRows.value = selection || []
+    draftRow.value = draftRows.value[0] || null
+    return
+  }
   const checked = (selection || []).some((item) => item.id === row.id)
   draftRow.value = checked ? row : null
   nextTick(() => {
@@ -358,13 +383,29 @@ function onSelect(selection, row) {
   })
 }
 
-function onSelectAll() {
+function onSelectAll(selection) {
+  if (props.multiple) {
+    draftRows.value = selection || []
+    draftRow.value = draftRows.value[0] || null
+    return
+  }
   draftRow.value = null
   tableRef.value?.clearSelection()
 }
 
 function onRowClick(row, column) {
   if (!row || column?.type === 'selection') return
+  if (props.multiple) {
+    const table = tableRef.value
+    if (!table) return
+    const exists = draftRows.value.some((item) => item.id === row.id)
+    table.toggleRowSelection(row, !exists)
+    draftRows.value = exists
+      ? draftRows.value.filter((item) => item.id !== row.id)
+      : [...draftRows.value, row]
+    draftRow.value = draftRows.value[0] || null
+    return
+  }
   draftRow.value = row
   const table = tableRef.value
   if (!table) return
@@ -396,18 +437,39 @@ function selectionKey(id) {
   return `${props.appId}:${props.field.sourceFormId}:${id}`
 }
 
-function confirmPick() {
-  const row = draftRow.value
-  if (!row?.id) return
-  selected.value = row
-  loadedKey = selectionKey(row.id)
-  emit('update:modelValue', row.id)
+function patchesOf(row) {
   const patches = {}
   for (const item of props.field.fillMappings || []) {
     if (!item?.sourceKey || !item?.targetKey) continue
     patches[item.targetKey] = cloneCopiedValue(row?.data?.[item.sourceKey])
   }
+  return patches
+}
+
+function confirmPick() {
+  if (props.multiple) {
+    const picked = draftRows.value.filter((row) => row?.id)
+    if (!picked.length) return
+    const first = picked[0]
+    selected.value = first
+    loadedKey = selectionKey(first.id)
+    emit('update:modelValue', first.id)
+    emit('fill', patchesOf(first))
+    emit(
+      'fill-rows',
+      picked.map((row) => ({ id: row.id, patches: patchesOf(row) })),
+    )
+    pickerVisible.value = false
+    return
+  }
+  const row = draftRow.value
+  if (!row?.id) return
+  selected.value = row
+  loadedKey = selectionKey(row.id)
+  emit('update:modelValue', row.id)
+  const patches = patchesOf(row)
   emit('fill', patches)
+  emit('fill-rows', [{ id: row.id, patches }])
   pickerVisible.value = false
 }
 
@@ -547,7 +609,7 @@ watch(
   width: 260px;
 }
 
-.data-select-table :deep(th.el-table-column--selection .el-checkbox) {
+.data-select-table.is-single :deep(th.el-table-column--selection .el-checkbox) {
   display: none;
 }
 </style>

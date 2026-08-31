@@ -21,7 +21,7 @@
           :fill-tips="fillTips"
           :items="dictItemsByCode[field.dictCode] || []"
           :dict-items-by-code="dictItemsByCode"
-          :selected="selectedKey === field.key"
+          :selected="isFieldSelected(field)"
           :selected-key="selectedKey"
           :active-pane-id="activePaneId"
           :dragging="dragKey === field.key"
@@ -30,6 +30,7 @@
           @copy="onCopy"
           @remove="onRemove"
           @add="onAdd"
+          @add-child="onAddChild"
           @reorder="onReorder"
           @update:activePaneId="onActivePaneId"
           @dragstart="onDragStart"
@@ -64,11 +65,19 @@ const emit = defineEmits([
   'remove',
   'reorder',
   'add',
+  'add-child',
   'update:activePaneId',
 ])
 
 const dragKey = ref('')
 const dragOverKey = ref('')
+
+function isFieldSelected(field) {
+  if (props.selectedKey === field.key) {
+    return true
+  }
+  return (field.fields || []).some((child) => child.key === props.selectedKey)
+}
 
 function paletteItem(data) {
   if (!data.startsWith('palette:')) {
@@ -92,6 +101,10 @@ function onRemove(field) {
 
 function onAdd(item, beforeKey, paneId) {
   emit('add', item, beforeKey, paneId)
+}
+
+function onAddChild(parentField, item) {
+  emit('add-child', parentField.key, item)
 }
 
 function onReorder(fromKey, toKey) {
@@ -123,6 +136,10 @@ function onDrop(event, field) {
   const data = event.dataTransfer.getData('text/plain')
   const item = paletteItem(data)
   if (item) {
+    if (field.type === 'subform') {
+      emit('add-child', field.key, item)
+      return
+    }
     emit('add', item, field.key)
     return
   }

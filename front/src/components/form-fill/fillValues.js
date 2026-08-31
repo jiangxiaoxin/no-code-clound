@@ -8,6 +8,12 @@ import {
 } from './addressField.js'
 import { fileItemsOf } from './fileField.js'
 import { imageUrlsOf } from './imageField.js'
+import {
+  emptySubformRow,
+  stripEmptySubformRows,
+  subformRowsRequiredError,
+  uniqueInRowsError,
+} from './subformField.js'
 
 const SKIP_TYPES = new Set([
   'divider',
@@ -25,11 +31,18 @@ export function isFillable(field) {
   return Boolean(field?.key) && !SKIP_TYPES.has(field.type)
 }
 
+export function isListColumn(field) {
+  return isFillable(field) || field?.type === 'subform'
+}
+
 function persistsValue(field) {
-  return isFillable(field) || field.type === 'data'
+  return isFillable(field) || field.type === 'data' || field.type === 'subform'
 }
 
 export function emptyValue(field) {
+  if (field.type === 'subform') {
+    return []
+  }
   if (
     field.type === 'checkbox' ||
     field.type === 'select-multiple' ||
@@ -41,13 +54,24 @@ export function emptyValue(field) {
   return undefined
 }
 
+function defaultSubformRows(field) {
+  if (field.optionSource === 'linkage') {
+    return []
+  }
+  const count = Number(field.defaultRowCount)
+  const n = Number.isInteger(count) ? Math.min(10, Math.max(0, count)) : 0
+  return Array.from({ length: n }, () => emptySubformRow(field.fields))
+}
+
 export function emptyRecordValues(fields) {
   fields = flattenFields(fields)
   const next = {}
   for (const field of fields) {
-    if (persistsValue(field)) {
-      next[field.key] = emptyValue(field)
+    if (!persistsValue(field)) {
+      continue
     }
+    next[field.key] =
+      field.type === 'subform' ? defaultSubformRows(field) : emptyValue(field)
   }
   return next
 }
@@ -56,6 +80,13 @@ export function cloneRecordValues(fields, data) {
   fields = flattenFields(fields)
   const next = {}
   for (const field of fields) {
+    if (field.type === 'subform') {
+      const rows = Array.isArray(data?.[field.key]) ? data[field.key] : []
+      next[field.key] = rows.map((row) =>
+        cloneRecordValues(field.fields || [], row),
+      )
+      continue
+    }
     if (field.type === 'data') {
       const value = data?.[field.key]
       next[field.key] =
@@ -111,6 +142,19 @@ export function isEmptyValue(field, value) {
 }
 
 export function serializeValue(field, value) {
+  if (field.type === 'subform') {
+    const rows = stripEmptySubformRows(field.fields, value).map((row) => {
+      const next = {}
+      for (const child of field.fields || []) {
+        const cell = serializeValue(child, row[child.key])
+        if (cell !== undefined) {
+          next[child.key] = cell
+        }
+      }
+      return next
+    })
+    return rows
+  }
   if (isEmptyValue(field, value)) {
     return undefined
   }
@@ -164,6 +208,20 @@ export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
 
 export function firstRequiredError(fields, values) {
   for (const field of flattenFields(fields)) {
+    if (field.type === 'subform') {
+      const required = subformRowsRequiredError(field, values[field.key])
+      if (required) {
+        return { message: required, key: field.key }
+      }
+      const unique = uniqueInRowsError(
+        field.fields,
+        stripEmptySubformRows(field.fields, values[field.key]),
+      )
+      if (unique) {
+        return { message: unique, key: field.key }
+      }
+      continue
+    }
     if (!isFillable(field) || !field.required) continue
     const missing =
       field.type === 'address'
@@ -230,7 +288,24 @@ export function valuesEqual(field, a, b) {
   )
 }
 
+function formatSubformCellValue(field, value, dictItemsByCode) {
+  const rows = stripEmptySubformRows(field.fields, value)
+  if (!rows.length) return ''
+  return rows
+    .map((row) =>
+      (field.fields || [])
+        .map((child) => formatCellValue(child, row[child.key], dictItemsByCode))
+        .filter(Boolean)
+        .join(' / '),
+    )
+    .filter(Boolean)
+    .join('；')
+}
+
 export function formatCellValue(field, value, dictItemsByCode) {
+  if (field?.type === 'subform') {
+    return formatSubformCellValue(field, value, dictItemsByCode)
+  }
   if (value == null || value === '') return ''
   /**
    * 下拉多选，要么按照字典选，要么是按照其他表数据选

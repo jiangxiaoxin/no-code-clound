@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Min } from 'class-validator';
 
 export class ListFormFieldsDto {
   @IsOptional()
@@ -10,4 +10,8 @@ export class ListFormFieldsDto {
   @IsInt()
   @Min(1)
   excludeFormId?: number;
+
+  @IsOptional()
+  @IsIn(['subform'])
+  include?: string;
 }

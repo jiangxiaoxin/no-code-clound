@@ -43,12 +43,13 @@ const ICON_COLORS = [
   '#F25C54',
 ];
 
-type OptionField = {
+export type OptionField = {
   key: string;
   title: string;
   type: string;
   dictCode?: string;
   optionSource?: string;
+  fields?: OptionField[];
 };
 
 @Injectable()
@@ -136,6 +137,7 @@ export class ApplicationService {
     ownerId: number,
     appId: number,
     excludeFormId?: number,
+    include?: string,
   ): Promise<{ id: number; name: string; fields: OptionField[] }[]> {
     await this.requireOwnedApp(ownerId, appId);
     const forms = await this.formRepo.find({
@@ -146,6 +148,7 @@ export class ApplicationService {
       Number.isInteger(excludeFormId) && (excludeFormId as number) > 0
         ? excludeFormId
         : undefined;
+    const includeSubform = include === 'subform';
 
     const result: { id: number; name: string; fields: OptionField[] }[] = [];
     for (const form of forms) {
@@ -154,6 +157,7 @@ export class ApplicationService {
       }
       const fields = this.toOptionFields(
         flattenFields(parseFormSchema(form.fields).fields),
+        includeSubform,
       );
       if (!fields.length) {
         continue;
@@ -378,6 +382,7 @@ export class ApplicationService {
 
   private toOptionFields(
     raw: Record<string, unknown>[] | null,
+    includeSubform = false,
   ): OptionField[] {
     if (!Array.isArray(raw)) {
       return [];
@@ -389,7 +394,24 @@ export class ApplicationService {
       }
       const type = typeof item.type === 'string' ? item.type : '';
       const key = typeof item.key === 'string' ? item.key : '';
-      if (!key || !OPTION_FIELD_TYPES.has(type)) {
+      if (!key) {
+        continue;
+      }
+      if (type === 'subform' && includeSubform) {
+        fields.push({
+          key,
+          title: typeof item.title === 'string' ? item.title : '',
+          type,
+          fields: this.toOptionFields(
+            Array.isArray(item.fields)
+              ? (item.fields as Record<string, unknown>[])
+              : [],
+            false,
+          ),
+        });
+        continue;
+      }
+      if (!OPTION_FIELD_TYPES.has(type)) {
         continue;
       }
       const next: OptionField = {

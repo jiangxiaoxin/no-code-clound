@@ -40,6 +40,23 @@ describe('coerceRecordData', () => {
     expect(coerceRecordData(fields, { kids: 'nope' })).toEqual({ kids: [] });
   });
 
+  it('coerces subform rows and drops empty ones', () => {
+    const out = coerceRecordData(
+      [
+        {
+          key: 'lines',
+          type: 'subform',
+          fields: [
+            { key: 'name', type: 'input' },
+            { key: 'qty', type: 'number' },
+          ],
+        },
+      ],
+      { lines: [{ name: '', qty: null }, { name: 'A', qty: 2 }] },
+    );
+    expect(out.lines).toEqual([{ name: 'A', qty: 2 }]);
+  });
+
   it('stores image urls as an array', () => {
     expect(
       coerceRecordData(fields, { pics: ['/uploads/a.png'] }),

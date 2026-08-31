@@ -704,5 +704,41 @@ describe('ApplicationService', () => {
         },
       ]);
     });
+
+    it('can include subform fields and their children', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([
+        {
+          id: 12,
+          name: '设备',
+          applicationId: 8,
+          fields: [
+            { key: 'no', title: '编号', type: 'input' },
+            {
+              key: 'parts',
+              title: '配件',
+              type: 'subform',
+              fields: [{ key: 'name', title: '名称', type: 'input' }],
+            },
+          ],
+        },
+      ]);
+
+      await expect(service.listFormFields(1, 8, undefined, 'subform')).resolves.toEqual([
+        {
+          id: 12,
+          name: '设备',
+          fields: [
+            { key: 'no', title: '编号', type: 'input' },
+            {
+              key: 'parts',
+              title: '配件',
+              type: 'subform',
+              fields: [{ key: 'name', title: '名称', type: 'input' }],
+            },
+          ],
+        },
+      ]);
+    });
   });
 });

@@ -22,6 +22,7 @@
                 :updating="updating"
                 :record-values="values"
                 :form-fields="flatFields"
+                :dict-items-by-code="dictItemsByCode"
                 @fill="onFill"
               />
             </div>
@@ -39,6 +40,7 @@
         :updating="updating"
         :record-values="values"
         :form-fields="flatFields"
+        :dict-items-by-code="dictItemsByCode"
         @fill="onFill"
       />
     </template>
@@ -51,7 +53,7 @@ import { ElMessage } from 'element-plus'
 import { queryFormRecordsApi } from '../../api/apps'
 import { fillInfluencerTips } from '../form-design/dataSelect'
 import { isSelectType } from '../form-design/fieldTypes'
-import { hasLinkage } from '../form-design/linkage'
+import { hasLinkage, hasSubformLinkage } from '../form-design/linkage'
 import {
   flattenFields,
   findTabsField,
@@ -63,8 +65,10 @@ import { emptyValue } from './fillValues'
 import {
   applyLinkageResult,
   linkageConditionsReady,
+  linkageManyMessage,
   linkageQueryPaging,
 } from './linkageRuntime'
+import { mapSourceSubformRows } from './subformField.js'
 import { addressFormatOf, regionJsonForFormat } from './addressField.js'
 import { buildSourceQuery, recordsToSelectItems } from './tableOptions'
 
@@ -138,6 +142,10 @@ function isLinkageField(field) {
   return hasLinkage(field)
 }
 
+function isSubformLinkageField(field) {
+  return hasSubformLinkage(field)
+}
+
 const regionLoaders = {
   'sheng.json': () => import('@region/sheng.json'),
   'sheng-shi.json': () => import('@region/sheng-shi.json'),
@@ -195,8 +203,16 @@ const linkageLoadKey = computed(() =>
     .join('|'),
 )
 
+const subformLinkageLoadKey = computed(() =>
+  flatFields.value
+    .filter(isSubformLinkageField)
+    .map((field) => `${field.key}:${linkageFieldLoadKey(field)}:${field.linkage?.sourceSubformKey}`)
+    .join('|'),
+)
+
 const loadKey = computed(
-  () => `${tableLoadKey.value}#${linkageLoadKey.value}#${props.disabled}`,
+  () =>
+    `${tableLoadKey.value}#${linkageLoadKey.value}#${subformLinkageLoadKey.value}#${props.disabled}`,
 )
 
 function itemsFor(field) {
@@ -244,6 +260,79 @@ function canWriteLinkageValue(field) {
   if (props.disabled) return false
   if (props.updating && field.editable === false) return false
   return true
+}
+
+let lastSubformKeys = {}
+let subformSeq = 0
+
+async function loadSubformLinkages() {
+  const seq = ++subformSeq
+  if (props.disabled || !props.appId) {
+    lastSubformKeys = {}
+    return
+  }
+  const fields = flatFields.value.filter(isSubformLinkageField)
+  const writeValues = shouldWriteLinkageValues()
+  const nextKeys = {}
+  await Promise.all(
+    fields.map(async (field) => {
+      const key = `${linkageFieldLoadKey(field)}:${field.linkage?.sourceSubformKey}`
+      nextKeys[field.key] = key
+      if (lastSubformKeys[field.key] === key) {
+        return
+      }
+      if (!writeValues || !canWriteLinkageValue(field)) {
+        return
+      }
+      if (!linkageConditionsReady(field.linkage, props.values)) {
+        props.values[field.key] = []
+        return
+      }
+      try {
+        const result = await queryRecordsOnce(
+          props.appId,
+          resolveLinkageFormId(field),
+          buildSourceQuery(
+            {
+              match: field.linkage.match,
+              conditions: field.linkage.conditions,
+            },
+            props.values,
+            flatFields.value,
+            { page: 1, pageSize: 2 },
+          ),
+        )
+        const total =
+          typeof result?.total === 'number'
+            ? result.total
+            : result?.items?.length || 0
+        if (total <= 0) {
+          props.values[field.key] = []
+          return
+        }
+        if (total > 1) {
+          props.values[field.key] = []
+          ElMessage.warning(linkageManyMessage(field))
+          return
+        }
+        const sourceRows = result?.items?.[0]?.data?.[field.linkage.sourceSubformKey]
+        const mapped = mapSourceSubformRows({
+          sourceRows,
+          mappings: field.linkage.fieldMappings,
+          targetFields: field.fields,
+        })
+        if (Array.isArray(sourceRows) && sourceRows.length > 200) {
+          ElMessage.warning('子表单最多 200 行')
+        }
+        props.values[field.key] = mapped
+      } catch {
+        props.values[field.key] = []
+      }
+    }),
+  )
+  if (seq === subformSeq) {
+    lastSubformKeys = nextKeys
+  }
 }
 
 function shouldWriteLinkageValues() {
@@ -379,7 +468,7 @@ async function loadLinkage() {
 
 function runLoads() {
   loadTableItems()
-  loadLinkage()
+  loadSubformLinkages().then(() => loadLinkage())
 }
 
 watch(
@@ -402,6 +491,7 @@ onUnmounted(() => {
   window.clearTimeout(loadTimer)
   loadSeq += 1
   linkageSeq += 1
+  subformSeq += 1
 })
 </script>
 

@@ -222,6 +222,40 @@ describe('FormRecordService', () => {
     expect(store.insert).toHaveBeenCalled();
   });
 
+  it('rejects create when unique subform number already exists', async () => {
+    appRepo.findOne.mockResolvedValue(ownedApp);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        {
+          key: 'lines',
+          type: 'subform',
+          title: '明细',
+          fields: [
+            { key: 'qty', type: 'number', title: '数量', unique: true },
+          ],
+        },
+      ],
+    });
+    store.existsByDataValue.mockResolvedValue(true);
+
+    await expect(
+      service.create(1, 8, 12, { lines: [{ qty: 0 }] }),
+    ).rejects.toEqual(
+      expect.objectContaining({
+        constructor: ConflictException,
+        message: '[数量]不允许重复值',
+      }),
+    );
+    expect(store.existsByDataValue).toHaveBeenCalledWith(
+      12,
+      'lines.qty',
+      0,
+      undefined,
+    );
+    expect(store.insert).not.toHaveBeenCalled();
+  });
+
   it('throws when record id is missing', async () => {
     appRepo.findOne.mockResolvedValue(ownedApp);
     formRepo.findOne.mockResolvedValue(form);

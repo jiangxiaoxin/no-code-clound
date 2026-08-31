@@ -1,7 +1,7 @@
 <template>
   <div class="fill-field" :class="fieldClass">
     <span
-      v-if="field.type !== 'divider'"
+      v-if="field.type !== 'divider' && !plain"
       class="fill-field-title"
       :title="fieldKeyTitle"
     >
@@ -158,8 +158,11 @@
       :model-value="modelValue"
       :record-values="recordValues"
       :form-fields="formFields"
+      :multiple="multiple"
+      :compact="compact"
       @update:model-value="onUpdateModelValue"
       @fill="onFill"
+      @fill-rows="onFillRows"
     />
     <CurrentUserName
       v-else-if="field.type === 'currentUser'"
@@ -198,7 +201,19 @@
       :placeholder="field.placeholder"
       @update:model-value="onUpdateModelValue"
     />
-    <div v-else-if="field.type === 'subform'" class="fill-subform" />
+    <FormSubform
+      v-else-if="field.type === 'subform'"
+      class="fill-full"
+      :app-id="appId"
+      :field="field"
+      :model-value="Array.isArray(modelValue) ? modelValue : []"
+      :disabled="disabled"
+      :updating="updating"
+      :record-values="recordValues"
+      :form-fields="formFields"
+      :dict-items-by-code="dictItemsByCode"
+      @update:model-value="onUpdateModelValue"
+    />
   </div>
 </template>
 
@@ -208,12 +223,14 @@ import { Connection, InfoFilled, Link } from '@element-plus/icons-vue'
 import { widthClass } from '../form-design/fieldTypes'
 import {
   hasLinkage,
+  hasSubformLinkage,
   needsOptionSourceHint as fieldNeedsOptionSourceHint,
 } from '../form-design/linkage'
 import FormDataSelect from './FormDataSelect.vue'
 import FormImageUpload from './FormImageUpload.vue'
 import FormFileUpload from './FormFileUpload.vue'
 import FormAddressSelect from './FormAddressSelect.vue'
+import FormSubform from './FormSubform.vue'
 import CurrentUserName from './CurrentUserName.vue'
 import CurrentUserDept from './CurrentUserDept.vue'
 
@@ -227,9 +244,13 @@ const props = defineProps({
   appId: { type: Number, default: 0 },
   recordValues: { type: Object, default: () => ({}) },
   formFields: { type: Array, default: () => [] },
+  dictItemsByCode: { type: Object, default: () => ({}) },
+  plain: { type: Boolean, default: false },
+  multiple: { type: Boolean, default: false },
+  compact: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:modelValue', 'fill'])
+const emit = defineEmits(['update:modelValue', 'fill', 'fill-rows'])
 
 function cloneDraft(value) {
   return Array.isArray(value) ? [...value] : value
@@ -248,7 +269,9 @@ const fieldKeyTitle = computed(() =>
   import.meta.env.DEV ? props.field.key || undefined : undefined,
 )
 
-const linked = computed(() => hasLinkage(props.field))
+const linked = computed(
+  () => hasLinkage(props.field) || hasSubformLinkage(props.field),
+)
 
 const isDisabled = computed(
   () =>
@@ -276,14 +299,22 @@ function onFill(patches) {
   emit('fill', patches)
 }
 
+function onFillRows(items) {
+  emit('fill-rows', items)
+}
+
 const needsOptionSourceHint = computed(() =>
   fieldNeedsOptionSourceHint(props.field),
 )
 
 const fieldClass = computed(() => {
+  if (props.plain) {
+    return ['is-plain']
+  }
   const width = widthClass[props.field.width] || 'is-w-full'
   if (props.field.type === 'image') return [width, 'is-image']
   if (props.field.type === 'file') return [width, 'is-file']
+  if (props.field.type === 'subform') return [width, 'is-subform']
   return width
 })
 </script>
@@ -320,7 +351,9 @@ const fieldClass = computed(() => {
 }
 
 .fill-field.is-image,
-.fill-field.is-file {
+.fill-field.is-file,
+.fill-field.is-subform,
+.fill-field.is-plain {
   max-width: none;
 }
 
