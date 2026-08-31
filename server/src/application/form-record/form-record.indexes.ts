@@ -16,6 +16,7 @@ export const FILTERABLE_TYPES: ReadonlySet<string> = new Set([
   'dept',
   'data',
   'relate',
+  'serialNumber',
 ]);
 
 export const SYSTEM_INDEX_NAMES = [

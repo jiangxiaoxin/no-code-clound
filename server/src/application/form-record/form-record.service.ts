@@ -26,6 +26,12 @@ import {
   parseImportRows,
 } from './form-record.import';
 import ExcelJS from 'exceljs';
+import { FormSerialSeqService } from './form-serial-seq.service';
+import {
+  findSerialField,
+  periodKey,
+  renderSerialValue,
+} from './serial-number';
 
 export type FormRecordView = {
   id: string;
@@ -51,6 +57,7 @@ export class FormRecordService {
     private readonly userRepo: Repository<User>,
     private readonly store: FormRecordStore,
     private readonly dictionaryService: DictionaryService,
+    private readonly serialSeq: FormSerialSeqService,
   ) {}
 
   async create(
@@ -64,6 +71,7 @@ export class FormRecordService {
     const coerced = coerceRecordData(fields, data); // 强制转换
     this.assertSubformConstraints(fields, coerced);
     await this.assertUniqueFields(formId, fields, coerced);
+    await this.applySerialNumber(formId, fields, coerced);
     const now = new Date();
     const inserted = await this.store.insert({
       appId,
@@ -268,6 +276,7 @@ export class FormRecordService {
         bucket.add(value);
       }
       if (skip) continue;
+      await this.applySerialNumber(formId, fields, data);
       docs.push({
         appId,
         formId,
@@ -330,6 +339,31 @@ export class FormRecordService {
         }
       }
     }
+  }
+
+  private async applySerialNumber(
+    formId: number,
+    fields: FormField[] | null,
+    data: Record<string, unknown>,
+  ) {
+    const field = findSerialField(fields);
+    if (!field?.key) return;
+    const rule = Array.isArray(field.serialRule) ? field.serialRule : [];
+    const counter = rule.find((item) => item.kind === 'counter');
+    const now = new Date();
+    let counterValue: number | undefined;
+    if (counter) {
+      const rawStart = Number(counter.start);
+      const start = Number.isInteger(rawStart) && rawStart >= 0 ? rawStart : 1;
+      const bucket = periodKey(Boolean(counter.reset), counter.resetPeriod, now);
+      counterValue = await this.serialSeq.takeNext(
+        formId,
+        field.key,
+        bucket,
+        start,
+      );
+    }
+    data[field.key] = renderSerialValue(field, data, now, counterValue);
   }
 
   private async assertUniqueFields(

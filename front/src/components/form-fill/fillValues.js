@@ -25,6 +25,7 @@ const SKIP_TYPES = new Set([
   'data',
   'relate',
   'tabs',
+  'serialNumber',
 ])
 
 export function isFillable(field) {
@@ -32,7 +33,11 @@ export function isFillable(field) {
 }
 
 export function isListColumn(field) {
-  return isFillable(field) || field?.type === 'subform'
+  return (
+    isFillable(field) ||
+    field?.type === 'subform' ||
+    field?.type === 'serialNumber'
+  )
 }
 
 function persistsValue(field) {
@@ -99,6 +104,11 @@ export function cloneRecordValues(fields, data) {
     }
     if (field.type === 'file') {
       next[field.key] = fileItemsOf(data?.[field.key])
+      continue
+    }
+    if (field.type === 'serialNumber') {
+      const value = data?.[field.key]
+      next[field.key] = typeof value === 'string' ? value : undefined
       continue
     }
     if (field.type === 'address') {

@@ -98,6 +98,17 @@ test('subform persists stripped rows and validates required', () => {
   assert.equal(formatCellValue(field, [{ name: '', qty: null }]), '')
 })
 
+test('serialNumber is shown from record but omitted from create payload', () => {
+  const field = { key: 'sn', type: 'serialNumber' }
+  assert.equal(isFillable(field), false)
+  assert.equal(isListColumn(field), true)
+  assert.equal(isInlineEditable(field), false)
+  const cloned = cloneRecordValues([field], { sn: '20260831-00001' })
+  assert.equal(cloned.sn, '20260831-00001')
+  const payload = buildRecordData([field], { sn: '20260831-00001' })
+  assert.equal(payload.sn, undefined)
+})
+
 test('选择数据 id is persisted but not treated as a fillable column', () => {
   const pick = { key: 'pick', type: 'data' }
   assert.equal(isFillable(pick), false)

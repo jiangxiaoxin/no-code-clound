@@ -22,6 +22,7 @@ describe('form-record.indexes', () => {
       { key: 'i1', type: 'image' },
       { key: 'f1', type: 'file' },
       { key: 's1', type: 'subform' },
+      { key: 'sn', type: 'serialNumber' },
       {
         key: 'tabs_1',
         type: 'tabs',
@@ -38,6 +39,7 @@ describe('form-record.indexes', () => {
       'idx_data_t1',
       'idx_data_t2',
       'idx_data_t3',
+      'idx_data_sn',
       'idx_data_inner',
     ]);
   });

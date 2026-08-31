@@ -157,6 +157,12 @@
     />
     <CurrentUserName v-else-if="field.type === 'currentUser'" class="canvas-item" />
     <CurrentUserDept v-else-if="field.type === 'currentUserDept'" class="canvas-item" />
+    <el-input
+      v-else-if="field.type === 'serialNumber'"
+      disabled
+      class="canvas-item"
+      :placeholder="field.placeholder"
+    />
     <el-divider v-else-if="field.type === 'divider'">
       {{ field.title }}
     </el-divider>

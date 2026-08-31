@@ -14,6 +14,8 @@ import { DictionaryService } from './dictionary/dictionary.service';
 import { FormRecordController } from './form-record/form-record.controller';
 import { FormRecordService } from './form-record/form-record.service';
 import { FormRecordStore } from './form-record/form-record.store';
+import { FormSerialSeq } from './form-record/form-serial-seq.entity';
+import { FormSerialSeqService } from './form-record/form-serial-seq.service';
 import { User } from '../user/user.entity';
 
 @Module({
@@ -26,6 +28,7 @@ import { User } from '../user/user.entity';
       Dictionary,
       DictionaryItem,
       User,
+      FormSerialSeq,
     ]),
     AuthModule,
   ],
@@ -39,6 +42,7 @@ import { User } from '../user/user.entity';
     DictionaryService,
     FormRecordStore,
     FormRecordService,
+    FormSerialSeqService,
   ],
 })
 export class ApplicationModule {}

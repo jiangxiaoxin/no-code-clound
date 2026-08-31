@@ -163,4 +163,21 @@ describe('mergeRecordData', () => {
     );
     expect(next).toEqual({ name: '旧', tags: ['x'] });
   });
+
+  it('drops client serialNumber on coerce and keeps existing on merge', () => {
+    const serialFields = [
+      { key: 'name', type: 'input' },
+      { key: 'sn', type: 'serialNumber' },
+    ];
+    expect(coerceRecordData(serialFields, { name: 'A', sn: 'hack' })).toEqual({
+      name: 'A',
+    });
+    expect(
+      mergeRecordData(
+        { name: 'A', sn: '20260831-00001' },
+        { name: 'B', sn: 'hack' },
+        serialFields,
+      ),
+    ).toEqual({ name: 'B', sn: '20260831-00001' });
+  });
 });
