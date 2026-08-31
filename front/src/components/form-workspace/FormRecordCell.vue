@@ -188,6 +188,7 @@ const props = defineProps({
   field: { type: Object, default: null },
   fields: { type: Array, default: () => [] },
   dictItemsByCode: { type: Object, default: () => ({}) },
+  userNames: { type: Object, default: () => ({}) },
   editing: { type: Boolean, default: false },
 })
 
@@ -219,6 +220,7 @@ const display = computed(() =>
     props.field,
     props.row.data?.[props.field?.key],
     props.dictItemsByCode,
+    props.userNames,
   ),
 )
 

@@ -138,12 +138,14 @@
         :value="item.value"
       />
     </el-select>
+    <FormMemberSelect
+      v-else-if="field.type === 'member' || field.type === 'member-multiple'"
+      class="canvas-item"
+      :field="field"
+      preview
+    />
     <el-select
-      v-else-if="
-        field.type === 'member' ||
-        field.type === 'dept' ||
-        field.type === 'relate'
-      "
+      v-else-if="field.type === 'dept' || field.type === 'relate'"
       disabled
       class="canvas-item"
       :placeholder="field.placeholder"
@@ -331,6 +333,7 @@ import { SUBFORM_CHILD_TYPES } from '../form-fill/subformField.js'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import FormFileUpload from '../form-fill/FormFileUpload.vue'
 import FormAddressSelect from '../form-fill/FormAddressSelect.vue'
+import FormMemberSelect from '../form-fill/FormMemberSelect.vue'
 import CurrentUserName from '../form-fill/CurrentUserName.vue'
 import CurrentUserDept from '../form-fill/CurrentUserDept.vue'
 

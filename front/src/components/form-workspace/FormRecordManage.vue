@@ -185,7 +185,8 @@ function openEdit(row) {
 }
 
 function onDetailSaved(updated) {
-  detailRecord.value = updated
+  detailStartEditing.value = false
+  detailVisible.value = false
   listRef.value?.upsertRecord(updated)
 }
 

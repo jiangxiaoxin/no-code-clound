@@ -774,6 +774,7 @@ describe('ApplicationService', () => {
           name: '客户',
           fields: [
             { key: 'n1', title: '客户名称', type: 'input' },
+            { key: 'm1', title: '负责人', type: 'member' },
             { key: 'x1', title: '', type: 'number' },
             { key: 'p1', title: '头像', type: 'image' },
             { key: 'f1', title: '附件', type: 'file' },

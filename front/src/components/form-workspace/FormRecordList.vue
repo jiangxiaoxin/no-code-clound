@@ -102,6 +102,7 @@
                 :field="fieldByKey[col.key]"
                 :fields="tableFields"
                 :dict-items-by-code="dictItemsByCode"
+                :user-names="userNames"
                 :editing="editingCell === cellKey(row.id, col.key)"
                 @start="editingCell = cellKey(row.id, col.key)"
                 @close="onCellClose(row.id, col.key)"
@@ -181,6 +182,7 @@ const pageSize = ref(20)
 const total = ref(0)
 const editingCell = ref('')
 const importVisible = ref(false)
+const userNames = ref({})
 // 切换表单时作废进行中的请求，避免把上一张表的记录写进来
 const loadSession = ref(0)
 const actions = computed(() => normalizeRecordActions(props.recordActions))
@@ -270,6 +272,7 @@ async function loadRecords() {
     if (session !== loadSession.value) return
     records.value = result?.items || []
     total.value = result?.total || 0
+    userNames.value = result?.userNames || {}
   } catch {
     if (session !== loadSession.value) return
     records.value = []

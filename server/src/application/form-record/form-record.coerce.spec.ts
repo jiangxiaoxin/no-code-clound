@@ -164,6 +164,29 @@ describe('mergeRecordData', () => {
     expect(next).toEqual({ name: '旧', tags: ['x'] });
   });
 
+  it('member keeps positive int and drops empty', () => {
+    expect(
+      coerceRecordData([{ key: 'owner', type: 'member' }], { owner: 8 }),
+    ).toEqual({ owner: 8 });
+    expect(
+      coerceRecordData([{ key: 'owner', type: 'member' }], { owner: '' }),
+    ).toEqual({});
+  });
+
+  it('member-multiple keeps unique positive ints in order', () => {
+    expect(
+      coerceRecordData([{ key: 'owners', type: 'member-multiple' }], {
+        owners: [3, 3, 1],
+      }),
+    ).toEqual({ owners: [3, 1] });
+  });
+
+  it('rejects non-positive member id', () => {
+    expect(() =>
+      coerceRecordData([{ key: 'owner', type: 'member' }], { owner: 0 }),
+    ).toThrow(BadRequestException);
+  });
+
   it('drops client serialNumber on coerce and keeps existing on merge', () => {
     const serialFields = [
       { key: 'name', type: 'input' },

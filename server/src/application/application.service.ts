@@ -38,6 +38,8 @@ const OPTION_FIELD_TYPES = new Set([
   'file',
   'address',
   'serialNumber',
+  'member',
+  'member-multiple',
 ]);
 
 const ICON_COLORS = [

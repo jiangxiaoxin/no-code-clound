@@ -328,3 +328,26 @@ test('tabs is layout-only and inner fields persist', () => {
     key: 'name',
   })
 })
+
+test('member single persists id; multiple persists unique ids; required', () => {
+  const one = { key: 'owner', type: 'member', title: '负责人', required: true }
+  const many = { key: 'owners', type: 'member-multiple', title: '成员' }
+  assert.equal(isFillable(one), true)
+  assert.equal(isListColumn(one), true)
+  assert.equal(isInlineEditable(one), false)
+  assert.deepEqual(buildRecordData([one], { owner: 9 }), { owner: 9 })
+  assert.deepEqual(
+    buildRecordData([many], { owners: [1, 1, 2] }),
+    { owners: [1, 2] },
+  )
+  assert.equal(validateRequired([one], { owner: undefined }), '请填写「负责人」')
+  assert.equal(
+    formatCellValue(one, 9, {}, { 9: '张三' }),
+    '张三',
+  )
+  assert.equal(formatCellValue(one, 9, {}, {}), '已删除')
+  assert.equal(
+    formatCellValue(many, [1, 2], {}, { 1: '甲', 2: '乙' }),
+    '甲、乙',
+  )
+})

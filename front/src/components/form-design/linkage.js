@@ -15,6 +15,8 @@ export const LINKAGE_VALUE_TYPES = [
   'image',
   'file',
   'address',
+  'member',
+  'member-multiple',
 ]
 
 export function hasLinkageSource(type) {

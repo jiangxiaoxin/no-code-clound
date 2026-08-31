@@ -14,13 +14,17 @@ import {
   subformRowsRequiredError,
   uniqueInRowsError,
 } from './subformField.js'
+import {
+  isMemberField,
+  memberDisplayName,
+  memberValueIds,
+} from '../form-design/memberField.js'
 
 const SKIP_TYPES = new Set([
   'divider',
   'currentUser',
   'currentUserDept',
   'subform',
-  'member',
   'dept',
   'data',
   'relate',
@@ -52,7 +56,8 @@ export function emptyValue(field) {
     field.type === 'checkbox' ||
     field.type === 'select-multiple' ||
     field.type === 'image' ||
-    field.type === 'file'
+    field.type === 'file' ||
+    field.type === 'member-multiple'
   ) {
     return []
   }
@@ -148,6 +153,12 @@ export function isEmptyValue(field, value) {
   if (field.type === 'number') {
     return value == null || value === ''
   }
+  if (field.type === 'member') {
+    return typeof value !== 'number' || !Number.isInteger(value) || value <= 0
+  }
+  if (field.type === 'member-multiple') {
+    return !Array.isArray(value) || value.length === 0
+  }
   return value == null || value === ''
 }
 
@@ -167,6 +178,11 @@ export function serializeValue(field, value) {
   }
   if (isEmptyValue(field, value)) {
     return undefined
+  }
+  if (isMemberField(field)) {
+    const ids = memberValueIds(field.type, value)
+    if (!ids.length) return undefined
+    return field.type === 'member-multiple' ? ids : ids[0]
   }
   if (field.type === 'image') {
     const urls = imageUrlsOf(value)
@@ -312,9 +328,13 @@ function formatSubformCellValue(field, value, dictItemsByCode) {
     .join('；')
 }
 
-export function formatCellValue(field, value, dictItemsByCode) {
+export function formatCellValue(field, value, dictItemsByCode, userNames) {
   if (field?.type === 'subform') {
     return formatSubformCellValue(field, value, dictItemsByCode)
+  }
+  if (isMemberField(field)) {
+    const ids = memberValueIds(field.type, value)
+    return ids.map((id) => memberDisplayName(id, userNames)).join('、')
   }
   if (value == null || value === '') return ''
   /**

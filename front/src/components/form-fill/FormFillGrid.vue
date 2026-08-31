@@ -23,6 +23,7 @@
                 :record-values="values"
                 :form-fields="flatFields"
                 :dict-items-by-code="dictItemsByCode"
+                :user-names="userNames"
                 @fill="onFill"
               />
             </div>
@@ -41,6 +42,7 @@
         :record-values="values"
         :form-fields="flatFields"
         :dict-items-by-code="dictItemsByCode"
+        :user-names="userNames"
         @fill="onFill"
       />
     </template>
@@ -79,6 +81,7 @@ const props = defineProps({
   dictItemsByCode: { type: Object, default: () => ({}) },
   disabled: { type: Boolean, default: false },
   updating: { type: Boolean, default: false },
+  userNames: { type: Object, default: () => ({}) },
 })
 
 const fillTips = computed(() => fillInfluencerTips(props.fields))

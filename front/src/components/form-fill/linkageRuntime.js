@@ -9,6 +9,7 @@ import {
 import { fileItemsOf, fileMaxCount } from './fileField.js'
 import { imageMaxCount, imageUrlsOf } from './imageField.js'
 import { recordsToSelectItems } from './tableOptions.js'
+import { memberValueIds, positiveIntIds } from '../form-design/memberField.js'
 
 function hasCurrentValue(value) {
   if (Array.isArray(value)) return value.length > 0
@@ -28,7 +29,12 @@ export function linkageConditionsReady(linkage, values) {
 }
 
 export function linkageQueryPaging(field) {
-  if (isSelectType(field?.type) || field?.type === 'image' || field?.type === 'file') {
+  if (
+    isSelectType(field?.type) ||
+    field?.type === 'image' ||
+    field?.type === 'file' ||
+    field?.type === 'member-multiple'
+  ) {
     return { page: 1, pageSize: 100 }
   }
   return { page: 1, pageSize: 2 }
@@ -178,6 +184,48 @@ export function applyLinkageResult(field, result, currentValue, extra = {}) {
         addressFormatOf(field),
         extra.addressTree || [],
       ),
+      items: [],
+      message: '',
+    }
+  }
+
+  if (field.type === 'member') {
+    const count = recordCount(result)
+    if (count <= 0) return emptyResult(field)
+    if (count > 1) {
+      return {
+        value: emptyValue(field),
+        items: [],
+        message: linkageManyMessage(field),
+      }
+    }
+    const raw = triggerValue(items[0], sourceKey)
+    const ids = memberValueIds(
+      'member',
+      Array.isArray(raw) ? raw[0] : raw,
+    )
+    return {
+      value: ids[0],
+      items: [],
+      message: '',
+    }
+  }
+
+  if (field.type === 'member-multiple') {
+    const ids = []
+    const seen = new Set()
+    for (const row of items) {
+      const raw = row?.data?.[sourceKey]
+      const list = Array.isArray(raw) ? raw : raw == null ? [] : [raw]
+      for (const id of positiveIntIds(list)) {
+        if (seen.has(id)) continue
+        seen.add(id)
+        ids.push(id)
+      }
+    }
+    if (!ids.length) return emptyResult(field)
+    return {
+      value: ids,
       items: [],
       message: '',
     }
