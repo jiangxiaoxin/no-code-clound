@@ -27,7 +27,7 @@
         :description="keyword.trim() ? '没有匹配的应用' : '还没有应用，点击右上角新建'"
       />
 
-      <el-space v-else class="app-grid" wrap :size="32">
+      <div v-else class="app-grid">
         <el-card
           v-for="app in visibleApps"
           :key="app.id"
@@ -35,14 +35,22 @@
           shadow="never"
           @click="openApp(app)"
         >
-          <el-space class="app-card-inner" direction="vertical" alignment="center" :size="12">
-            <el-text class="app-icon" :style="{ background: app.icon }">
+          <el-button
+            class="app-card-delete"
+            text
+            type="danger"
+            title="删除"
+            :icon="Delete"
+            @click.stop="onDeleteApp(app)"
+          />
+          <div class="app-card-inner">
+            <span class="app-icon" :style="{ background: app.icon }">
               {{ appInitial(app.name) }}
-            </el-text>
-            <el-text class="app-name" truncated>{{ app.name }}</el-text>
-          </el-space>
+            </span>
+            <span class="app-name">{{ app.name }}</span>
+          </div>
         </el-card>
-      </el-space>
+      </div>
     </el-main>
   </el-container>
 
@@ -81,10 +89,10 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Delete, Plus, Search } from '@element-plus/icons-vue'
 import AppHeader from '../components/AppHeader.vue'
-import { createAppApi, listAppsApi } from '../api/apps'
+import { createAppApi, deleteAppApi, listAppsApi } from '../api/apps'
 
 const router = useRouter()
 const keyword = ref('')
@@ -127,6 +135,30 @@ async function loadApps() {
 
 function openApp(app) {
   router.push(`/apps/${app.id}`)
+}
+
+async function onDeleteApp(app) {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除应用「${app.name}」？删除后不可恢复。`,
+      '删除应用',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await deleteAppApi(app.id)
+    apps.value = apps.value.filter((item) => item.id !== app.id)
+    ElMessage.success('已删除应用')
+  } catch {
+    // 错误已由 http 拦截器提示
+  }
 }
 
 function openCreate() {
@@ -195,10 +227,14 @@ onMounted(loadApps)
 }
 
 .app-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
   width: 100%;
 }
 
 .app-card {
+  position: relative;
   width: 156px;
   cursor: pointer;
   border: none;
@@ -218,13 +254,26 @@ onMounted(loadApps)
   padding: 20px 18px 16px;
 }
 
-.app-card-inner {
-  width: 100%;
+.app-card-delete {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.app-card-inner :deep(.el-space__item) {
+.app-card:hover .app-card-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-card-inner {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
 }
 
 .app-icon {
@@ -245,7 +294,10 @@ onMounted(loadApps)
 .app-name {
   display: block;
   width: 100%;
+  overflow: hidden;
   text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   line-height: 1.4;
   color: var(--el-text-color-primary);

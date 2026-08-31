@@ -6,7 +6,10 @@ import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
 import { ApplicationService } from './application.service';
+import { Dictionary } from './dictionary/dictionary.entity';
+import { DictionaryItem } from './dictionary/dictionary-item.entity';
 import { FormRecordStore } from './form-record/form-record.store';
+import { FormSerialSeq } from './form-record/form-serial-seq.entity';
 
 describe('ApplicationService', () => {
   let service: ApplicationService;
@@ -15,6 +18,7 @@ describe('ApplicationService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    remove: jest.fn(),
   };
   const groupRepo = {
     find: jest.fn(),
@@ -22,6 +26,7 @@ describe('ApplicationService', () => {
     create: jest.fn(),
     save: jest.fn(),
     remove: jest.fn(),
+    delete: jest.fn(),
   };
   const formRepo = {
     find: jest.fn(),
@@ -30,15 +35,28 @@ describe('ApplicationService', () => {
     save: jest.fn(),
     remove: jest.fn(),
     count: jest.fn(),
+    delete: jest.fn(),
   };
   const formConfigRepo = {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    delete: jest.fn(),
+  };
+  const dictRepo = {
+    find: jest.fn(),
+    delete: jest.fn(),
+  };
+  const itemRepo = {
+    delete: jest.fn(),
+  };
+  const serialSeqRepo = {
+    delete: jest.fn(),
   };
 
   const formRecordStore = {
     dropFormCollection: jest.fn(),
+    dropAppCollections: jest.fn(),
     syncIndexes: jest.fn(),
   };
 
@@ -58,6 +76,9 @@ describe('ApplicationService', () => {
         { provide: getRepositoryToken(AppGroup), useValue: groupRepo },
         { provide: getRepositoryToken(AppForm), useValue: formRepo },
         { provide: getRepositoryToken(AppFormConfig), useValue: formConfigRepo },
+        { provide: getRepositoryToken(Dictionary), useValue: dictRepo },
+        { provide: getRepositoryToken(DictionaryItem), useValue: itemRepo },
+        { provide: getRepositoryToken(FormSerialSeq), useValue: serialSeqRepo },
         { provide: FormRecordStore, useValue: formRecordStore },
       ],
     }).compile();
@@ -155,6 +176,74 @@ describe('ApplicationService', () => {
       } catch (e) {
         expect((e as NotFoundException).message).toBe('应用不存在');
       }
+    });
+  });
+
+  describe('deleteApp', () => {
+    it('removes mysql rows and mongo collections for the app', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([
+        { id: 10, applicationId: 8 },
+        { id: 11, applicationId: 8 },
+      ]);
+      dictRepo.find.mockResolvedValue([{ id: 3, applicationId: 8 }]);
+
+      await service.deleteApp(1, 8);
+
+      expect(formRecordStore.dropAppCollections).toHaveBeenCalledWith(8, [
+        10, 11,
+      ]);
+      expect(formRecordStore.dropAppCollections.mock.invocationCallOrder[0]).toBeLessThan(
+        serialSeqRepo.delete.mock.invocationCallOrder[0],
+      );
+      expect(serialSeqRepo.delete).toHaveBeenCalled();
+      expect(formConfigRepo.delete).toHaveBeenCalled();
+      expect(itemRepo.delete).toHaveBeenCalled();
+      expect(dictRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
+      expect(formRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
+      expect(groupRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
+      expect(repo.remove).toHaveBeenCalledWith(ownedApp);
+    });
+
+    it('still drops leftover mongo collections when the app has no forms', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([]);
+      dictRepo.find.mockResolvedValue([]);
+
+      await service.deleteApp(1, 8);
+
+      expect(formRecordStore.dropAppCollections).toHaveBeenCalledWith(8, []);
+      expect(serialSeqRepo.delete).not.toHaveBeenCalled();
+      expect(formConfigRepo.delete).not.toHaveBeenCalled();
+      expect(itemRepo.delete).not.toHaveBeenCalled();
+      expect(dictRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
+      expect(formRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
+      expect(groupRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
+      expect(repo.remove).toHaveBeenCalledWith(ownedApp);
+    });
+
+    it('does not delete mysql when mongo drop fails', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([{ id: 10, applicationId: 8 }]);
+      dictRepo.find.mockResolvedValue([]);
+      formRecordStore.dropAppCollections.mockRejectedValue(
+        new Error('mongo down'),
+      );
+
+      await expect(service.deleteApp(1, 8)).rejects.toThrow('mongo down');
+      expect(repo.remove).not.toHaveBeenCalled();
+      expect(formRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('throws 404 when missing or not owner', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(service.deleteApp(1, 8)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(formRepo.find).not.toHaveBeenCalled();
+      expect(formRecordStore.dropAppCollections).not.toHaveBeenCalled();
+      expect(repo.remove).not.toHaveBeenCalled();
     });
   });
 

@@ -14,6 +14,10 @@ export function getAppApi(id) {
   return http.get(`/apps/${id}`)
 }
 
+export function deleteAppApi(id) {
+  return http.delete(`/apps/${id}`)
+}
+
 export function getDirectoryApi(id) {
   return http.get(`/apps/${id}/directory`)
 }

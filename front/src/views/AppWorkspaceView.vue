@@ -28,23 +28,24 @@
         </el-dropdown>
       </div>
 
-      <el-empty
-        v-if="!loading && treeData.length === 0"
-        :description="keyword.trim() ? '没有匹配的分组或表单' : '还没有分组和表单'"
-      />
-      <el-tree
-        v-else
-        ref="treeRef"
-        class="aside-tree"
-        :data="treeData"
-        node-key="key"
-        highlight-current
-        :default-expand-all="true"
-        :expand-on-click-node="true"
-        :current-node-key="currentForm?.key"
-        :props="{ label: 'name', children: 'children' }"
-        @node-click="onNodeClick"
-      >
+      <div class="aside-body">
+        <el-empty
+          v-if="!loading && treeData.length === 0"
+          :description="keyword.trim() ? '没有匹配的分组或表单' : '还没有分组和表单'"
+        />
+        <el-tree
+          v-else
+          ref="treeRef"
+          class="aside-tree"
+          :data="treeData"
+          node-key="key"
+          highlight-current
+          :default-expand-all="true"
+          :expand-on-click-node="true"
+          :current-node-key="currentForm?.key"
+          :props="{ label: 'name', children: 'children' }"
+          @node-click="onNodeClick"
+        >
         <template #default="{ data }">
           <div class="tree-node">
             <el-icon>
@@ -74,6 +75,7 @@
           </div>
         </template>
       </el-tree>
+      </div>
       <div class="aside-footer">
         <el-button class="aside-backend" text :icon="Setting" @click="goBackend">应用后台</el-button>
       </div>
@@ -486,10 +488,14 @@ watch(formId, () => {
   }
 }
 
-.aside-tree {
+.aside-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
+}
+
+.aside-tree {
+  min-height: 0;
 
   :deep(.el-tree-node__content) {
     width: 100%;

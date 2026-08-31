@@ -119,4 +119,39 @@ describe('FormRecordStore', () => {
       { projection: { _id: 1 } },
     );
   });
+
+  describe('dropAppCollections', () => {
+    it('drops known form collections and leftover collections of the app', async () => {
+      const byName = new Map<string, { drop: jest.Mock; findOne: jest.Mock }>();
+      const col = (name: string) => {
+        if (!byName.has(name)) {
+          byName.set(name, { drop: jest.fn(), findOne: jest.fn() });
+        }
+        return byName.get(name)!;
+      };
+      const appStore = new FormRecordStore({
+        getDb: () => ({
+          collection: jest.fn((name: string) => col(name)),
+          listCollections: () => ({
+            toArray: async () => [
+              { name: 'frm_10' },
+              { name: 'frm_99' },
+              { name: 'users' },
+            ],
+          }),
+        }),
+      } as never);
+      col('frm_99').findOne.mockResolvedValue({ _id: 'x' });
+
+      await appStore.dropAppCollections(8, [10]);
+
+      expect(col('frm_10').drop).toHaveBeenCalled();
+      expect(col('frm_99').findOne).toHaveBeenCalledWith(
+        { appId: 8 },
+        { projection: { _id: 1 } },
+      );
+      expect(col('frm_99').drop).toHaveBeenCalled();
+      expect(byName.has('users')).toBe(false);
+    });
+  });
 });

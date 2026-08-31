@@ -138,6 +138,14 @@ export class ApplicationController {
     return this.applicationService.getOne(req.user.id, id);
   }
 
+  @Delete(':id')
+  deleteApp(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.applicationService.deleteApp(req.user.id, id);
+  }
+
   @Get(':id/directory')
   directory(
     @Req() req: { user: { id: number } },

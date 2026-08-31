@@ -73,10 +73,7 @@ const dragKey = ref('')
 const dragOverKey = ref('')
 
 function isFieldSelected(field) {
-  if (props.selectedKey === field.key) {
-    return true
-  }
-  return (field.fields || []).some((child) => child.key === props.selectedKey)
+  return props.selectedKey === field.key
 }
 
 function paletteItem(data) {

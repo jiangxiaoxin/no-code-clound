@@ -294,6 +294,7 @@
             :key="`${child.key}-preview`"
             class="canvas-subform-cell"
             :class="{
+              'is-selected': selectedKey === child.key,
               'is-image': child.type === 'image',
               'is-file': child.type === 'file',
             }"
@@ -658,7 +659,12 @@ function onChildDragEnd() {
 }
 
 .canvas-field.is-child-selected {
+  background: var(--el-bg-color);
   border-color: var(--el-color-primary-light-5);
+}
+
+.canvas-field.is-child-selected:hover {
+  background: var(--el-bg-color);
 }
 
 .canvas-field.is-embedded {
@@ -722,6 +728,7 @@ function onChildDragEnd() {
 .canvas-subform-cell.is-hint {
   color: var(--el-text-color-placeholder);
   font-size: 13px;
+  line-height: 34px;
 }
 
 .canvas-subform-plus {
@@ -730,9 +737,10 @@ function onChildDragEnd() {
   font-size: 16px;
 }
 
-.canvas-subform-col.is-selected {
+.canvas-subform-col.is-selected,
+.canvas-subform-cell.is-selected {
   color: var(--el-color-primary);
-  background: var(--el-color-primary-light-9);
+  background: var(--el-color-primary-light-7);
 }
 
 .canvas-subform-body {

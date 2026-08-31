@@ -77,6 +77,27 @@ export class FormRecordStore {
     }
   }
 
+  async dropAppCollections(appId: number, formIds: number[]): Promise<void> {
+    const dropped = new Set(formIds);
+    for (const formId of formIds) {
+      await this.dropFormCollection(formId);
+    }
+    const cols = await this.mongo.getDb().listCollections().toArray();
+    for (const col of cols) {
+      const match = /^frm_(\d+)$/.exec(col.name);
+      if (!match) continue;
+      const formId = Number(match[1]);
+      if (dropped.has(formId)) continue;
+      const leftover = await this.col(formId).findOne(
+        { appId },
+        { projection: { _id: 1 } },
+      );
+      if (leftover) {
+        await this.dropFormCollection(formId);
+      }
+    }
+  }
+
   async insert(doc: Omit<FormRecordDoc, '_id'>): Promise<{ id: string }> {
     await this.ensureSystemIndexes(doc.formId);
     const result = await this.col(doc.formId).insertOne(doc as FormRecordDoc);

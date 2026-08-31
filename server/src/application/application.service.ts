@@ -5,17 +5,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AppForm } from './app-form.entity';
 import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
+import { Dictionary } from './dictionary/dictionary.entity';
+import { DictionaryItem } from './dictionary/dictionary-item.entity';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
 import { flattenFields } from './form-record/flatten-fields';
 import { FormField } from './form-record/form-record.types';
 import { FormRecordStore } from './form-record/form-record.store';
+import { FormSerialSeq } from './form-record/form-serial-seq.entity';
 import { mergeFormConfig, normalizeFormConfig } from './form-config';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
 import { assertSerialSchema } from './form-record/serial-number';
@@ -68,6 +71,12 @@ export class ApplicationService {
     private readonly formRepo: Repository<AppForm>,
     @InjectRepository(AppFormConfig)
     private readonly formConfigRepo: Repository<AppFormConfig>,
+    @InjectRepository(Dictionary)
+    private readonly dictRepo: Repository<Dictionary>,
+    @InjectRepository(DictionaryItem)
+    private readonly itemRepo: Repository<DictionaryItem>,
+    @InjectRepository(FormSerialSeq)
+    private readonly serialSeqRepo: Repository<FormSerialSeq>,
     private readonly formRecordStore: FormRecordStore,
   ) {}
 
@@ -104,6 +113,32 @@ export class ApplicationService {
   ): Promise<{ id: number; name: string; icon: string }> {
     const app = await this.requireOwnedApp(ownerId, id);
     return this.toAppItem(app);
+  }
+
+  async deleteApp(ownerId: number, id: number): Promise<void> {
+    const app = await this.requireOwnedApp(ownerId, id);
+    const forms = await this.formRepo.find({
+      where: { applicationId: id },
+    });
+    const formIds = forms.map((form) => form.id);
+    const dicts = await this.dictRepo.find({
+      where: { applicationId: id },
+    });
+    const dictIds = dicts.map((row) => row.id);
+
+    await this.formRecordStore.dropAppCollections(id, formIds);
+
+    if (formIds.length) {
+      await this.serialSeqRepo.delete({ formId: In(formIds) });
+      await this.formConfigRepo.delete({ formId: In(formIds) });
+    }
+    if (dictIds.length) {
+      await this.itemRepo.delete({ dictionaryId: In(dictIds) });
+    }
+    await this.dictRepo.delete({ applicationId: id });
+    await this.formRepo.delete({ applicationId: id });
+    await this.groupRepo.delete({ applicationId: id });
+    await this.appRepo.remove(app);
   }
 
   async getForm(ownerId: number, appId: number, formId: number) {
