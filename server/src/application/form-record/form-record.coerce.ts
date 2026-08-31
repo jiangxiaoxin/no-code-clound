@@ -93,6 +93,12 @@ function coerceSubformValue(field: FormField, value: unknown): unknown {
     }
     const row = coerceRecordData(children, raw);
     if (isSubformRowEmpty(children, row)) {
+      const requiredChild = children.find((child) => child.required);
+      if (requiredChild) {
+        throw new BadRequestException(
+          `[${field.title || '未命名'}.${requiredChild.title || '未命名'}]不能为空`,
+        );
+      }
       continue;
     }
     rows.push(row);

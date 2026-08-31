@@ -57,6 +57,25 @@ describe('coerceRecordData', () => {
     expect(out.lines).toEqual([{ name: 'A', qty: 2 }]);
   });
 
+  it('rejects empty subform row when a child is required', () => {
+    expect(() =>
+      coerceRecordData(
+        [
+          {
+            key: 'lines',
+            type: 'subform',
+            title: '子表单',
+            fields: [
+              { key: 'name', type: 'input', title: '物料名称', required: true },
+              { key: 'qty', type: 'number' },
+            ],
+          },
+        ],
+        { lines: [{ name: '', qty: null }] },
+      ),
+    ).toThrow('[子表单.物料名称]不能为空');
+  });
+
   it('stores image urls as an array', () => {
     expect(
       coerceRecordData(fields, { pics: ['/uploads/a.png'] }),

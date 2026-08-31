@@ -596,7 +596,7 @@
         />
       </template>
       <template v-if="isSerialField">
-        <el-form-item label="分隔符">
+        <el-form-item label="流水号分隔符">
           <el-input
             :model-value="field.serialSeparator"
             maxlength="8"
@@ -609,19 +609,21 @@
             v-for="seg in field.serialRule"
             :key="seg.id"
             class="serial-rule-row"
-            draggable="true"
-            @dragstart="onSerialDragStart(seg, $event)"
             @dragover="onSerialDragOver"
             @drop="onSerialDrop(seg, $event)"
-            @dragend="onSerialDragEnd"
           >
-            <span class="serial-rule-handle">
+            <span
+              class="serial-rule-handle"
+              draggable="true"
+              @dragstart="onSerialDragStart(seg, $event)"
+              @dragend="onSerialDragEnd"
+            >
               <el-icon><Rank /></el-icon>
             </span>
             <button
               type="button"
               class="serial-rule-summary"
-              :class="{ 'is-active': activeSerialSegId === seg.id, 'is-invalid': isSerialFieldSegInvalid(seg) }"
+              :class="{ 'is-active': serialSegDialogVisible && activeSerialSegId === seg.id, 'is-invalid': isSerialFieldSegInvalid(seg) }"
               @click="onSelectSerialSeg(seg)"
             >
               {{ serialSegmentSummary(seg, fields) }}
@@ -629,78 +631,96 @@
             <el-button type="danger" link :icon="Delete" @click="onRemoveSerialSeg(seg)" />
           </div>
           <div class="serial-rule-add">
-            <el-button @click="onAddSerialSeg('fixed')">固定字符</el-button>
-            <el-button @click="onAddSerialSeg('datetime')">日期时间</el-button>
-            <el-button
-              :disabled="!canAddSerialCounter(field.serialRule)"
-              @click="onAddSerialSeg('counter')"
-            >
-              自动计数
-            </el-button>
-            <el-button @click="onAddSerialSeg('field')">表单字段</el-button>
+            <el-dropdown trigger="click" @command="onAddSerialSeg">
+              <el-button :icon="Plus" type="primary">添加</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="fixed">固定字符</el-dropdown-item>
+                  <el-dropdown-item command="datetime">日期时间</el-dropdown-item>
+                  <el-dropdown-item
+                    command="counter"
+                    :disabled="!canAddSerialCounter(field.serialRule)"
+                  >
+                    自动计数
+                  </el-dropdown-item>
+                  <el-dropdown-item command="field">表单字段</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </div>
-        <template v-if="activeSerialSeg">
-          <el-form-item v-if="activeSerialSeg.kind === 'fixed'" label="固定字符">
-            <el-input
-              v-model="activeSerialSeg.text"
-              maxlength="32"
-              @keydown="onSerialFixedKeydown"
-            />
-          </el-form-item>
-          <el-form-item v-if="activeSerialSeg.kind === 'datetime'" label="日期格式">
-            <el-select v-model="activeSerialSeg.format">
-              <el-option
-                v-for="item in SERIAL_DATETIME_OPTIONS"
-                :key="item.value"
-                :label="item.label"
-                :value="item.value"
-              />
-            </el-select>
-          </el-form-item>
-          <template v-if="activeSerialSeg.kind === 'counter'">
-            <el-form-item label="起始值">
-              <el-input-number
-                v-model="activeSerialSeg.start"
-                :min="0"
-                :precision="0"
-                :controls="false"
+        <el-dialog
+          v-model="serialSegDialogVisible"
+          :title="serialSegDialogTitle"
+          width="480px"
+          draggable
+          @closed="onSerialSegDialogClosed"
+        >
+          <el-form v-if="activeSerialSeg" label-position="top" @submit.prevent>
+            <el-form-item v-if="activeSerialSeg.kind === 'fixed'" label="固定字符">
+              <el-input
+                v-model="activeSerialSeg.text"
+                maxlength="32"
+                @keydown="onSerialFixedKeydown"
               />
             </el-form-item>
-            <el-form-item label="计数位数">
-              <el-input-number
-                v-model="activeSerialSeg.digits"
-                :min="1"
-                :max="12"
-                :precision="0"
-                :controls="false"
-              />
-            </el-form-item>
-            <el-form-item label="是否重置">
-              <el-switch v-model="activeSerialSeg.reset" @change="onSerialResetChange" />
-            </el-form-item>
-            <el-form-item v-if="activeSerialSeg.reset" label="重置周期">
-              <el-select v-model="activeSerialSeg.resetPeriod">
+            <el-form-item v-if="activeSerialSeg.kind === 'datetime'" label="日期格式">
+              <el-select v-model="activeSerialSeg.format">
                 <el-option
-                  v-for="item in SERIAL_RESET_PERIODS"
+                  v-for="item in SERIAL_DATETIME_OPTIONS"
                   :key="item.value"
                   :label="item.label"
                   :value="item.value"
                 />
               </el-select>
             </el-form-item>
+            <template v-if="activeSerialSeg.kind === 'counter'">
+              <el-form-item label="起始值">
+                <el-input-number
+                  v-model="activeSerialSeg.start"
+                  :min="0"
+                  :precision="0"
+                  :controls="false"
+                />
+              </el-form-item>
+              <el-form-item label="计数位数">
+                <el-input-number
+                  v-model="activeSerialSeg.digits"
+                  :min="1"
+                  :max="12"
+                  :precision="0"
+                  :controls="false"
+                />
+              </el-form-item>
+              <el-form-item label="是否重置">
+                <el-switch v-model="activeSerialSeg.reset" @change="onSerialResetChange" />
+              </el-form-item>
+              <el-form-item v-if="activeSerialSeg.reset" label="重置周期">
+                <el-select v-model="activeSerialSeg.resetPeriod">
+                  <el-option
+                    v-for="item in SERIAL_RESET_PERIODS"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"
+                  />
+                </el-select>
+              </el-form-item>
+            </template>
+            <el-form-item v-if="activeSerialSeg.kind === 'field'" label="引用字段">
+              <el-select v-model="activeSerialSeg.fieldKey" clearable placeholder="请选择单行文本或数字">
+                <el-option
+                  v-for="item in serialRefOptions"
+                  :key="item.key"
+                  :label="item.title || item.key"
+                  :value="item.key"
+                />
+              </el-select>
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button type="primary" @click="closeSerialSegDialog">确定</el-button>
           </template>
-          <el-form-item v-if="activeSerialSeg.kind === 'field'" label="引用字段">
-            <el-select v-model="activeSerialSeg.fieldKey" clearable placeholder="请选择单行文本或数字">
-              <el-option
-                v-for="item in serialRefOptions"
-                :key="item.key"
-                :label="item.title || item.key"
-                :value="item.key"
-              />
-            </el-select>
-          </el-form-item>
-        </template>
+        </el-dialog>
       </template>
       <el-form-item v-if="field.type !== 'divider' && field.type !== 'subform' && !parentSubform" label="字段宽度">
         <el-radio-group class="width-options" :model-value="field.width" @change="onWidthChange">
@@ -719,13 +739,15 @@
           v-for="pane in field.panes"
           :key="pane.id"
           class="pane-row"
-          draggable="true"
-          @dragstart="onPaneDragStart(pane, $event)"
           @dragover="onPaneDragOver"
           @drop="onPaneDrop(pane, $event)"
-          @dragend="onPaneDragEnd"
         >
-          <span class="pane-handle">
+          <span
+            class="pane-handle"
+            draggable="true"
+            @dragstart="onPaneDragStart(pane, $event)"
+            @dragend="onPaneDragEnd"
+          >
             <el-icon><Rank /></el-icon>
           </span>
           <el-input
@@ -841,6 +863,14 @@ let paneTitleBeforeEdit = ''
 const draggingPaneId = ref('')
 const draggingSerialId = ref('')
 const activeSerialSegId = ref('')
+const serialSegDialogVisible = ref(false)
+
+const SERIAL_SEG_DIALOG_TITLES = {
+  fixed: '固定字符',
+  datetime: '日期时间',
+  counter: '自动计数',
+  field: '表单字段',
+}
 
 function onPaneTitleFocus(pane) {
   paneTitleBeforeEdit = pane.title || ''
@@ -899,8 +929,21 @@ function onSerialSeparatorInput(value) {
   props.field.serialSeparator = value
 }
 
-function onSelectSerialSeg(seg) {
+function openSerialSegDialog(seg) {
   activeSerialSegId.value = seg.id
+  serialSegDialogVisible.value = true
+}
+
+function closeSerialSegDialog() {
+  serialSegDialogVisible.value = false
+}
+
+function onSerialSegDialogClosed() {
+  activeSerialSegId.value = ''
+}
+
+function onSelectSerialSeg(seg) {
+  openSerialSegDialog(seg)
 }
 
 function onAddSerialSeg(kind) {
@@ -911,14 +954,15 @@ function onAddSerialSeg(kind) {
   }
   const seg = newSerialSegment(kind)
   props.field.serialRule.push(seg)
-  activeSerialSegId.value = seg.id
+  openSerialSegDialog(seg)
 }
 
 function onRemoveSerialSeg(seg) {
   if (!props.field?.serialRule) return
   props.field.serialRule = props.field.serialRule.filter((item) => item.id !== seg.id)
   if (activeSerialSegId.value === seg.id) {
-    activeSerialSegId.value = props.field.serialRule[0]?.id || ''
+    serialSegDialogVisible.value = false
+    activeSerialSegId.value = ''
   }
 }
 
@@ -1203,9 +1247,11 @@ const activeSerialSeg = computed(
   () =>
     (props.field?.serialRule || []).find(
       (item) => item.id === activeSerialSegId.value,
-    ) ||
-    (props.field?.serialRule || [])[0] ||
-    null,
+    ) || null,
+)
+
+const serialSegDialogTitle = computed(
+  () => SERIAL_SEG_DIALOG_TITLES[activeSerialSeg.value?.kind] || '规则段',
 )
 
 const hasDisplayFields = computed(() =>
@@ -1414,7 +1460,11 @@ watch(() => props.appId, loadOptions, { immediate: true })
 watch(
   () => [props.field?.key, props.field?.type],
   () => {
-    if (!props.field || props.field.type !== 'serialNumber') return
+    if (!props.field || props.field.type !== 'serialNumber') {
+      serialSegDialogVisible.value = false
+      activeSerialSegId.value = ''
+      return
+    }
     if (!Array.isArray(props.field.serialRule)) {
       props.field.serialRule = []
     }
@@ -1423,7 +1473,8 @@ watch(
     }
     const ids = props.field.serialRule.map((item) => item.id)
     if (!ids.includes(activeSerialSegId.value)) {
-      activeSerialSegId.value = ids[0] || ''
+      serialSegDialogVisible.value = false
+      activeSerialSegId.value = ''
     }
   },
   { immediate: true },
@@ -1441,6 +1492,8 @@ watch(
     displayVisible.value = false
     mappingVisible.value = false
     processVisible.value = false
+    serialSegDialogVisible.value = false
+    activeSerialSegId.value = ''
   },
 )
 </script>
@@ -1647,6 +1700,10 @@ watch(
   cursor: grab;
 }
 
+.pane-handle:active {
+  cursor: grabbing;
+}
+
 .pane-row .el-input {
   flex: 1;
   min-width: 0;
@@ -1673,6 +1730,10 @@ watch(
   cursor: grab;
 }
 
+.serial-rule-handle:active {
+  cursor: grabbing;
+}
+
 .serial-rule-summary {
   flex: 1;
   min-width: 0;
@@ -1695,7 +1756,15 @@ watch(
 
 .serial-rule-add {
   display: flex;
-  flex-wrap: wrap;
+}
+
+.serial-rule-add :deep(.el-dropdown) {
+  flex: 1;
+  min-width: 0;
+}
+
+.serial-rule-add :deep(.el-button) {
+  width: 100%;
 }
 
 .member-scope-dialog {

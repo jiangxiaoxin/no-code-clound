@@ -87,7 +87,14 @@ test('subform persists stripped rows and validates required', () => {
   assert.equal(validateRequired([field], { lines: [] }), '[明细]不能为空')
   assert.equal(
     validateRequired([field], { lines: [{ name: '', qty: 1 }] }),
-    '[名称]不能为空',
+    '[明细.名称]不能为空',
+  )
+  assert.equal(
+    validateRequired(
+      [{ ...field, required: false }],
+      { lines: [{ name: '', qty: null }] },
+    ),
+    '[明细.名称]不能为空',
   )
   assert.equal(isFillable(field), false)
   assert.equal(isListColumn(field), true)

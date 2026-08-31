@@ -74,6 +74,10 @@ function fieldTitle(field) {
   return field?.title || '未命名'
 }
 
+function subformChildPath(parent, child) {
+  return `${fieldTitle(parent)}.${fieldTitle(child)}`
+}
+
 function isAddressEmpty(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return true
@@ -202,16 +206,13 @@ export function subformRequiredError(field, rows) {
   return ''
 }
 
-export function subformChildRequiredError(fields, row) {
-  if (isSubformRowEmpty(fields, row)) {
-    return ''
-  }
-  for (const field of fields || []) {
+export function subformChildRequiredError(parent, row) {
+  for (const field of parent?.fields || []) {
     if (!field?.required) {
       continue
     }
     if (isSubformCellEmpty(field, row?.[field.key])) {
-      return `[${fieldTitle(field)}]不能为空`
+      return `[${subformChildPath(parent, field)}]不能为空`
     }
   }
   return ''
@@ -222,9 +223,8 @@ export function subformRowsRequiredError(field, rows) {
   if (required) {
     return required
   }
-  const children = field?.fields || []
   for (const row of Array.isArray(rows) ? rows : []) {
-    const childError = subformChildRequiredError(children, row)
+    const childError = subformChildRequiredError(field, row)
     if (childError) {
       return childError
     }

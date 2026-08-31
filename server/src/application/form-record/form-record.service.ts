@@ -321,7 +321,7 @@ export class FormRecordService {
           }
           if (isSubformChildEmpty(child, row[child.key])) {
             throw new BadRequestException(
-              `[${child.title || '未命名'}]不能为空`,
+              `[${field.title || '未命名'}.${child.title || '未命名'}]不能为空`,
             );
           }
         }

@@ -7,11 +7,12 @@
     <template v-else>
       <div class="list-toolbar">
         <div class="list-toolbar-actions">
-          <el-button v-if="actions.create" link @click="onCreateClick">
+          <el-button v-if="actions.create" type="primary" link @click="onCreateClick">
             新增
           </el-button>
           <el-button
             v-if="actions.edit"
+            type="warning"
             :disabled="selectedRecords.length !== 1"
             @click="onEditClick"
             link
@@ -20,15 +21,17 @@
           </el-button>
           <el-button
             v-if="actions.delete"
+            type="danger"
             link
             :disabled="!selectedRecords.length"
             @click="onDeleteSelected"
           >
             删除
           </el-button>
-          <el-button v-if="actions.import" @click="openImport" link>导入</el-button>
+          <el-button v-if="actions.import" type="success" @click="openImport" link>导入</el-button>
           <el-button
             v-if="actions.downloadTemplate"
+            type="info"
             @click="onDownloadTemplate"
             link
           >

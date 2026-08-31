@@ -97,7 +97,7 @@
             </div>
             <div v-else class="member-picker-hint">范围内全部人员</div>
           </div>
-          <div v-else class="member-picker-list">
+          <div class="member-picker-list">
             <div
               v-for="user in visibleUsers"
               :key="user.id"

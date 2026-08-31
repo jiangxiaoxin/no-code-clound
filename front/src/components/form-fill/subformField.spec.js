@@ -6,6 +6,7 @@ import {
   mapSourceSubformRows,
   shouldSubformDataSelectMultiple,
   stripEmptySubformRows,
+  subformRowsRequiredError,
   uniqueInRowsError,
 } from './subformField.js'
 
@@ -28,6 +29,23 @@ test('strips empty rows and keeps zero', () => {
   ])
   assert.equal(rows.length, 1)
   assert.equal(rows[0].qty, 0)
+})
+
+test('required child blocks an otherwise empty row', () => {
+  const field = {
+    key: 'lines',
+    type: 'subform',
+    title: '订单明细',
+    fields: [
+      { key: 'name', type: 'input', title: '物料名称', required: true },
+      { key: 'qty', type: 'number', title: '数量' },
+    ],
+  }
+  assert.equal(
+    subformRowsRequiredError(field, [{ name: '', qty: null }]),
+    '[订单明细.物料名称]不能为空',
+  )
+  assert.equal(subformRowsRequiredError(field, []), '')
 })
 
 test('uniqueInRows catches duplicate text and data id', () => {
