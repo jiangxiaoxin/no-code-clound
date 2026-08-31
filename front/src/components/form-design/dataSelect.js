@@ -67,18 +67,25 @@ export function hasFillMappings(raw) {
 
 export function fillInfluencerTips(fields) {
   const namesByTarget = {}
-  for (const field of fields || []) {
-    if (field.type !== 'data') continue
-    const name =
-      (typeof field.title === 'string' && field.title.trim()) || field.key
-    if (!name) continue
-    for (const item of cloneFillMappings(field.fillMappings)) {
-      if (!item.sourceKey || !item.targetKey) continue
-      const list =
-        namesByTarget[item.targetKey] || (namesByTarget[item.targetKey] = [])
-      if (!list.includes(name)) list.push(name)
+  function collect(list) {
+    for (const field of list || []) {
+      if (field.type === 'subform') {
+        collect(field.fields)
+        continue
+      }
+      if (field.type !== 'data') continue
+      const name =
+        (typeof field.title === 'string' && field.title.trim()) || field.key
+      if (!name) continue
+      for (const item of cloneFillMappings(field.fillMappings)) {
+        if (!item.sourceKey || !item.targetKey) continue
+        const list =
+          namesByTarget[item.targetKey] || (namesByTarget[item.targetKey] = [])
+        if (!list.includes(name)) list.push(name)
+      }
     }
   }
+  collect(fields)
   const tips = {}
   for (const [key, names] of Object.entries(namesByTarget)) {
     tips[key] = `会受 [ ${names.join('、')} ] 字段影响`

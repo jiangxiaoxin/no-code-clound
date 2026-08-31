@@ -31,7 +31,7 @@
       </el-form-item>
       <template v-if="!isCurrentDisplayField">
       <template v-if="field.type !== 'divider'">
-      <el-form-item v-if="field.type !== 'divider' && field.type !== 'image' && field.type !== 'file'" label="占位文字">
+      <el-form-item v-if="field.type !== 'divider' && field.type !== 'image' && field.type !== 'file' && field.type !== 'subform'" label="占位文字">
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
       <el-form-item label="字段说明">
@@ -63,9 +63,17 @@
             <span>是否可修改</span>
             <el-switch :model-value="field.editable !== false" @change="onEditableChange" />
           </div>
-          <div v-if="field.type === 'input' || field.type === 'number'" class="required-row">
+          <div v-if="showUniqueSwitch" class="required-row">
             <span>不允许重复值</span>
-            <el-switch v-model="field.unique" />
+            <el-switch :model-value="Boolean(field.unique)" @change="onUniqueChange" />
+          </div>
+          <div v-if="showUniqueInRowsSwitch" class="required-row">
+            <span>单条数据内不允许重复值</span>
+            <el-switch
+              :model-value="Boolean(field.uniqueInRows || field.unique)"
+              :disabled="Boolean(field.unique)"
+              @change="onUniqueInRowsChange"
+            />
           </div>
           <div v-if="field.type === 'input' || field.type === 'textarea'" class="required-row">
             <span>最大文本长度：</span>
@@ -352,7 +360,7 @@
         :picker-column-keys="field?.pickerColumnKeys"
         :option-filters="field?.optionFilters"
         :source-fields="sourceFields"
-        :form-fields="formFields"
+        :form-fields="conditionFields"
         @confirm="onProcessConfirm"
       />
       <DataLinkageDialog
@@ -362,8 +370,8 @@
         :field-title="field.title"
         :field-type="field.type"
         :linkage="field.linkage"
-        :current-fields="fields"
-        :form-fields="formFields"
+        :current-fields="conditionFields"
+        :form-fields="conditionFields"
         @confirm="onLinkageConfirm"
       />
       <FormOptionFilterDialog
@@ -371,12 +379,132 @@
         :app-id="appId"
         :option-filters="field.optionFilters"
         :source-fields="sourceFields"
-        :form-fields="formFields"
+        :form-fields="optionFilterFields"
         @confirm="onFilterConfirm"
       />
       </template>
       </template>
-      <el-form-item v-if="field.type !== 'divider'" label="字段宽度">
+      <template v-if="field.type === 'subform'">
+        <el-form-item label="取值来源">
+          <el-select v-model="field.optionSource" placeholder="请选择" @change="onSubformSourceChange">
+            <el-option value="custom" label="自定义" />
+            <el-option value="linkage" label="数据联动" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="field.optionSource === 'linkage'" label="数据联动">
+          <div class="linkage-row">
+            <div
+              class="filter-trigger"
+              :class="{ 'is-placeholder': !hasSubformLinkage(field) }"
+              @click="openSubformLinkage"
+            >
+              {{ hasSubformLinkage(field) ? '已设置数据联动' : '设置数据联动' }}
+            </div>
+            <el-icon
+              v-if="hasSubformLinkage(field)"
+              class="linkage-clear"
+              @click.stop="confirmClearLinkage"
+            >
+              <CircleClose />
+            </el-icon>
+          </div>
+        </el-form-item>
+        <el-form-item v-if="showDefaultRowCount">
+          <div class="required-row">
+            <span>默认行数</span>
+            <el-input-number
+              v-model="field.defaultRowCount"
+              class="max-length-input"
+              :min="0"
+              :max="10"
+              :precision="0"
+              :step="1"
+              step-strictly
+              :controls="false"
+              size="small"
+              align="left"
+            />
+          </div>
+        </el-form-item>
+        <el-form-item>
+          <div class="required-row">
+            <span>固定前 N 列</span>
+            <el-input-number
+              v-model="field.frozenCols"
+              class="max-length-input"
+              :min="0"
+              :max="5"
+              :precision="0"
+              :step="1"
+              step-strictly
+              :controls="false"
+              size="small"
+              align="left"
+            />
+          </div>
+        </el-form-item>
+        <el-form-item label="子字段">
+          <div class="subform-children">
+            <div
+              v-for="(child, index) in field.fields || []"
+              :key="child.key"
+              class="subform-child-row"
+              @click="onSelectChild(child)"
+            >
+              <span class="subform-child-title">{{ child.title }}（{{ fieldTypeLabel(child.type) }}）</span>
+              <span class="subform-child-actions">
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="index === 0"
+                  @click.stop="onMoveChild(child, -1)"
+                >
+                  左移
+                </el-button>
+                <el-button
+                  link
+                  type="primary"
+                  :disabled="index === (field.fields || []).length - 1"
+                  @click.stop="onMoveChild(child, 1)"
+                >
+                  右移
+                </el-button>
+                <!-- <el-button link type="primary" @click.stop="onCopyChild(child)">复制</el-button> -->
+                <el-button link type="danger" @click.stop="onRemoveChild(child)">删除</el-button>
+              </span>
+            </div>
+            <el-dropdown
+              trigger="click"
+              popper-class="canvas-subform-type-menu"
+              @command="onAddChildType"
+            >
+              <el-button type="primary" link>添加子字段</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item
+                    v-for="item in childTypeOptions"
+                    :key="item.type"
+                    :command="item.type"
+                    :icon="item.icon"
+                  >
+                    {{ item.label }}
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </el-form-item>
+        <SubformLinkageDialog
+          v-model="subformLinkageVisible"
+          :app-id="appId"
+          :form-id="formId"
+          :linkage="field.linkage"
+          :form-fields="mainLabeledFields"
+          :target-fields="field.fields || []"
+          @confirm="onLinkageConfirm"
+        />
+      </template>
+      <el-form-item v-if="field.type !== 'divider' && field.type !== 'subform' && !parentSubform" label="字段宽度">
         <el-radio-group class="width-options" :model-value="field.width" @change="onWidthChange">
           <el-radio-button value="1/4">1/4</el-radio-button>
           <el-radio-button value="1/3">1/3</el-radio-button>
@@ -395,7 +523,7 @@
 import { computed, ref, watch } from 'vue'
 import { CircleClose } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
-import { formatOptions, formColumnOptions, fieldTypeLabel, isSelectType } from './fieldTypes'
+import { formatOptions, formColumnOptions, fieldTypes, fieldTypeLabel, isSelectType } from './fieldTypes'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
 import FormSourcePicker from './FormSourcePicker.vue'
 import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
@@ -403,10 +531,12 @@ import DataSelectDisplayFieldsDialog from './DataSelectDisplayFieldsDialog.vue'
 import DataSelectFillMappingDialog from './DataSelectFillMappingDialog.vue'
 import DataSelectProcessDrawer from './DataSelectProcessDrawer.vue'
 import DataLinkageDialog from './DataLinkageDialog.vue'
+import SubformLinkageDialog from './SubformLinkageDialog.vue'
 import { hasOptionFilters } from './optionFilters'
 import {
   hasLinkage,
   hasLinkageSource,
+  hasSubformLinkage,
   optionSourceChoices,
 } from './linkage'
 import {
@@ -416,6 +546,7 @@ import {
   hasFillMappings,
 } from './dataSelect'
 import { isFillable } from '../form-fill/fillValues'
+import { SUBFORM_CHILD_TYPES, fieldRefLabel } from '../form-fill/subformField.js'
 import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
 import { FILE_FORMAT_OPTIONS } from '../form-fill/fileField'
 import { ADDRESS_FORMAT_OPTIONS } from '../form-fill/addressField'
@@ -428,9 +559,19 @@ const props = defineProps({
   appId: { type: Number, required: true },
   formId: { type: Number, required: true },
   columns: { type: Number, default: 1 },
+  parentSubform: { type: Object, default: null },
 })
 
-const emit = defineEmits(['update:tab', 'update:width', 'update:columns'])
+const emit = defineEmits([
+  'update:tab',
+  'update:width',
+  'update:columns',
+  'select-child',
+  'add-child',
+  'copy-child',
+  'remove-child',
+  'move-child',
+])
 
 function onWidthChange(value) {
   emit('update:width', value)
@@ -450,12 +591,137 @@ const linkageVisible = ref(false)
 const displayVisible = ref(false)
 const mappingVisible = ref(false)
 const processVisible = ref(false)
+const subformLinkageVisible = ref(false)
 
-const formFields = computed(() =>
-  (props.fields || []).filter(
+const formFields = computed(() => {
+  if (props.parentSubform) {
+    return (props.parentSubform.fields || []).filter(
+      (item) =>
+        item.key !== props.field?.key &&
+        item.type !== 'image' &&
+        item.type !== 'file' &&
+        item.type !== 'data',
+    )
+  }
+  return (props.fields || []).filter(
     (item) => isFillable(item) && item.key !== props.field?.key,
+  )
+})
+
+const optionFilterFields = computed(() =>
+  (props.fields || []).filter(
+    (item) =>
+      isFillable(item) &&
+      item.type !== 'subform' &&
+      item.key !== props.field?.key,
   ),
 )
+
+const conditionFields = computed(() => {
+  const mains = (props.fields || [])
+    .filter((item) => item.type !== 'subform' && item.key !== props.field?.key)
+    .map((item) => ({
+      ...item,
+      title: fieldRefLabel(item),
+    }))
+  if (!props.parentSubform) {
+    return mains
+  }
+  const siblings = (props.parentSubform.fields || [])
+    .filter((item) => item.key !== props.field?.key)
+    .map((item) => ({
+      ...item,
+      title: fieldRefLabel(item, {
+        parentTitle: props.parentSubform.title || '子表单',
+      }),
+    }))
+  return [...mains, ...siblings]
+})
+
+const isSubformChild = computed(() => Boolean(props.parentSubform))
+
+const showUniqueSwitch = computed(
+  () =>
+    props.field?.type === 'input' ||
+    props.field?.type === 'number' ||
+    (isSubformChild.value && props.field?.type === 'data'),
+)
+
+const showUniqueInRowsSwitch = computed(
+  () =>
+    isSubformChild.value &&
+    (props.field?.type === 'input' ||
+      props.field?.type === 'number' ||
+      props.field?.type === 'data'),
+)
+
+const showDefaultRowCount = computed(
+  () =>
+    props.field?.type === 'subform' && !hasSubformLinkage(props.field),
+)
+
+const mainLabeledFields = computed(() =>
+  (props.fields || [])
+    .filter((item) => item.type !== 'subform')
+    .map((item) => ({
+      ...item,
+      title: fieldRefLabel(item),
+    })),
+)
+
+const childTypeOptions = computed(() =>
+  fieldTypes.filter((item) => SUBFORM_CHILD_TYPES.includes(item.type)),
+)
+
+function onUniqueChange(value) {
+  if (!props.field) {
+    return
+  }
+  props.field.unique = value
+  if (value) {
+    props.field.uniqueInRows = true
+  }
+}
+
+function onUniqueInRowsChange(value) {
+  if (!props.field || props.field.unique) {
+    return
+  }
+  props.field.uniqueInRows = value
+}
+
+function onSubformSourceChange(value) {
+  if (!props.field) {
+    return
+  }
+  if (value !== 'linkage') {
+    delete props.field.linkage
+  }
+}
+
+function onSelectChild(child) {
+  emit('select-child', child)
+}
+
+function onAddChildType(type) {
+  const item = fieldTypes.find((entry) => entry.type === type)
+  if (!item || !props.field) {
+    return
+  }
+  emit('add-child', props.field.key, item)
+}
+
+function onCopyChild(child) {
+  emit('copy-child', child)
+}
+
+function onRemoveChild(child) {
+  emit('remove-child', child)
+}
+
+function onMoveChild(child, direction) {
+  emit('move-child', child.key, direction)
+}
 
 const fieldTypeText = computed(() => fieldTypeLabel(props.field?.type))
 const optionSourceLabel = computed(() =>
@@ -519,6 +785,10 @@ function openOptionFilters() {
 
 function openLinkage() {
   linkageVisible.value = true
+}
+
+function openSubformLinkage() {
+  subformLinkageVisible.value = true
 }
 
 async function confirmClearLinkage() {
@@ -814,6 +1084,38 @@ watch(
   margin-right: 12px;
   font-size: 14px;
   color: var(--el-text-color-regular);
+}
+
+.subform-children {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.subform-child-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+  cursor: pointer;
+}
+
+.subform-child-title {
+  min-width: 0;
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subform-child-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+
+  :deep(.el-button + .el-button) {
+    margin-left: 4px;
+  }
 }
 
 .field-type-text {

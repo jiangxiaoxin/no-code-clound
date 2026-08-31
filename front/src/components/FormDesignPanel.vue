@@ -17,15 +17,22 @@
         @remove="removeField"
         @reorder="reorderFields"
         @add="addField"
+        @add-child="addChildField"
       />
       <FormDesignProps
         v-model:tab="propTab"
         v-model:columns="columns"
         :field="selectedField"
         :fields="fields"
+        :parent-subform="parentSubform"
         :app-id="appId"
         :form-id="formId"
         @update:width="setFieldWidth"
+        @select-child="selectField"
+        @add-child="addChildField"
+        @copy-child="copyField"
+        @remove-child="removeField"
+        @move-child="moveChildField"
       />
     </el-container>
   </el-container>
@@ -72,6 +79,12 @@ import {
   defaultFileFormats,
 } from './form-fill/fileField'
 import { DEFAULT_ADDRESS_FORMAT } from './form-fill/addressField'
+import {
+  findFieldByKey,
+  findParentSubform,
+  isSubformChildType,
+  walkFormFields,
+} from './form-fill/subformField.js'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -90,7 +103,11 @@ const selectedKey = ref('')
 const dictItemsByCode = ref({})
 
 const selectedField = computed(
-  () => fields.value.find((field) => field.key === selectedKey.value) || null,
+  () => findFieldByKey(fields.value, selectedKey.value),
+)
+
+const parentSubform = computed(() =>
+  findParentSubform(fields.value, selectedKey.value),
 )
 
 const previewJson = computed(() => JSON.stringify(fields.value, null, 2))
@@ -98,17 +115,17 @@ const previewJson = computed(() => JSON.stringify(fields.value, null, 2))
 const dictCodes = computed(() => {
   const codes = []
   const seen = new Set()
-  for (const field of fields.value) {
+  walkFormFields(fields.value, (field) => {
     const usesDict =
       (field.type === 'radio' || field.type === 'checkbox' || isSelectType(field.type)) &&
       (field.optionSource || 'dictionary') === 'dictionary' &&
       field.dictCode
     if (!usesDict || seen.has(field.dictCode)) {
-      continue
+      return
     }
     seen.add(field.dictCode)
     codes.push(field.dictCode)
-  }
+  })
   return codes
 })
 
@@ -145,14 +162,18 @@ function nextKey() {
   return crypto.randomUUID()
 }
 
-function addField(item, beforeKey) {
-  const field = {
+function createFieldFromItem(item, { child = false } = {}) {
+  const isSubform = item.type === 'subform'
+  return {
     key: nextKey(),
     type: item.type,
     component: item.component,
     title: item.label,
-    placeholder: item.placeholder || '',
-    width: item.type === 'divider' ? '1' : defaultWidthByColumns(columns.value),
+    placeholder: isSubform ? '' : item.placeholder || '',
+    width:
+      isSubform || item.type === 'divider' || child
+        ? '1'
+        : defaultWidthByColumns(columns.value),
     required: false,
     disabled: false,
     editable: true,
@@ -187,17 +208,28 @@ function addField(item, beforeKey) {
           downloadable: true,
         }
       : {}),
+    ...(isSubform
+      ? {
+          defaultRowCount: 0,
+          frozenCols: 0,
+          optionSource: 'custom',
+          fields: [],
+        }
+      : {}),
   }
-  if (beforeKey) {
-    const index = fields.value.findIndex((entry) => entry.key === beforeKey)
-    fields.value.splice(index < 0 ? fields.value.length : index, 0, field)
-  } else {
-    fields.value.push(field)
-  }
-  selectField(field)
 }
 
-function copyField(field) {
+function remapCopiedKeys(field, keyMap) {
+  if (!field.fillMappings) {
+    return
+  }
+  field.fillMappings = cloneFillMappings(field.fillMappings).map((item) => ({
+    ...item,
+    targetKey: keyMap[item.targetKey] || item.targetKey,
+  }))
+}
+
+function cloneOneField(field) {
   const copied = {
     ...field,
     key: nextKey(),
@@ -206,7 +238,20 @@ function copyField(field) {
     copied.optionFilters = cloneOptionFilters(field.optionFilters)
   }
   if (field.linkage) {
-    copied.linkage = cloneLinkage(field.linkage)
+    copied.linkage = {
+      ...cloneLinkage(field.linkage),
+      ...(field.linkage.sourceSubformKey
+        ? { sourceSubformKey: field.linkage.sourceSubformKey }
+        : {}),
+      ...(Array.isArray(field.linkage.fieldMappings)
+        ? {
+            fieldMappings: field.linkage.fieldMappings.map((item) => ({
+              sourceKey: item?.sourceKey || '',
+              targetKey: item?.targetKey || '',
+            })),
+          }
+        : {}),
+    }
   }
   if (field.displayFieldKeys) {
     copied.displayFieldKeys = cloneDisplayFieldKeys(field.displayFieldKeys)
@@ -220,9 +265,90 @@ function copyField(field) {
   if (field.acceptFormats) {
     copied.acceptFormats = [...field.acceptFormats]
   }
+  return copied
+}
+
+function copySubformField(field) {
+  const copied = cloneOneField(field)
+  const keyMap = {}
+  copied.fields = (field.fields || []).map((child) => {
+    const childCopy = cloneOneField(child)
+    keyMap[child.key] = childCopy.key
+    return childCopy
+  })
+  for (const child of copied.fields) {
+    remapCopiedKeys(child, keyMap)
+  }
+  if (copied.linkage?.fieldMappings) {
+    copied.linkage.fieldMappings = copied.linkage.fieldMappings.map((item) => ({
+      ...item,
+      targetKey: keyMap[item.targetKey] || item.targetKey,
+    }))
+  }
+  return copied
+}
+
+function addField(item, beforeKey) {
+  const field = createFieldFromItem(item)
+  if (beforeKey) {
+    const index = fields.value.findIndex((entry) => entry.key === beforeKey)
+    fields.value.splice(index < 0 ? fields.value.length : index, 0, field)
+  } else {
+    fields.value.push(field)
+  }
+  selectField(field)
+}
+
+function addChildField(parentKey, item, beforeChildKey) {
+  const parent = fields.value.find((field) => field.key === parentKey)
+  if (!parent || parent.type !== 'subform') {
+    return
+  }
+  if (!isSubformChildType(item.type)) {
+    ElMessage.warning('该字段暂不支持添加到子表单')
+    return
+  }
+  if (!Array.isArray(parent.fields)) {
+    parent.fields = []
+  }
+  const field = createFieldFromItem(item, { child: true })
+  if (beforeChildKey) {
+    const index = parent.fields.findIndex((entry) => entry.key === beforeChildKey)
+    parent.fields.splice(index < 0 ? parent.fields.length : index, 0, field)
+  } else {
+    parent.fields.push(field)
+  }
+  selectField(field)
+}
+
+function copyField(field) {
+  const parent = findParentSubform(fields.value, field.key)
+  const copied =
+    field.type === 'subform' ? copySubformField(field) : cloneOneField(field)
+  if (parent) {
+    remapCopiedKeys(copied, { [field.key]: copied.key })
+    const index = parent.fields.findIndex((item) => item.key === field.key)
+    parent.fields.splice(index + 1, 0, copied)
+    selectField(copied)
+    return
+  }
   const index = fields.value.findIndex((item) => item.key === field.key)
   fields.value.splice(index + 1, 0, copied)
   selectField(copied)
+}
+
+function moveChildField(childKey, direction) {
+  const parent = findParentSubform(fields.value, childKey)
+  if (!parent?.fields) {
+    return
+  }
+  const index = parent.fields.findIndex((item) => item.key === childKey)
+  const next = index + direction
+  if (index < 0 || next < 0 || next >= parent.fields.length) {
+    return
+  }
+  const [moved] = parent.fields.splice(index, 1)
+  parent.fields.splice(next, 0, moved)
 }
 
 async function removeField(field) {
@@ -237,6 +363,15 @@ async function removeField(field) {
       },
     )
   } catch {
+    return
+  }
+
+  const parent = findParentSubform(fields.value, field.key)
+  if (parent) {
+    parent.fields = parent.fields.filter((item) => item.key !== field.key)
+    if (selectedKey.value === field.key) {
+      selectedKey.value = parent.key
+    }
     return
   }
 
@@ -275,6 +410,13 @@ function ensureOptionSource(field) {
       field.acceptFormats = defaultFileFormats()
     }
     if (typeof field.downloadable !== 'boolean') field.downloadable = true
+  }
+  if (field.type === 'subform') {
+    field.width = '1'
+    if (!Array.isArray(field.fields)) field.fields = []
+    if (field.defaultRowCount == null) field.defaultRowCount = 0
+    if (field.frozenCols == null) field.frozenCols = 0
+    if (!field.optionSource) field.optionSource = 'custom'
   }
 }
 

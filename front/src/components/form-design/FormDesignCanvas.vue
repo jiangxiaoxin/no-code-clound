@@ -18,16 +18,21 @@
           :field="field"
           :fill-tip="fillTips[field.key]"
           :items="dictItemsByCode[field.dictCode] || []"
-          :selected="selectedKey === field.key"
+          :dict-items-by-code="dictItemsByCode"
+          :fill-tips="fillTips"
+          :selected-key="selectedKey"
+          :selected="isFieldSelected(field)"
           :dragging="dragKey === field.key"
           :drag-over="dragOverKey === field.key"
           @select="$emit('select', field)"
+          @select-child="onSelectChild"
           @copy="$emit('copy', field)"
           @remove="$emit('remove', field)"
           @dragstart="onDragStart(field, $event)"
           @dragover="onDragOver(field)"
           @drop="onDrop(field, $event)"
           @dragend="onDragEnd"
+          @add-child="onAddChild(field, $event)"
         />
       </div>
     </div>
@@ -49,7 +54,18 @@ const props = defineProps({
 
 const fillTips = computed(() => fillInfluencerTips(props.fields))
 
-const emit = defineEmits(['select', 'copy', 'remove', 'reorder', 'add'])
+const emit = defineEmits(['select', 'select-child', 'copy', 'remove', 'reorder', 'add', 'add-child'])
+
+function isFieldSelected(field) {
+  if (props.selectedKey === field.key) {
+    return true
+  }
+  return (field.fields || []).some((child) => child.key === props.selectedKey)
+}
+
+function onSelectChild(child) {
+  emit('select', child)
+}
 
 const dragKey = ref('')
 const dragOverKey = ref('')
@@ -74,10 +90,18 @@ function onDragOver(field) {
   }
 }
 
+function onAddChild(field, item) {
+  emit('add-child', field.key, item)
+}
+
 function onDrop(field, event) {
   dragOverKey.value = ''
   const item = paletteItem(event.dataTransfer.getData('text/plain'))
   if (item) {
+    if (field.type === 'subform') {
+      emit('add-child', field.key, item)
+      return
+    }
     emit('add', item, field.key)
     return
   }

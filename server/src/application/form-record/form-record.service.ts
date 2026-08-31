@@ -61,6 +61,7 @@ export class FormRecordService {
     const form = await this.requireForm(ownerId, appId, formId);
     const fields = this.readFields(form);
     const coerced = coerceRecordData(fields, data); // 强制转换
+    this.assertSubformConstraints(fields, coerced);
     await this.assertUniqueFields(formId, fields, coerced);
     const now = new Date();
     const inserted = await this.store.insert({
@@ -141,6 +142,7 @@ export class FormRecordService {
     if (!existing) throw new NotFoundException('记录不存在');
     const fields = this.readFields(form);
     const merged = mergeRecordData(existing.data ?? {}, data, fields);
+    this.assertSubformConstraints(fields, merged);
     await this.assertUniqueFields(formId, fields, merged, recordId);
     const doc = await this.store.replaceData(formId, recordId, merged, ownerId);
     if (!doc) throw new NotFoundException('记录不存在');
@@ -279,6 +281,56 @@ export class FormRecordService {
     return { imported };
   }
 
+  private assertSubformConstraints(
+    fields: FormField[] | null,
+    data: Record<string, unknown>,
+  ) {
+    for (const field of fields ?? []) {
+      if (field.type !== 'subform') {
+        continue;
+      }
+      const rows = Array.isArray(data[field.key])
+        ? (data[field.key] as Record<string, unknown>[])
+        : [];
+      if (field.required && rows.length === 0) {
+        throw new BadRequestException(
+          `[${field.title || '未命名'}]不能为空`,
+        );
+      }
+      const children = field.fields ?? [];
+      for (const row of rows) {
+        for (const child of children) {
+          if (!child.required) {
+            continue;
+          }
+          if (isSubformChildEmpty(child, row[child.key])) {
+            throw new BadRequestException(
+              `[${child.title || '未命名'}]不能为空`,
+            );
+          }
+        }
+      }
+      for (const child of children) {
+        if (!child.unique && !child.uniqueInRows) {
+          continue;
+        }
+        const seen = new Set<string | number>();
+        for (const row of rows) {
+          const value = uniqueChildComparableValue(child, row[child.key]);
+          if (value === undefined) {
+            continue;
+          }
+          if (seen.has(value)) {
+            throw new ConflictException(
+              `[${child.title || '未命名'}]同一子表内不允许重复值`,
+            );
+          }
+          seen.add(value);
+        }
+      }
+    }
+  }
+
   private async assertUniqueFields(
     formId: number,
     fields: FormField[] | null,
@@ -286,6 +338,34 @@ export class FormRecordService {
     excludeRecordId?: string,
   ) {
     for (const field of fields ?? []) {
+      if (field.type === 'subform') {
+        const rows = Array.isArray(data[field.key])
+          ? (data[field.key] as Record<string, unknown>[])
+          : [];
+        for (const child of field.fields ?? []) {
+          if (!child.unique) {
+            continue;
+          }
+          for (const row of rows) {
+            const value = uniqueComparableValue(child, row[child.key]);
+            if (value === undefined) {
+              continue;
+            }
+            const exists = await this.store.existsByDataValue(
+              formId,
+              `${field.key}.${child.key}`,
+              value,
+              excludeRecordId,
+            );
+            if (exists) {
+              throw new ConflictException(
+                `[${child.title || '未命名'}]不允许重复值`,
+              );
+            }
+          }
+        }
+        continue;
+      }
       // 目前进对[单行文本]进行重复值检测
       const value = uniqueComparableValue(field, data[field.key]);
       if (value === undefined) {
@@ -379,12 +459,11 @@ export class FormRecordService {
   }
 }
 
-function uniqueComparableValue(
+function uniqueChildComparableValue(
   field: FormField,
   value: unknown,
 ): string | number | undefined {
-  if (!field.unique) return undefined;
-  if (field.type === 'input') {
+  if (field.type === 'input' || field.type === 'data') {
     if (typeof value !== 'string' || value === '') return undefined;
     return value;
   }
@@ -393,4 +472,34 @@ function uniqueComparableValue(
     return value;
   }
   return undefined;
+}
+
+function uniqueComparableValue(
+  field: FormField,
+  value: unknown,
+): string | number | undefined {
+  if (!field.unique) return undefined;
+  return uniqueChildComparableValue(field, value);
+}
+
+function isSubformChildEmpty(field: FormField, value: unknown): boolean {
+  if (value === undefined || value === null || value === '') {
+    return true;
+  }
+  if (
+    field.type === 'checkbox' ||
+    field.type === 'select-multiple' ||
+    field.type === 'image' ||
+    field.type === 'file'
+  ) {
+    return !Array.isArray(value) || value.length === 0;
+  }
+  if (field.type === 'address') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return true;
+    }
+    const ids = (value as { ids?: unknown }).ids;
+    return !Array.isArray(ids) || ids.length === 0;
+  }
+  return false;
 }

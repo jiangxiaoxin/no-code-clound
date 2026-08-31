@@ -46,6 +46,62 @@ function coerceFileValue(value: unknown): { url: string; name: string }[] {
     .filter((item): item is { url: string; name: string } => Boolean(item));
 }
 
+const SUBFORM_MAX_ROWS = 200;
+
+function isCoercedEmpty(field: FormField, value: unknown): boolean {
+  if (value === undefined || value === null || value === '') {
+    return true;
+  }
+  if (
+    field.type === 'checkbox' ||
+    field.type === 'select-multiple' ||
+    field.type === 'image' ||
+    field.type === 'file'
+  ) {
+    return !Array.isArray(value) || value.length === 0;
+  }
+  if (field.type === 'address') {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return true;
+    }
+    const ids = (value as { ids?: unknown }).ids;
+    return !Array.isArray(ids) || ids.length === 0;
+  }
+  return false;
+}
+
+function isSubformRowEmpty(
+  fields: FormField[],
+  row: Record<string, unknown>,
+): boolean {
+  return fields.every((field) => isCoercedEmpty(field, row[field.key]));
+}
+
+function coerceSubformValue(field: FormField, value: unknown): unknown {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const children = field.fields ?? [];
+  if (!children.length) {
+    return [];
+  }
+  const rows: Record<string, unknown>[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      continue;
+    }
+    const row = coerceRecordData(children, raw);
+    if (isSubformRowEmpty(children, row)) {
+      continue;
+    }
+    rows.push(row);
+  }
+  if (rows.length > SUBFORM_MAX_ROWS) {
+    throw new BadRequestException('子表单最多 200 行');
+  }
+  return rows;
+}
+
 function coerceFieldValue(field: FormField, value: unknown): unknown {
   switch (field.type) {
     case 'divider':
@@ -123,7 +179,7 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
       return next;
     }
     case 'subform':
-      return Array.isArray(value) ? value : [];
+      return coerceSubformValue(field, value);
     default:
       return value;
   }

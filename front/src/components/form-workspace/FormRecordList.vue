@@ -139,7 +139,7 @@ import { computed, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { deleteFormRecordApi, downloadRecordImportTemplateApi, queryFormRecordsApi } from '../../api/apps'
-import { isFillable } from '../form-fill/fillValues.js'
+import { isFillable, isListColumn } from '../form-fill/fillValues.js'
 import { formatDateTime } from '../../utils/timeValue.js'
 import FormRecordCell from './FormRecordCell.vue'
 import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
@@ -184,7 +184,8 @@ const importVisible = ref(false)
 const loadSession = ref(0)
 const actions = computed(() => normalizeRecordActions(props.recordActions))
 
-const tableFields = computed(() => props.fields.filter(isFillable))
+const tableFields = computed(() => props.fields.filter(isListColumn))
+const sortFields = computed(() => tableFields.value.filter(isFillable))
 const fieldByKey = computed(() =>
   Object.fromEntries(tableFields.value.map((field) => [field.key, field])),
 )
@@ -206,7 +207,7 @@ const { columnPrefs, visibleColumns } = useColumnPrefs({
 const { sortRules, sortOptions, saveSortRules } = useSortPrefs({
   appId: toRef(props, 'appId'),
   formId: computed(() => props.form?.id),
-  tableFields,
+  tableFields: sortFields,
   schemaLoading: toRef(props, 'schemaLoading'),
 })
 

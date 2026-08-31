@@ -90,7 +90,7 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
         title: field.title || '未命名',
         visible: true,
         fixed: '',
-        minWidth: DEFAULT_COL_WIDTH,
+        minWidth: field.type === 'subform' ? 220 : DEFAULT_COL_WIDTH,
       })),
       {
         key: CREATED_BY_KEY,

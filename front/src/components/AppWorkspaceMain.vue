@@ -57,6 +57,7 @@ import {
   validateRequired,
 } from './form-fill/fillValues.js'
 import { isSelectType as isSelectField } from './form-design/fieldTypes'
+import { walkFormFields } from './form-fill/subformField.js'
 import FormRecordCreateTab from './form-workspace/FormRecordCreateTab.vue'
 import FormRecordManage from './form-workspace/FormRecordManage.vue'
 
@@ -118,17 +119,17 @@ function resetValues() {
 const dictCodes = computed(() => {
   const codes = []
   const seen = new Set()
-  for (const field of fields.value) {
+  walkFormFields(fields.value, (field) => {
     const usesDict =
       (field.type === 'radio' ||
         field.type === 'checkbox' ||
         isSelectField(field.type)) &&
       (field.optionSource || 'dictionary') === 'dictionary' &&
       field.dictCode
-    if (!usesDict || seen.has(field.dictCode)) continue
+    if (!usesDict || seen.has(field.dictCode)) return
     seen.add(field.dictCode)
     codes.push(field.dictCode)
-  }
+  })
   return codes
 })
 

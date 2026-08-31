@@ -6,6 +6,7 @@ import {
   emptyRecordValues,
   formatCellValue,
   isFillable,
+  isListColumn,
   isInlineEditable,
   serializeValue,
   validateRequired,
@@ -61,6 +62,38 @@ test('登录人部门 is display-only and not persisted', () => {
   assert.deepEqual(emptyRecordValues([field]), {})
   assert.deepEqual(cloneRecordValues([field], { dept: '研发部' }), {})
   assert.deepEqual(buildRecordData([field], { dept: '研发部' }), {})
+})
+
+test('subform persists stripped rows and validates required', () => {
+  const field = {
+    key: 'lines',
+    type: 'subform',
+    title: '明细',
+    required: true,
+    fields: [
+      { key: 'name', type: 'input', title: '名称', required: true },
+      { key: 'qty', type: 'number', title: '数量' },
+    ],
+  }
+  assert.deepEqual(emptyRecordValues([{ ...field, defaultRowCount: 2 }]).lines.length, 2)
+  assert.deepEqual(
+    buildRecordData([field], {
+      lines: [{ name: '', qty: null }, { name: 'A', qty: 0 }],
+    }),
+    { lines: [{ name: 'A', qty: 0 }] },
+  )
+  assert.equal(validateRequired([field], { lines: [] }), '[明细]不能为空')
+  assert.equal(
+    validateRequired([field], { lines: [{ name: '', qty: 1 }] }),
+    '[名称]不能为空',
+  )
+  assert.equal(isFillable(field), false)
+  assert.equal(isListColumn(field), true)
+  assert.equal(
+    formatCellValue(field, [{ name: '螺丝', qty: 2 }, { name: '垫片', qty: 4 }]),
+    '螺丝 / 2；垫片 / 4',
+  )
+  assert.equal(formatCellValue(field, [{ name: '', qty: null }]), '')
 })
 
 test('选择数据 id is persisted but not treated as a fillable column', () => {

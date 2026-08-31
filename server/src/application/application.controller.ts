@@ -185,6 +185,7 @@ export class ApplicationController {
       req.user.id,
       id,
       query.excludeFormId,
+      query.include,
     );
   }
 

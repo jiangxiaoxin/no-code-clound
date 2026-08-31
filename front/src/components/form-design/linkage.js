@@ -84,6 +84,42 @@ export function hasLinkage(field) {
   return field?.optionSource === 'linkage' && isLinkageConfigured(field.linkage)
 }
 
+export function cloneSubformLinkage(raw) {
+  const base = cloneLinkage(raw)
+  return {
+    ...base,
+    sourceSubformKey: raw?.sourceSubformKey || '',
+    fieldMappings: Array.isArray(raw?.fieldMappings)
+      ? raw.fieldMappings.map((item) => ({
+          sourceKey: item?.sourceKey || '',
+          targetKey: item?.targetKey || '',
+        }))
+      : [],
+  }
+}
+
+export function isSubformLinkageConfigured(linkage) {
+  const id = Number(linkage?.sourceFormId)
+  if (!Number.isInteger(id) || id <= 0) return false
+  if (!linkage?.sourceSubformKey) return false
+  if (
+    !(linkage.fieldMappings || []).some(
+      (item) => item.sourceKey && item.targetKey,
+    )
+  ) {
+    return false
+  }
+  return (linkage.conditions || []).some(isCompleteCondition)
+}
+
+export function hasSubformLinkage(field) {
+  return (
+    field?.type === 'subform' &&
+    field?.optionSource === 'linkage' &&
+    isSubformLinkageConfigured(field.linkage)
+  )
+}
+
 export function needsOptionSourceHint(field) {
   if (!isSelectType(field?.type)) return false
   const source = field.optionSource || 'dictionary'
