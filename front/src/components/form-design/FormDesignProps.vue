@@ -39,7 +39,7 @@
         <el-input v-model="field.description" type="textarea" :rows="3" maxlength="200" show-word-limit
           placeholder="填写后，标题右侧会显示说明" />
       </el-form-item>
-      <el-form-item label="校验设置">
+      <el-form-item v-if="!isSerialField" label="校验设置">
         <div style="width: 100%;">
           <div class="required-row">
             <span>必填</span>
@@ -377,6 +377,113 @@
       />
       </template>
       </template>
+      <template v-if="isSerialField">
+        <el-form-item label="分隔符">
+          <el-input
+            :model-value="field.serialSeparator"
+            maxlength="8"
+            placeholder="各段之间的连接符，留空则直接相连"
+            @input="onSerialSeparatorInput"
+          />
+        </el-form-item>
+        <div class="serial-rule-list">
+          <div
+            v-for="seg in field.serialRule"
+            :key="seg.id"
+            class="serial-rule-row"
+            draggable="true"
+            @dragstart="onSerialDragStart(seg, $event)"
+            @dragover="onSerialDragOver"
+            @drop="onSerialDrop(seg, $event)"
+            @dragend="onSerialDragEnd"
+          >
+            <span class="serial-rule-handle">
+              <el-icon><Rank /></el-icon>
+            </span>
+            <button
+              type="button"
+              class="serial-rule-summary"
+              :class="{ 'is-active': activeSerialSegId === seg.id, 'is-invalid': isSerialFieldSegInvalid(seg) }"
+              @click="onSelectSerialSeg(seg)"
+            >
+              {{ serialSegmentSummary(seg, fields) }}
+            </button>
+            <el-button type="danger" link :icon="Delete" @click="onRemoveSerialSeg(seg)" />
+          </div>
+          <div class="serial-rule-add">
+            <el-button @click="onAddSerialSeg('fixed')">固定字符</el-button>
+            <el-button @click="onAddSerialSeg('datetime')">日期时间</el-button>
+            <el-button
+              :disabled="!canAddSerialCounter(field.serialRule)"
+              @click="onAddSerialSeg('counter')"
+            >
+              自动计数
+            </el-button>
+            <el-button @click="onAddSerialSeg('field')">表单字段</el-button>
+          </div>
+        </div>
+        <template v-if="activeSerialSeg">
+          <el-form-item v-if="activeSerialSeg.kind === 'fixed'" label="固定字符">
+            <el-input
+              v-model="activeSerialSeg.text"
+              maxlength="32"
+              @keydown="onSerialFixedKeydown"
+            />
+          </el-form-item>
+          <el-form-item v-if="activeSerialSeg.kind === 'datetime'" label="日期格式">
+            <el-select v-model="activeSerialSeg.format">
+              <el-option
+                v-for="item in SERIAL_DATETIME_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+          <template v-if="activeSerialSeg.kind === 'counter'">
+            <el-form-item label="起始值">
+              <el-input-number
+                v-model="activeSerialSeg.start"
+                :min="0"
+                :precision="0"
+                :controls="false"
+              />
+            </el-form-item>
+            <el-form-item label="计数位数">
+              <el-input-number
+                v-model="activeSerialSeg.digits"
+                :min="1"
+                :max="12"
+                :precision="0"
+                :controls="false"
+              />
+            </el-form-item>
+            <el-form-item label="是否重置">
+              <el-switch v-model="activeSerialSeg.reset" @change="onSerialResetChange" />
+            </el-form-item>
+            <el-form-item v-if="activeSerialSeg.reset" label="重置周期">
+              <el-select v-model="activeSerialSeg.resetPeriod">
+                <el-option
+                  v-for="item in SERIAL_RESET_PERIODS"
+                  :key="item.value"
+                  :label="item.label"
+                  :value="item.value"
+                />
+              </el-select>
+            </el-form-item>
+          </template>
+          <el-form-item v-if="activeSerialSeg.kind === 'field'" label="引用字段">
+            <el-select v-model="activeSerialSeg.fieldKey" clearable placeholder="请选择单行文本或数字">
+              <el-option
+                v-for="item in serialRefOptions"
+                :key="item.key"
+                :label="item.title || item.key"
+                :value="item.key"
+              />
+            </el-select>
+          </el-form-item>
+        </template>
+      </template>
       <el-form-item v-if="field.type !== 'divider'" label="字段宽度">
         <el-radio-group class="width-options" :model-value="field.width" @change="onWidthChange">
           <el-radio-button value="1/4">1/4</el-radio-button>
@@ -463,6 +570,15 @@ import {
   hasFillMappings,
 } from './dataSelect'
 import { isFillable } from '../form-fill/fillValues'
+import {
+  SERIAL_DATETIME_OPTIONS,
+  SERIAL_RESET_PERIODS,
+  canAddSerialCounter,
+  newSerialSegment,
+  reorderSerialRule,
+  serialRefFields,
+  serialSegmentSummary,
+} from './serialField.js'
 import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
 import { FILE_FORMAT_OPTIONS } from '../form-fill/fileField'
 import { ADDRESS_FORMAT_OPTIONS } from '../form-fill/addressField'
@@ -485,6 +601,8 @@ function onWidthChange(value) {
 
 let paneTitleBeforeEdit = ''
 const draggingPaneId = ref('')
+const draggingSerialId = ref('')
+const activeSerialSegId = ref('')
 
 function onPaneTitleFocus(pane) {
   paneTitleBeforeEdit = pane.title || ''
@@ -538,6 +656,73 @@ function onPaneDragEnd() {
   draggingPaneId.value = ''
 }
 
+function onSerialSeparatorInput(value) {
+  if (!props.field) return
+  props.field.serialSeparator = value
+}
+
+function onSelectSerialSeg(seg) {
+  activeSerialSegId.value = seg.id
+}
+
+function onAddSerialSeg(kind) {
+  if (!props.field) return
+  if (kind === 'counter' && !canAddSerialCounter(props.field.serialRule)) return
+  if (!Array.isArray(props.field.serialRule)) {
+    props.field.serialRule = []
+  }
+  const seg = newSerialSegment(kind)
+  props.field.serialRule.push(seg)
+  activeSerialSegId.value = seg.id
+}
+
+function onRemoveSerialSeg(seg) {
+  if (!props.field?.serialRule) return
+  props.field.serialRule = props.field.serialRule.filter((item) => item.id !== seg.id)
+  if (activeSerialSegId.value === seg.id) {
+    activeSerialSegId.value = props.field.serialRule[0]?.id || ''
+  }
+}
+
+function onSerialDragStart(seg, event) {
+  draggingSerialId.value = seg.id
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', seg.id)
+}
+
+function onSerialDragOver(event) {
+  event.preventDefault()
+}
+
+function onSerialDrop(seg, event) {
+  event.preventDefault()
+  const fromId = draggingSerialId.value || event.dataTransfer.getData('text/plain')
+  reorderSerialRule(props.field.serialRule, fromId, seg.id)
+  draggingSerialId.value = ''
+}
+
+function onSerialDragEnd() {
+  draggingSerialId.value = ''
+}
+
+function onSerialFixedKeydown(event) {
+  if (event.key === 'Enter') {
+    event.preventDefault()
+  }
+}
+
+function onSerialResetChange(value) {
+  if (!activeSerialSeg.value) return
+  if (value && !activeSerialSeg.value.resetPeriod) {
+    activeSerialSeg.value.resetPeriod = 'day'
+  }
+}
+
+function isSerialFieldSegInvalid(seg) {
+  if (seg?.kind !== 'field' || !seg.fieldKey) return false
+  return !serialRefOptions.value.some((item) => item.key === seg.fieldKey)
+}
+
 function onEditableChange(value) {
   if (!props.field) {
     return
@@ -571,6 +756,21 @@ const isCurrentDisplayField = computed(
   () =>
     props.field?.type === 'currentUser' ||
     props.field?.type === 'currentUserDept',
+)
+
+const isSerialField = computed(() => props.field?.type === 'serialNumber')
+
+const serialRefOptions = computed(() =>
+  serialRefFields(props.fields, props.field?.key),
+)
+
+const activeSerialSeg = computed(
+  () =>
+    (props.field?.serialRule || []).find(
+      (item) => item.id === activeSerialSegId.value,
+    ) ||
+    (props.field?.serialRule || [])[0] ||
+    null,
 )
 
 const hasDisplayFields = computed(() =>
@@ -773,6 +973,23 @@ async function loadSourceFields() {
 
 watch(() => props.appId, loadOptions, { immediate: true })
 watch(
+  () => [props.field?.key, props.field?.type],
+  () => {
+    if (!props.field || props.field.type !== 'serialNumber') return
+    if (!Array.isArray(props.field.serialRule)) {
+      props.field.serialRule = []
+    }
+    if (props.field.serialSeparator == null) {
+      props.field.serialSeparator = '-'
+    }
+    const ids = props.field.serialRule.map((item) => item.id)
+    if (!ids.includes(activeSerialSegId.value)) {
+      activeSerialSegId.value = ids[0] || ''
+    }
+  },
+  { immediate: true },
+)
+watch(
   () => [props.appId, props.formId, props.field?.sourceFormId],
   loadSourceFields,
   { immediate: true },
@@ -963,4 +1180,51 @@ watch(
   flex: 1;
   min-width: 0;
 }
+
+.serial-rule-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+}
+
+.serial-rule-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.serial-rule-handle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  margin-right: 8px;
+  color: var(--el-text-color-placeholder);
+  cursor: grab;
+}
+
+.serial-rule-summary {
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
+  background: var(--el-bg-color);
+  cursor: pointer;
+}
+
+.serial-rule-summary.is-active {
+  border-color: var(--el-color-primary);
+}
+
+.serial-rule-summary.is-invalid {
+  color: var(--el-color-danger);
+}
+
+.serial-rule-add {
+  display: flex;
+  flex-wrap: wrap;
+}
+
 </style>

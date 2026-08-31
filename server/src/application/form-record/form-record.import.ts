@@ -20,6 +20,7 @@ export const IMPORT_SKIP_TYPES = new Set([
   'dept',
   'data',
   'relate',
+  'serialNumber',
 ]);
 
 export const MAX_IMPORT_FILE_SIZE = 10 * 1024 * 1024;

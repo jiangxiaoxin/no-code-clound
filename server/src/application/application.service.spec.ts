@@ -581,6 +581,56 @@ describe('ApplicationService', () => {
       }
       expect(formRepo.save).not.toHaveBeenCalled();
     });
+
+    it('rejects two serial number fields', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+        fields: null,
+      });
+      const fields = [
+        {
+          key: 'a',
+          type: 'serialNumber',
+          serialRule: [{ kind: 'datetime', format: 'YYYY' }],
+        },
+        {
+          key: 'b',
+          type: 'serialNumber',
+          serialRule: [{ kind: 'datetime', format: 'YYYY' }],
+        },
+      ];
+      await expect(service.saveFields(1, 8, 10, fields)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(formRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows serial number without counter', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+        fields: null,
+      });
+      formRepo.save.mockImplementation(async (row: AppForm) => row);
+      formRecordStore.syncIndexes.mockResolvedValue(undefined);
+      const fields = [
+        {
+          key: 'sn',
+          type: 'serialNumber',
+          serialRule: [{ kind: 'datetime', format: 'epochMs' }],
+        },
+      ];
+      await expect(service.saveFields(1, 8, 10, fields)).resolves.toEqual(
+        expect.objectContaining({ fields }),
+      );
+    });
   });
 
   describe('listFormFields', () => {

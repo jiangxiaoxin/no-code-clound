@@ -14,9 +14,11 @@ import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
 import { flattenFields } from './form-record/flatten-fields';
+import { FormField } from './form-record/form-record.types';
 import { FormRecordStore } from './form-record/form-record.store';
 import { mergeFormConfig, normalizeFormConfig } from './form-config';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
+import { assertSerialSchema } from './form-record/serial-number';
 
 const OPTION_FIELD_TYPES = new Set([
   'input',
@@ -32,6 +34,7 @@ const OPTION_FIELD_TYPES = new Set([
   'image',
   'file',
   'address',
+  'serialNumber',
 ]);
 
 const ICON_COLORS = [
@@ -120,6 +123,7 @@ export class ApplicationService {
     }
     await this.requireOwnedApp(ownerId, appId);
     const form = await this.requireForm(appId, formId);
+    assertSerialSchema(flattenFields(fields as FormField[]));
     form.fields = serializeFormSchema(
       fields as Record<string, unknown>[],
       columns,

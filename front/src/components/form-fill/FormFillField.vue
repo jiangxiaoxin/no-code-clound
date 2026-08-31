@@ -171,6 +171,13 @@
       class="fill-full"
       :title="fieldKeyTitle"
     />
+    <el-input
+      v-else-if="field.type === 'serialNumber'"
+      :model-value="typeof modelValue === 'string' ? modelValue : ''"
+      disabled
+      class="fill-full"
+      :placeholder="field.placeholder"
+    />
     <el-divider v-else-if="field.type === 'divider'" :title="fieldKeyTitle">
       {{ field.title }}
     </el-divider>

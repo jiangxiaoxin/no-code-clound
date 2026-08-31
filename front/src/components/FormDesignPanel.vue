@@ -74,6 +74,10 @@ import {
   paneIdOfField,
 } from './form-design/tabsField.js'
 import {
+  createDefaultSerialField,
+  hasSerialNumberField,
+} from './form-design/serialField.js'
+import {
   DEFAULT_IMAGE_MAX_COUNT,
   DEFAULT_IMAGE_MAX_SIZE_MB,
   defaultImageFormats,
@@ -210,6 +214,12 @@ function listContaining(key) {
 }
 
 function addField(item, beforeKey, paneId, fromCanvas) {
+  if (item.type === 'serialNumber') {
+    if (hasSerialNumberField(fields.value)) {
+      ElMessage.warning('每个表单只能有一个流水号')
+      return
+    }
+  }
   if (item.type === 'tabs') {
     if (hasTabsField(fields.value)) {
       ElMessage.warning('每个表单只能有一个标签页')
@@ -263,6 +273,13 @@ function addField(item, beforeKey, paneId, fromCanvas) {
           downloadable: true,
         }
       : {}),
+  }
+
+  if (item.type === 'serialNumber') {
+    const serial = createDefaultSerialField(field.key)
+    field.placeholder = serial.placeholder
+    field.serialSeparator = serial.serialSeparator
+    field.serialRule = serial.serialRule
   }
 
   if (!(fromCanvas && !paneId)) {

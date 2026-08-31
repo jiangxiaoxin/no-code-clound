@@ -8,6 +8,7 @@ import { User } from '../../user/user.entity';
 import { FormRecordService } from './form-record.service';
 import { FormRecordStore } from './form-record.store';
 import { DictionaryService } from '../dictionary/dictionary.service';
+import { FormSerialSeqService } from './form-serial-seq.service';
 
 describe('FormRecordService', () => {
   let service: FormRecordService;
@@ -24,6 +25,9 @@ describe('FormRecordService', () => {
   };
   const dictionaryService = {
     listEnabledItemsByCodes: jest.fn(),
+  };
+  const serialSeq = {
+    takeNext: jest.fn(),
   };
   const ownedApp = { id: 8, ownerId: 1 };
   const form = {
@@ -54,6 +58,7 @@ describe('FormRecordService', () => {
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: FormRecordStore, useValue: store },
         { provide: DictionaryService, useValue: dictionaryService },
+        { provide: FormSerialSeqService, useValue: serialSeq },
       ],
     }).compile();
     service = module.get(FormRecordService);
@@ -262,5 +267,60 @@ describe('FormRecordService', () => {
         filter: { 'data.status': '1' },
       }),
     );
+  });
+
+  it('generates serial number on create and ignores client value', async () => {
+    serialSeq.takeNext.mockResolvedValue(1);
+    appRepo.findOne.mockResolvedValue(ownedApp);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        { key: 'name', type: 'input' },
+        {
+          key: 'sn',
+          type: 'serialNumber',
+          serialSeparator: '-',
+          serialRule: [
+            { kind: 'datetime', format: 'YYYYMMDD' },
+            { kind: 'counter', start: 1, digits: 5 },
+          ],
+        },
+      ],
+    });
+    store.insert.mockResolvedValue({ id: doc._id.toHexString() });
+    store.findById.mockResolvedValue({
+      ...doc,
+      data: { name: '张三', sn: 'generated' },
+    });
+    userRepo.find.mockResolvedValue([{ id: 1, displayName: '李四' }]);
+
+    await service.create(1, 8, 12, { name: '张三', sn: 'hack' });
+
+    expect(serialSeq.takeNext).toHaveBeenCalled();
+    const inserted = store.insert.mock.calls[0][0];
+    expect(inserted.data.name).toBe('张三');
+    expect(inserted.data.sn).toMatch(/^\d{8}-00001$/);
+    expect(inserted.data.sn).not.toBe('hack');
+  });
+
+  it('does not call takeNext when serial has no counter', async () => {
+    appRepo.findOne.mockResolvedValue(ownedApp);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        {
+          key: 'sn',
+          type: 'serialNumber',
+          serialRule: [{ kind: 'datetime', format: 'epochMs' }],
+        },
+      ],
+    });
+    store.insert.mockResolvedValue({ id: doc._id.toHexString() });
+    store.findById.mockResolvedValue({ ...doc, data: { sn: '1' } });
+    userRepo.find.mockResolvedValue([{ id: 1, displayName: '李四' }]);
+
+    await service.create(1, 8, 12, {});
+    expect(serialSeq.takeNext).not.toHaveBeenCalled();
+    expect(String(store.insert.mock.calls[0][0].data.sn)).toMatch(/^\d+$/);
   });
 });

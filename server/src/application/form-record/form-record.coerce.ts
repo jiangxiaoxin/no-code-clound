@@ -53,6 +53,7 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
     case 'tabs':
     case 'currentUser':
     case 'currentUserDept':
+    case 'serialNumber':
       return undefined;
     case 'input':
     case 'textarea':
@@ -166,6 +167,7 @@ export function mergeRecordData(
   for (const [key, value] of Object.entries(patch)) {
     const field = fieldMap.get(key);
     if (!field) continue;
+    if (field.type === 'serialNumber') continue;
     if (value === null) {
       delete next[key];
       continue;

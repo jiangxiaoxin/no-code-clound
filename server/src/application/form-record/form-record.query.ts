@@ -42,6 +42,7 @@ const STRING_CONTAINS_TYPES = new Set([
   'select-multiple',
   'checkbox',
   'date',
+  'serialNumber',
 ]);
 const RANGE_TYPES = new Set(['number', 'date', 'time', 'datetime']);
 const DICT_VALUE_OPS = new Set(['eq', 'ne', 'in']);
