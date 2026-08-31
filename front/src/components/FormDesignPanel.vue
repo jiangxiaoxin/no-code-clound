@@ -3,7 +3,7 @@
     <FormDesignToolbar
       @clear="clearFields"
       @save="saveFields"
-      @preview="previewVisible = true"
+      @preview="openPreview"
     />
     <el-container class="form-layout">
       <FormDesignPalette @add="addField" />
@@ -12,11 +12,12 @@
         :fields="fields"
         :selected-key="selectedKey"
         :dict-items-by-code="dictItemsByCode"
+        v-model:active-pane-id="activePaneId"
         @select="selectField"
         @copy="copyField"
         @remove="removeField"
         @reorder="reorderFields"
-        @add="addField"
+        @add="onCanvasAdd"
       />
       <FormDesignProps
         v-model:tab="propTab"
@@ -36,10 +37,11 @@
     width="800px"
     align-center
     destroy-on-close
+    draggable
   >
     <div class="preview-json">{{ previewJson }}</div>
     <template #footer>
-      <el-button @click="previewVisible = false">关闭</el-button>
+      <el-button @click="closePreview">关闭</el-button>
       <el-button type="primary" @click="copyPreviewJson">复制</el-button>
     </template>
   </el-dialog>
@@ -61,6 +63,16 @@ import {
   cloneDisplayFieldLabels,
   cloneFillMappings,
 } from './form-design/dataSelect'
+import {
+  createTabsField,
+  findFieldByKey,
+  findTabsField,
+  flattenFields,
+  hasTabsField,
+  isTabsField,
+  neighborPaneId,
+  paneIdOfField,
+} from './form-design/tabsField.js'
 import {
   DEFAULT_IMAGE_MAX_COUNT,
   DEFAULT_IMAGE_MAX_SIZE_MB,
@@ -87,10 +99,11 @@ const previewVisible = ref(false)
 const columns = ref(1)
 const fields = ref([])
 const selectedKey = ref('')
+const activePaneId = ref('')
 const dictItemsByCode = ref({})
 
 const selectedField = computed(
-  () => fields.value.find((field) => field.key === selectedKey.value) || null,
+  () => findFieldByKey(fields.value, selectedKey.value),
 )
 
 const previewJson = computed(() => JSON.stringify(fields.value, null, 2))
@@ -98,7 +111,7 @@ const previewJson = computed(() => JSON.stringify(fields.value, null, 2))
 const dictCodes = computed(() => {
   const codes = []
   const seen = new Set()
-  for (const field of fields.value) {
+  for (const field of flattenFields(fields.value)) {
     const usesDict =
       (field.type === 'radio' || field.type === 'checkbox' || isSelectType(field.type)) &&
       (field.optionSource || 'dictionary') === 'dictionary' &&
@@ -145,7 +158,70 @@ function nextKey() {
   return crypto.randomUUID()
 }
 
-function addField(item, beforeKey) {
+function openPreview() {
+  previewVisible.value = true
+}
+
+function closePreview() {
+  previewVisible.value = false
+}
+
+function onCanvasAdd(item, beforeKey, paneId) {
+  addField(item, beforeKey, paneId, true)
+}
+
+function insertIntoList(list, field, beforeKey) {
+  if (beforeKey) {
+    const index = list.findIndex((entry) => entry.key === beforeKey)
+    list.splice(index < 0 ? list.length : index, 0, field)
+  } else {
+    list.push(field)
+  }
+}
+
+function findPane(paneId) {
+  if (!paneId) return null
+  const tabs = findTabsField(fields.value)
+  return (tabs?.panes || []).find((pane) => pane.id === paneId) || null
+}
+
+function resolveTargetPaneId(paneId) {
+  if (paneId) return paneId
+  const selected = selectedField.value
+  if (isTabsField(selected) || paneIdOfField(fields.value, selectedKey.value)) {
+    const tabs = findTabsField(fields.value)
+    return activePaneId.value || tabs?.panes?.[0]?.id || ''
+  }
+  return ''
+}
+
+function listContaining(key) {
+  if ((fields.value || []).some((item) => item.key === key)) {
+    return fields.value
+  }
+  const tabs = findTabsField(fields.value)
+  if (!tabs) return null
+  for (const pane of tabs.panes || []) {
+    if ((pane.fields || []).some((item) => item.key === key)) {
+      return pane.fields
+    }
+  }
+  return null
+}
+
+function addField(item, beforeKey, paneId, fromCanvas) {
+  if (item.type === 'tabs') {
+    if (hasTabsField(fields.value)) {
+      ElMessage.warning('每个表单只能有一个标签页')
+      return
+    }
+    const field = createTabsField(nextKey(), [nextKey(), nextKey()])
+    insertIntoList(fields.value, field, beforeKey)
+    activePaneId.value = field.panes[0].id
+    selectField(field)
+    return
+  }
+
   const field = {
     key: nextKey(),
     type: item.type,
@@ -188,12 +264,20 @@ function addField(item, beforeKey) {
         }
       : {}),
   }
-  if (beforeKey) {
-    const index = fields.value.findIndex((entry) => entry.key === beforeKey)
-    fields.value.splice(index < 0 ? fields.value.length : index, 0, field)
-  } else {
-    fields.value.push(field)
+
+  if (!(fromCanvas && !paneId)) {
+    const targetPaneId = resolveTargetPaneId(paneId)
+    const pane = findPane(targetPaneId)
+    if (pane) {
+      if (!pane.fields) pane.fields = []
+      insertIntoList(pane.fields, field, beforeKey)
+      activePaneId.value = pane.id
+      selectField(field)
+      return
+    }
   }
+
+  insertIntoList(fields.value, field, beforeKey)
   selectField(field)
 }
 
@@ -240,9 +324,20 @@ async function removeField(field) {
     return
   }
 
-  fields.value = fields.value.filter((item) => item.key !== field.key)
+  const list = listContaining(field.key)
+  if (!list) {
+    return
+  }
+  const filtered = list.filter((item) => item.key !== field.key)
+  if (list === fields.value) {
+    fields.value = filtered
+  } else {
+    const paneId = paneIdOfField(fields.value, field.key)
+    const pane = findPane(paneId)
+    if (pane) pane.fields = filtered
+  }
   if (selectedKey.value === field.key) {
-    selectedKey.value = fields.value.at(-1)?.key || ''
+    selectedKey.value = filtered.at(-1)?.key || fields.value.at(-1)?.key || ''
   }
 }
 
@@ -279,9 +374,23 @@ function ensureOptionSource(field) {
 }
 
 function selectField(field) {
+  if (!field?.key) {
+    selectedKey.value = ''
+    return
+  }
   ensureOptionSource(field)
   selectedKey.value = field.key
   propTab.value = 'field'
+  if (isTabsField(field)) {
+    if (!activePaneId.value) {
+      activePaneId.value = field.panes?.[0]?.id || ''
+    }
+    return
+  }
+  const paneId = paneIdOfField(fields.value, field.key)
+  if (paneId) {
+    activePaneId.value = paneId
+  }
 }
 
 function setFieldWidth(width) {
@@ -292,13 +401,21 @@ function setFieldWidth(width) {
 }
 
 function reorderFields(fromKey, toKey) {
-  const from = fields.value.findIndex((item) => item.key === fromKey)
-  const to = fields.value.findIndex((item) => item.key === toKey)
-  if (from < 0 || to < 0 || from === to) {
+  if (!fromKey || !toKey || fromKey === toKey) {
     return
   }
-  const [moved] = fields.value.splice(from, 1)
-  fields.value.splice(to, 0, moved)
+  const fromList = listContaining(fromKey)
+  const toList = listContaining(toKey)
+  if (!fromList || !toList || fromList !== toList) {
+    return
+  }
+  const from = fromList.findIndex((item) => item.key === fromKey)
+  const to = toList.findIndex((item) => item.key === toKey)
+  if (from < 0 || to < 0) {
+    return
+  }
+  const [moved] = fromList.splice(from, 1)
+  fromList.splice(to, 0, moved)
 }
 
 async function clearFields() {
@@ -318,6 +435,7 @@ async function clearFields() {
 
   fields.value = []
   selectedKey.value = ''
+  activePaneId.value = ''
 }
 
 async function saveFields() {
@@ -356,8 +474,29 @@ watch(
         ? props.initialColumns
         : 1
     selectedKey.value = ''
+    activePaneId.value = ''
   },
   { immediate: true },
+)
+
+watch(
+  () => {
+    const field = selectedField.value
+    if (!isTabsField(field)) return ''
+    return (field.panes || []).map((pane) => pane.id).join(',')
+  },
+  (key, prevKey) => {
+    const ids = key ? key.split(',') : []
+    if (!ids.length) return
+    if (ids.includes(activePaneId.value)) return
+    const prevIds = prevKey ? prevKey.split(',') : []
+    const removedId = prevIds.find((id) => !ids.includes(id))
+    const neighbor = neighborPaneId(
+      prevIds.map((id) => ({ id })),
+      removedId,
+    )
+    activePaneId.value = ids.includes(neighbor) ? neighbor : ids[0]
+  },
 )
 </script>
 

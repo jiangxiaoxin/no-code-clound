@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { flattenFields } from '../form-design/tabsField.js'
 import {
   buildRecordData,
   cloneRecordValues,
   emptyRecordValues,
+  firstRequiredError,
   formatCellValue,
   isFillable,
   isInlineEditable,
@@ -263,4 +265,22 @@ test('address is inline editable unless disabled, locked, or linkage', () => {
     }),
     false,
   )
+})
+
+test('tabs is layout-only and inner fields persist', () => {
+  const tabs = {
+    type: 'tabs',
+    key: 'tabs_1',
+    panes: [
+      { id: 'p1', title: 'A', fields: [{ key: 'name', type: 'input', title: '姓名', required: true }] },
+    ],
+  }
+  assert.equal(isFillable(tabs), false)
+  assert.deepEqual(emptyRecordValues([tabs]), { name: undefined })
+  assert.deepEqual(buildRecordData([tabs], { name: '张三' }), { name: '张三' })
+  assert.equal(validateRequired([tabs], { name: '' }), '请填写「姓名」')
+  assert.deepEqual(firstRequiredError([tabs], { name: '' }), {
+    message: '请填写「姓名」',
+    key: 'name',
+  })
 })

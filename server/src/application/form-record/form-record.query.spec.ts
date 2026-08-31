@@ -401,6 +401,27 @@ describe('buildRecordQuery', () => {
       }),
     ).toThrow(BadRequestException);
   });
+
+  it('filters fields inside tabs panes', () => {
+    expect(
+      buildRecordQuery(
+        [
+          {
+            key: 'tabs_1',
+            type: 'tabs',
+            panes: [
+              {
+                id: 'p1',
+                title: 'A',
+                fields: [{ key: 'inner', type: 'input' }],
+              },
+            ],
+          },
+        ],
+        { filters: [{ key: 'inner', op: 'eq', value: 'x' }] },
+      ).filter,
+    ).toEqual({ 'data.inner': 'x' });
+  });
 });
 
 describe('rewriteDictFilterValues', () => {
@@ -461,5 +482,33 @@ describe('rewriteDictFilterValues', () => {
         { key: 'name', op: 'eq', value: '青岛' },
       ]),
     ).toEqual(['11']);
+  });
+
+  it('resolves dictCode for fields inside tabs panes', () => {
+    const nested = [
+      {
+        key: 'tabs_1',
+        type: 'tabs',
+        panes: [
+          {
+            id: 'p1',
+            title: 'A',
+            fields: [{ key: 'status', type: 'radio', dictCode: '11' }],
+          },
+        ],
+      },
+    ];
+    expect(
+      dictCodesForFilters(nested, [
+        { key: 'status', op: 'eq', value: '启用' },
+      ]),
+    ).toEqual(['11']);
+    expect(
+      rewriteDictFilterValues(
+        nested,
+        [{ key: 'status', op: 'eq', value: '启用' }],
+        itemsByCode,
+      ),
+    ).toEqual([{ key: 'status', op: 'eq', value: '1' }]);
   });
 });

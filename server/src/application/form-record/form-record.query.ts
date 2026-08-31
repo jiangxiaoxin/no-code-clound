@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { flattenFields } from './flatten-fields';
 import { FILTERABLE_TYPES } from './form-record.indexes';
 import { FormField } from './form-record.types';
 
@@ -52,6 +53,13 @@ function fieldDictCode(field: FormField | undefined): string {
   return String(field.dictCode).trim();
 }
 
+function findField(
+  fields: FormField[] | null | undefined,
+  key: string,
+): FormField | undefined {
+  return flattenFields(fields).find((field) => field.key === key);
+}
+
 export function mapDictFilterValue(
   value: unknown,
   items: DictItem[],
@@ -70,9 +78,7 @@ export function dictCodesForFilters(
   const seen = new Set<string>();
   for (const item of filters ?? []) {
     if (!DICT_VALUE_OPS.has(item.op)) continue;
-    const code = fieldDictCode(
-      (fields ?? []).find((field) => field.key === item.key),
-    );
+    const code = fieldDictCode(findField(fields, item.key));
     if (!code || seen.has(code)) continue;
     seen.add(code);
     codes.push(code);
@@ -88,9 +94,7 @@ export function rewriteDictFilterValues(
   if (!filters) return filters;
   return filters.map((item) => {
     if (!DICT_VALUE_OPS.has(item.op)) return item;
-    const code = fieldDictCode(
-      (fields ?? []).find((field) => field.key === item.key),
-    );
+    const code = fieldDictCode(findField(fields, item.key));
     if (!code) return item;
     const items = itemsByCode.get(code) ?? [];
     if (item.op === 'in') {
@@ -120,7 +124,7 @@ function resolvePath(
   if (key === 'updatedAt') return { path: 'updatedAt', type: 'datetime' };
   if (key === 'createdBy') return { path: 'createdBy', type: 'createdBy' };
   if (key === 'updatedBy') return { path: 'updatedBy', type: 'createdBy' };
-  const field = (fields ?? []).find((item) => item.key === key);
+  const field = findField(fields, key);
   if (!field || !FILTERABLE_TYPES.has(field.type)) unsupported();
   return { path: `data.${key}`, type: field.type };
 }

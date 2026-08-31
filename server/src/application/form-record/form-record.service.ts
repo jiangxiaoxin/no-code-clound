@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { AppForm } from '../app-form.entity';
 import { Application } from '../application.entity';
 import { coerceRecordData, mergeRecordData } from './form-record.coerce';
+import { flattenFields } from './flatten-fields';
 import {
   buildRecordQuery,
   dictCodesForFilters,
@@ -247,7 +248,7 @@ export class FormRecordService {
     const seen = new Map<string, Set<string | number>>();
     for (const data of parsed) {
       let skip = false;
-      for (const field of fields ?? []) {
+      for (const field of flattenFields(fields ?? [])) {
         const value = uniqueComparableValue(field, data[field.key]);
         if (value === undefined) continue;
         let bucket = seen.get(field.key);
@@ -285,7 +286,7 @@ export class FormRecordService {
     data: Record<string, unknown>,
     excludeRecordId?: string,
   ) {
-    for (const field of fields ?? []) {
+    for (const field of flattenFields(fields ?? [])) {
       // 目前进对[单行文本]进行重复值检测
       const value = uniqueComparableValue(field, data[field.key]);
       if (value === undefined) {

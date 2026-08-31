@@ -98,6 +98,7 @@ import {
   Search,
 } from '@element-plus/icons-vue'
 
+import { flattenFields } from '../form-design/tabsField.js'
 import {
   loadQuickSearchPrefs,
   quickSearchStorageKey,
@@ -126,9 +127,11 @@ const popoverVisible = ref(false)
 const isAllMode = computed(() => mode.value === 'all')
 const isSpecificMode = computed(() => mode.value === 'specific')
 
+const flatFields = computed(() => flattenFields(props.fields))
+
 const visibleFields = computed(() => {
   const q = fieldQuery.value.trim().toLowerCase()
-  return props.fields.filter((field) => {
+  return flatFields.value.filter((field) => {
     if (!q) return true
     return String(field.title || '未命名字段').toLowerCase().includes(q)
   })
@@ -175,7 +178,7 @@ function persistPrefs() {
   saveQuickSearchPrefs(
     storageKey(),
     { mode: mode.value, selectedKeys: selectedKeys.value },
-    props.fields,
+    flatFields.value,
   )
 }
 
@@ -184,10 +187,10 @@ watch(
     props.appId,
     props.formId,
     userStore.user?.id,
-    props.fields.map((field) => field.key).join(','),
+    flatFields.value.map((field) => field.key).join(','),
   ],
   () => {
-    const next = loadQuickSearchPrefs(storageKey(), props.fields)
+    const next = loadQuickSearchPrefs(storageKey(), flatFields.value)
     mode.value = next.mode
     selectedKeys.value = next.selectedKeys
   },

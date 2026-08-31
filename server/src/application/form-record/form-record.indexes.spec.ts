@@ -22,13 +22,26 @@ describe('form-record.indexes', () => {
       { key: 'i1', type: 'image' },
       { key: 'f1', type: 'file' },
       { key: 's1', type: 'subform' },
+      {
+        key: 'tabs_1',
+        type: 'tabs',
+        panes: [
+          {
+            id: 'p1',
+            title: 'A',
+            fields: [{ key: 'inner', type: 'input' }],
+          },
+        ],
+      },
     ]);
     expect(names).toEqual([
       'idx_data_t1',
       'idx_data_t2',
       'idx_data_t3',
+      'idx_data_inner',
     ]);
   });
+
 
   it('returns no data indexes when fields is null', () => {
     expect(targetDataIndexNames(null)).toEqual([]);

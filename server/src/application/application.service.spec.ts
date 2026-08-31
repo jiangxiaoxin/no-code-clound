@@ -649,6 +649,42 @@ describe('ApplicationService', () => {
       });
     });
 
+    it('returns pane inner input and omits tabs', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([
+        {
+          id: 13,
+          name: '带标签页',
+          applicationId: 8,
+          fields: {
+            columns: 1,
+            fields: [
+              {
+                key: 'tabs_1',
+                title: '标签页',
+                type: 'tabs',
+                panes: [
+                  {
+                    id: 'p1',
+                    title: 'A',
+                    fields: [{ key: 'n2', title: '姓名', type: 'input' }],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      ]);
+
+      await expect(service.listFormFields(1, 8)).resolves.toEqual([
+        {
+          id: 13,
+          name: '带标签页',
+          fields: [{ key: 'n2', title: '姓名', type: 'input' }],
+        },
+      ]);
+    });
+
     it('does not exclude when excludeFormId is omitted', async () => {
       repo.findOne.mockResolvedValue(ownedApp);
       formRepo.find.mockResolvedValue([

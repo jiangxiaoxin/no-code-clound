@@ -1,5 +1,6 @@
 import { FormField } from './form-record.types';
 import { coerceRecordData } from './form-record.coerce';
+import { flattenFields } from './flatten-fields';
 import {
   ADDRESS_IMPORT_NOTE,
   addressImportExample,
@@ -9,6 +10,7 @@ import {
 
 export const IMPORT_SKIP_TYPES = new Set([
   'divider',
+  'tabs',
   'currentUser',
   'currentUserDept',
   'image',
@@ -27,7 +29,7 @@ export { ADDRESS_IMPORT_NOTE, addressImportExample };
 type DictItem = { label?: string; value?: string };
 
 export function importableFields(fields: FormField[] | null | undefined): FormField[] {
-  return (fields ?? []).filter(
+  return flattenFields(fields).filter(
     (field) => Boolean(field?.key) && !IMPORT_SKIP_TYPES.has(field.type),
   );
 }

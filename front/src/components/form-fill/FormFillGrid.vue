@@ -1,20 +1,47 @@
 <template>
   <div class="fill-grid">
-    <FormFillField
-      v-for="field in fields"
-      :key="field.key"
-      :app-id="appId"
-      :field="field"
-      :fill-tip="fillTips[field.key]"
-      :items="itemsFor(field)"
-      :model-value="values[field.key]"
-      :disabled="disabled"
-      :updating="updating"
-      :record-values="values"
-      :form-fields="fields"
-      @update:model-value="values[field.key] = $event"
-      @fill="onFill"
-    />
+    <template v-for="field in fields" :key="field.key">
+      <div v-if="isTabsField(field)" class="fill-tabs">
+        <el-tabs :model-value="activePaneId" @tab-change="onTabChange">
+          <el-tab-pane
+            v-for="pane in field.panes"
+            :key="pane.id"
+            :name="pane.id"
+            :label="pane.title"
+          >
+            <div class="fill-grid">
+              <FormFillField
+                v-for="paneField in pane.fields"
+                :key="paneField.key"
+                :app-id="appId"
+                :field="paneField"
+                :fill-tip="fillTips[paneField.key]"
+                :items="itemsFor(paneField)"
+                :model-value="values[paneField.key]"
+                :disabled="disabled"
+                :updating="updating"
+                :record-values="values"
+                :form-fields="flatFields"
+                @fill="onFill"
+              />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
+      <FormFillField
+        v-else
+        :app-id="appId"
+        :field="field"
+        :fill-tip="fillTips[field.key]"
+        :items="itemsFor(field)"
+        :model-value="values[field.key]"
+        :disabled="disabled"
+        :updating="updating"
+        :record-values="values"
+        :form-fields="flatFields"
+        @fill="onFill"
+      />
+    </template>
   </div>
 </template>
 
@@ -25,6 +52,12 @@ import { queryFormRecordsApi } from '../../api/apps'
 import { fillInfluencerTips } from '../form-design/dataSelect'
 import { isSelectType } from '../form-design/fieldTypes'
 import { hasLinkage } from '../form-design/linkage'
+import {
+  flattenFields,
+  findTabsField,
+  isTabsField,
+  paneIdOfField,
+} from '../form-design/tabsField.js'
 import FormFillField from './FormFillField.vue'
 import { emptyValue } from './fillValues'
 import {
@@ -45,6 +78,9 @@ const props = defineProps({
 })
 
 const fillTips = computed(() => fillInfluencerTips(props.fields))
+const flatFields = computed(() => flattenFields(props.fields))
+const tabsField = computed(() => findTabsField(props.fields))
+const activePaneId = ref('')
 const tableItemsByKey = ref({})
 const linkageItemsByKey = ref({})
 const pendingQueries = new Map()
@@ -55,6 +91,28 @@ let loadPrimed = false
 let lastLoadKeys = {}
 let lastLinkageKeys = {}
 let linkagePrimed = false
+
+watch(
+  tabsField,
+  (tabs) => {
+    const ids = (tabs?.panes || []).map((pane) => pane.id)
+    if (!ids.includes(activePaneId.value)) {
+      activePaneId.value = ids[0] || ''
+    }
+  },
+  { immediate: true },
+)
+
+function revealField(key) {
+  const paneId = paneIdOfField(props.fields, key)
+  if (paneId) activePaneId.value = paneId
+}
+
+function onTabChange(name) {
+  activePaneId.value = name
+}
+
+defineExpose({ revealField })
 
 function resolveSourceFormId(field) {
   const n = Number(field.sourceFormId)
@@ -124,14 +182,14 @@ function linkageFieldLoadKey(field) {
 }
 
 const tableLoadKey = computed(() =>
-  props.fields
+  flatFields.value
     .filter(isTableSelect)
     .map((field) => `${field.key}:${fieldLoadKey(field)}`)
     .join('|'),
 )
 
 const linkageLoadKey = computed(() =>
-  props.fields
+  flatFields.value
     .filter(isLinkageField)
     .map((field) => `${field.key}:${linkageFieldLoadKey(field)}`)
     .join('|'),
@@ -159,7 +217,7 @@ function onFill(patches) {
 }
 
 function hasFieldFilterRefs() {
-  return props.fields.some((field) => {
+  return flatFields.value.some((field) => {
     const conditions = isTableSelect(field)
       ? field.optionFilters?.conditions
       : isLinkageField(field)
@@ -209,7 +267,7 @@ async function loadTableItems() {
     lastLoadKeys = {}
     return
   }
-  const fields = props.fields.filter(isTableSelect)
+  const fields = flatFields.value.filter(isTableSelect)
   const next = { ...tableItemsByKey.value }
   const nextKeys = {}
   for (const key of Object.keys(next)) {
@@ -229,7 +287,7 @@ async function loadTableItems() {
         const result = await queryRecordsOnce(
           props.appId,
           resolveSourceFormId(field),
-          buildSourceQuery(field.optionFilters, props.values, props.fields),
+          buildSourceQuery(field.optionFilters, props.values, flatFields.value),
         )
         next[field.key] = recordsToSelectItems(
           result?.items,
@@ -253,7 +311,7 @@ async function loadLinkage() {
     lastLinkageKeys = {}
     return
   }
-  const fields = props.fields.filter(isLinkageField)
+  const fields = flatFields.value.filter(isLinkageField)
   const writeValues = shouldWriteLinkageValues()
   const next = { ...linkageItemsByKey.value }
   const nextKeys = {}
@@ -284,7 +342,7 @@ async function loadLinkage() {
               conditions: field.linkage.conditions,
             },
             props.values,
-            props.fields,
+            flatFields.value,
             linkageQueryPaging(field),
           ),
         )
@@ -352,5 +410,10 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 8px;
+}
+
+.fill-tabs {
+  grid-column: span 12;
+  min-width: 0;
 }
 </style>

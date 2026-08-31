@@ -22,6 +22,7 @@
 
       <FormRecordCreateTab
         v-show="tab === 'create'"
+        ref="createTabRef"
         :app-id="appId"
         :fields="fields"
         :values="values"
@@ -54,9 +55,10 @@ import {
 import {
   buildRecordData,
   emptyRecordValues,
-  validateRequired,
+  firstRequiredError,
 } from './form-fill/fillValues.js'
 import { isSelectType as isSelectField } from './form-design/fieldTypes'
+import { flattenFields } from './form-design/tabsField.js'
 import FormRecordCreateTab from './form-workspace/FormRecordCreateTab.vue'
 import FormRecordManage from './form-workspace/FormRecordManage.vue'
 
@@ -99,6 +101,7 @@ const fields = ref([])
 const values = reactive({})
 const dictItemsByCode = ref({})
 const workspaceTabOrder = ref([])
+const createTabRef = ref(null)
 // 切换表单时作废进行中的请求，避免把上一张表的字段写进来
 const loadSession = ref(0)
 
@@ -136,7 +139,7 @@ function resetValues() {
 const dictCodes = computed(() => {
   const codes = []
   const seen = new Set()
-  for (const field of fields.value) {
+  for (const field of flattenFields(fields.value)) {
     const usesDict =
       (field.type === 'radio' ||
         field.type === 'checkbox' ||
@@ -209,9 +212,10 @@ async function loadDictItems() {
 }
 
 async function onSave() {
-  const message = validateRequired(fields.value, values)
-  if (message) {
-    ElMessage.warning(message)
+  const err = firstRequiredError(fields.value, values)
+  if (err) {
+    ElMessage.warning(err.message)
+    createTabRef.value?.revealField(err.key)
     return
   }
   saving.value = true

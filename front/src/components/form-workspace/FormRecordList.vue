@@ -100,7 +100,7 @@
                 :form-id="form.id"
                 :row="row"
                 :field="fieldByKey[col.key]"
-                :fields="fields"
+                :fields="tableFields"
                 :dict-items-by-code="dictItemsByCode"
                 :editing="editingCell === cellKey(row.id, col.key)"
                 @start="editingCell = cellKey(row.id, col.key)"
@@ -139,6 +139,7 @@ import { computed, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { deleteFormRecordApi, downloadRecordImportTemplateApi, queryFormRecordsApi } from '../../api/apps'
+import { flattenFields } from '../form-design/tabsField.js'
 import { isFillable } from '../form-fill/fillValues.js'
 import { formatDateTime } from '../../utils/timeValue.js'
 import FormRecordCell from './FormRecordCell.vue'
@@ -184,7 +185,7 @@ const importVisible = ref(false)
 const loadSession = ref(0)
 const actions = computed(() => normalizeRecordActions(props.recordActions))
 
-const tableFields = computed(() => props.fields.filter(isFillable))
+const tableFields = computed(() => flattenFields(props.fields).filter(isFillable))
 const fieldByKey = computed(() =>
   Object.fromEntries(tableFields.value.map((field) => [field.key, field])),
 )

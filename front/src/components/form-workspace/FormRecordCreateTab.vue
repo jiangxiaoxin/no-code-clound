@@ -7,6 +7,7 @@
     <template v-else>
       <div class="fill-scroll">
         <FormFillGrid
+          ref="gridRef"
           :app-id="appId"
           :fields="fields"
           :values="values"
@@ -14,8 +15,8 @@
         />
       </div>
       <div class="fill-footer">
-        <el-button @click="$emit('cancel')">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="$emit('save')">
+        <el-button @click="onCancel">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="onSave">
           保存
         </el-button>
       </div>
@@ -24,6 +25,7 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import FormFillGrid from '../form-fill/FormFillGrid.vue'
 
 defineProps({
@@ -35,7 +37,20 @@ defineProps({
   saving: { type: Boolean, default: false },
 })
 
-defineEmits(['cancel', 'save'])
+const emit = defineEmits(['cancel', 'save'])
+const gridRef = ref(null)
+
+function onCancel() {
+  emit('cancel')
+}
+
+function onSave() {
+  emit('save')
+}
+
+defineExpose({
+  revealField: (key) => gridRef.value?.revealField(key),
+})
 </script>
 
 <style scoped lang="less">

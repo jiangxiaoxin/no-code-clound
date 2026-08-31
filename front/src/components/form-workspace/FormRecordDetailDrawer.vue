@@ -10,6 +10,7 @@
   >
     <div v-if="record" class="fill-drawer-body">
       <FormFillGrid
+        ref="gridRef"
         :app-id="appId"
         :fields="fields"
         :values="detailValues"
@@ -44,7 +45,7 @@ import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { updateFormRecordApi } from '../../api/apps'
 import FormFillGrid from '../form-fill/FormFillGrid.vue'
-import { cloneRecordValues, validateRequired, buildRecordData } from '../form-fill/fillValues.js'
+import { cloneRecordValues, firstRequiredError, buildRecordData } from '../form-fill/fillValues.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -63,6 +64,7 @@ const editing = ref(false)
 const saving = ref(false)
 const detailValues = reactive({})
 const snapshot = ref({})
+const gridRef = ref(null)
 
 function applyValues(data) {
   for (const key of Object.keys(detailValues)) {
@@ -98,9 +100,10 @@ function cancelEdit() {
 }
 
 async function saveDetail() {
-  const message = validateRequired(props.fields, detailValues)
-  if (message) {
-    ElMessage.warning(message)
+  const err = firstRequiredError(props.fields, detailValues)
+  if (err) {
+    ElMessage.warning(err.message)
+    gridRef.value?.revealField(err.key)
     return
   }
   if (!props.record?.id || !props.formId) {

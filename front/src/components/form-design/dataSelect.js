@@ -1,3 +1,4 @@
+import { flattenFields } from './tabsField.js'
 import {
   CREATED_AT_KEY,
   CREATED_BY_KEY,
@@ -66,6 +67,7 @@ export function hasFillMappings(raw) {
 }
 
 export function fillInfluencerTips(fields) {
+  fields = flattenFields(fields)
   const namesByTarget = {}
   for (const field of fields || []) {
     if (field.type !== 'data') continue

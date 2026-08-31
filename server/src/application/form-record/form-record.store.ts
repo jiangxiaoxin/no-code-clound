@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Collection, ObjectId } from 'mongodb';
 import { MongoService } from '../../mongo/mongo.service';
+import { flattenFields } from './flatten-fields';
 import {
   collectionName,
   dataIndexName,
@@ -49,7 +50,7 @@ export class FormRecordStore {
     await this.ensureSystemIndexes(formId);
     const col = this.col(formId);
     const wanted = new Set(targetDataIndexNames(fields));
-    for (const field of fields ?? []) {
+    for (const field of flattenFields(fields)) {
       if (!FILTERABLE_TYPES.has(field.type)) continue;
       await col.createIndex(
         { [`data.${field.key}`]: 1 },

@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { flattenFields } from './flatten-fields';
 import { FormField } from './form-record.types';
 
 function requireObject(input: unknown): Record<string, unknown> {
@@ -49,6 +50,7 @@ function coerceFileValue(value: unknown): { url: string; name: string }[] {
 function coerceFieldValue(field: FormField, value: unknown): unknown {
   switch (field.type) {
     case 'divider':
+    case 'tabs':
     case 'currentUser':
     case 'currentUserDept':
       return undefined;
@@ -141,7 +143,7 @@ export function coerceRecordData(
 ): Record<string, unknown> {
   const src = requireObject(input);
   const out: Record<string, unknown> = {};
-  for (const field of fields ?? []) {
+  for (const field of flattenFields(fields ?? [])) {
     if (!(field.key in src)) continue;
     const coerced = coerceFieldValue(field, src[field.key]);
     if (coerced !== undefined) {
@@ -157,7 +159,9 @@ export function mergeRecordData(
   fields: FormField[] | null | undefined,
 ): Record<string, unknown> {
   const patch = requireObject(patchInput);
-  const fieldMap = new Map((fields ?? []).map((field) => [field.key, field]));
+  const fieldMap = new Map(
+    flattenFields(fields ?? []).map((field) => [field.key, field]),
+  );
   const next = { ...existing };
   for (const [key, value] of Object.entries(patch)) {
     const field = fieldMap.get(key);

@@ -2,6 +2,7 @@
   <el-main class="canvas">
     <div
       class="canvas-paper"
+      @click="onCanvasBlank"
       @dragover.prevent
       @dragleave="onCanvasDragLeave"
       @drop.prevent="onDropCanvas"
@@ -17,16 +18,23 @@
           :app-id="appId"
           :field="field"
           :fill-tip="fillTips[field.key]"
+          :fill-tips="fillTips"
           :items="dictItemsByCode[field.dictCode] || []"
+          :dict-items-by-code="dictItemsByCode"
           :selected="selectedKey === field.key"
+          :selected-key="selectedKey"
+          :active-pane-id="activePaneId"
           :dragging="dragKey === field.key"
           :drag-over="dragOverKey === field.key"
-          @select="$emit('select', field)"
-          @copy="$emit('copy', field)"
-          @remove="$emit('remove', field)"
-          @dragstart="onDragStart(field, $event)"
-          @dragover="onDragOver(field)"
-          @drop="onDrop(field, $event)"
+          @select="onSelect"
+          @copy="onCopy"
+          @remove="onRemove"
+          @add="onAdd"
+          @reorder="onReorder"
+          @update:activePaneId="onActivePaneId"
+          @dragstart="onDragStart"
+          @dragover="onDragOver"
+          @drop="onDrop"
           @dragend="onDragEnd"
         />
       </div>
@@ -45,11 +53,19 @@ const props = defineProps({
   fields: { type: Array, required: true },
   selectedKey: { type: String, default: '' },
   dictItemsByCode: { type: Object, default: () => ({}) },
+  activePaneId: { type: String, default: '' },
 })
 
 const fillTips = computed(() => fillInfluencerTips(props.fields))
 
-const emit = defineEmits(['select', 'copy', 'remove', 'reorder', 'add'])
+const emit = defineEmits([
+  'select',
+  'copy',
+  'remove',
+  'reorder',
+  'add',
+  'update:activePaneId',
+])
 
 const dragKey = ref('')
 const dragOverKey = ref('')
@@ -62,7 +78,35 @@ function paletteItem(data) {
   return fieldTypes.find((item) => item.type === type) || null
 }
 
-function onDragStart(field, event) {
+function onSelect(field) {
+  emit('select', field)
+}
+
+function onCopy(field) {
+  emit('copy', field)
+}
+
+function onRemove(field) {
+  emit('remove', field)
+}
+
+function onAdd(item, beforeKey, paneId) {
+  emit('add', item, beforeKey, paneId)
+}
+
+function onReorder(fromKey, toKey) {
+  emit('reorder', fromKey, toKey)
+}
+
+function onActivePaneId(id) {
+  emit('update:activePaneId', id)
+}
+
+function onCanvasBlank() {
+  emit('select', null)
+}
+
+function onDragStart(event, field) {
   dragKey.value = field.key
   event.dataTransfer.effectAllowed = 'move'
   event.dataTransfer.setData('text/plain', field.key)
@@ -74,14 +118,15 @@ function onDragOver(field) {
   }
 }
 
-function onDrop(field, event) {
+function onDrop(event, field) {
   dragOverKey.value = ''
-  const item = paletteItem(event.dataTransfer.getData('text/plain'))
+  const data = event.dataTransfer.getData('text/plain')
+  const item = paletteItem(data)
   if (item) {
     emit('add', item, field.key)
     return
   }
-  emit('reorder', dragKey.value, field.key)
+  emit('reorder', data, field.key)
 }
 
 function onDropCanvas(event) {

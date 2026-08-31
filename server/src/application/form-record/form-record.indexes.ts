@@ -1,3 +1,4 @@
+import { flattenFields } from './flatten-fields';
 import { FormField } from './form-record.types';
 
 export const FILTERABLE_TYPES: ReadonlySet<string> = new Set([
@@ -37,7 +38,7 @@ export function targetDataIndexNames(
   if (!fields) {
     return [];
   }
-  return fields
+  return flattenFields(fields)
     .filter((field) => FILTERABLE_TYPES.has(field.type))
     .map((field) => dataIndexName(field.key));
 }

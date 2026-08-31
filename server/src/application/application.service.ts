@@ -13,6 +13,7 @@ import { Application } from './application.entity';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
+import { flattenFields } from './form-record/flatten-fields';
 import { FormRecordStore } from './form-record/form-record.store';
 import { mergeFormConfig, normalizeFormConfig } from './form-config';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
@@ -151,7 +152,9 @@ export class ApplicationService {
       if (exclude != null && form.id === exclude) {
         continue;
       }
-      const fields = this.toOptionFields(parseFormSchema(form.fields).fields);
+      const fields = this.toOptionFields(
+        flattenFields(parseFormSchema(form.fields).fields),
+      );
       if (!fields.length) {
         continue;
       }

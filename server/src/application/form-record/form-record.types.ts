@@ -7,4 +7,5 @@ export type FormField = {
   required?: boolean;
   optionSource?: string;
   addressFormat?: string;
+  panes?: { id: string; title?: string; fields?: FormField[] }[];
 };

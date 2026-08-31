@@ -26,6 +26,7 @@
         <span class="field-type-label">组件类型</span>
         <span class="field-type-text">{{ fieldTypeText }}</span>
       </div>
+      <template v-if="field.type !== 'tabs'">
       <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
@@ -362,7 +363,7 @@
         :field-title="field.title"
         :field-type="field.type"
         :linkage="field.linkage"
-        :current-fields="fields"
+        :current-fields="currentFields"
         :form-fields="formFields"
         @confirm="onLinkageConfirm"
       />
@@ -386,6 +387,44 @@
           <el-radio-button value="1">整行</el-radio-button>
         </el-radio-group>
       </el-form-item>
+      </template>
+      <div v-else class="pane-list">
+        <div class="pane-list-title">标签页</div>
+        <div
+          v-for="pane in field.panes"
+          :key="pane.id"
+          class="pane-row"
+          draggable="true"
+          @dragstart="onPaneDragStart(pane, $event)"
+          @dragover="onPaneDragOver"
+          @drop="onPaneDrop(pane, $event)"
+          @dragend="onPaneDragEnd"
+        >
+          <span class="pane-handle">
+            <el-icon><Rank /></el-icon>
+          </span>
+          <el-input
+            v-model="pane.title"
+            maxlength="32"
+            @focus="onPaneTitleFocus(pane)"
+            @blur="onPaneTitleBlur(pane)"
+          />
+          <el-button
+            type="danger"
+            link
+            :icon="Delete"
+            :disabled="!canRemovePane(field.panes)"
+            @click="onRemovePane(pane)"
+          />
+        </div>
+        <el-button
+          :icon="Plus"
+          :disabled="!canAddPane(field.panes)"
+          @click="onAddPane"
+        >
+          添加标签页
+        </el-button>
+      </div>
 
     </el-form>
   </el-aside>
@@ -393,9 +432,17 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { CircleClose } from '@element-plus/icons-vue'
+import { CircleClose, Delete, Plus, Rank } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { formatOptions, formColumnOptions, fieldTypeLabel, isSelectType } from './fieldTypes'
+import {
+  canAddPane,
+  canRemovePane,
+  flattenFields,
+  nextPaneTitle,
+  reorderPanes,
+  trimPaneTitle,
+} from './tabsField.js'
 import FormFieldSourcePicker from './FormFieldSourcePicker.vue'
 import FormSourcePicker from './FormSourcePicker.vue'
 import FormOptionFilterDialog from './FormOptionFilterDialog.vue'
@@ -436,6 +483,61 @@ function onWidthChange(value) {
   emit('update:width', value)
 }
 
+let paneTitleBeforeEdit = ''
+const draggingPaneId = ref('')
+
+function onPaneTitleFocus(pane) {
+  paneTitleBeforeEdit = pane.title || ''
+}
+
+function onPaneTitleBlur(pane) {
+  pane.title = trimPaneTitle(pane.title, paneTitleBeforeEdit)
+}
+
+function onAddPane() {
+  if (!props.field || !canAddPane(props.field.panes)) return
+  props.field.panes.push({
+    id: crypto.randomUUID(),
+    title: nextPaneTitle(props.field.panes),
+    fields: [],
+  })
+}
+
+async function onRemovePane(pane) {
+  if (!canRemovePane(props.field.panes)) return
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${pane.title || '未命名'}」？该标签页及其内部字段将一并删除。`,
+      '删除标签页',
+      { confirmButtonText: '删除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  props.field.panes = props.field.panes.filter((item) => item.id !== pane.id)
+}
+
+function onPaneDragStart(pane, event) {
+  draggingPaneId.value = pane.id
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', pane.id)
+}
+
+function onPaneDragOver(event) {
+  event.preventDefault()
+}
+
+function onPaneDrop(pane, event) {
+  event.preventDefault()
+  const fromId = draggingPaneId.value || event.dataTransfer.getData('text/plain')
+  reorderPanes(props.field.panes, fromId, pane.id)
+  draggingPaneId.value = ''
+}
+
+function onPaneDragEnd() {
+  draggingPaneId.value = ''
+}
+
 function onEditableChange(value) {
   if (!props.field) {
     return
@@ -452,9 +554,13 @@ const mappingVisible = ref(false)
 const processVisible = ref(false)
 
 const formFields = computed(() =>
-  (props.fields || []).filter(
+  flattenFields(props.fields || []).filter(
     (item) => isFillable(item) && item.key !== props.field?.key,
   ),
+)
+
+const currentFields = computed(() =>
+  flattenFields(props.fields || []).filter(isFillable),
 )
 
 const fieldTypeText = computed(() => fieldTypeLabel(props.field?.type))
@@ -825,5 +931,36 @@ watch(
   border-radius: var(--el-border-radius-base);
   flex: 1;
   font-weight: bold;
+}
+
+.pane-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.pane-list-title {
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--el-text-color-regular);
+}
+
+.pane-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pane-handle {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--el-text-color-placeholder);
+  cursor: grab;
+}
+
+.pane-row .el-input {
+  flex: 1;
+  min-width: 0;
 }
 </style>

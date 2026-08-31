@@ -1,3 +1,4 @@
+import { flattenFields } from '../form-design/tabsField.js'
 import { asDate, formatTimeFieldValue, parseCalendarParts } from '../../utils/timeValue.js'
 import {
   isAddressEmpty,
@@ -17,6 +18,7 @@ const SKIP_TYPES = new Set([
   'dept',
   'data',
   'relate',
+  'tabs',
 ])
 
 export function isFillable(field) {
@@ -40,6 +42,7 @@ export function emptyValue(field) {
 }
 
 export function emptyRecordValues(fields) {
+  fields = flattenFields(fields)
   const next = {}
   for (const field of fields) {
     if (persistsValue(field)) {
@@ -50,6 +53,7 @@ export function emptyRecordValues(fields) {
 }
 
 export function cloneRecordValues(fields, data) {
+  fields = flattenFields(fields)
   const next = {}
   for (const field of fields) {
     if (field.type === 'data') {
@@ -144,6 +148,7 @@ export function serializeValue(field, value) {
 }
 
 export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
+  fields = flattenFields(fields)
   const data = {}
   for (const field of fields) {
     if (!persistsValue(field)) continue
@@ -157,20 +162,25 @@ export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
   return data
 }
 
-export function validateRequired(fields, values) {
-  for (const field of fields) {
+export function firstRequiredError(fields, values) {
+  for (const field of flattenFields(fields)) {
     if (!isFillable(field) || !field.required) continue
-    if (field.type === 'address') {
-      if (!isAddressValueReady(field, values[field.key])) {
-        return `请填写「${field.title || '未命名'}」`
+    const missing =
+      field.type === 'address'
+        ? !isAddressValueReady(field, values[field.key])
+        : isEmptyValue(field, values[field.key])
+    if (missing) {
+      return {
+        message: `请填写「${field.title || '未命名'}」`,
+        key: field.key,
       }
-      continue
-    }
-    if (isEmptyValue(field, values[field.key])) {
-      return `请填写「${field.title || '未命名'}」`
     }
   }
-  return ''
+  return null
+}
+
+export function validateRequired(fields, values) {
+  return firstRequiredError(fields, values)?.message || ''
 }
 
 const INLINE_EDIT_TYPES = new Set([

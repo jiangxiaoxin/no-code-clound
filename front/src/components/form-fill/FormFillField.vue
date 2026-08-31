@@ -257,12 +257,19 @@ const isDisabled = computed(
     (props.updating && props.field.editable === false),
 )
 
-function onUpdateModelValue(value) {
+function commitValue(value) {
+  if (props.recordValues && props.field.key) {
+    props.recordValues[props.field.key] = value
+  }
   emit('update:modelValue', value)
 }
 
+function onUpdateModelValue(value) {
+  commitValue(value)
+}
+
 function onCommitDraft() {
-  emit('update:modelValue', cloneDraft(draft.value))
+  commitValue(cloneDraft(draft.value))
 }
 
 function onFill(patches) {

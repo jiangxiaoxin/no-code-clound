@@ -110,7 +110,32 @@ describe('coerceRecordData', () => {
       expect((e as BadRequestException).message).toBe('字段值类型不正确');
     }
   });
+
+  it('coerces fields inside tabs and drops the tabs key', () => {
+    const nested = [
+      { key: 'before', type: 'input' },
+      {
+        key: 'tabs_1',
+        type: 'tabs',
+        panes: [
+          {
+            id: 'p1',
+            title: 'A',
+            fields: [{ key: 'name', type: 'input' }],
+          },
+        ],
+      },
+    ];
+    expect(
+      coerceRecordData(nested, {
+        before: 'x',
+        tabs_1: { no: true },
+        name: '张三',
+      }),
+    ).toEqual({ before: 'x', name: '张三' });
+  });
 });
+
 
 describe('mergeRecordData', () => {
   it('keeps unmentioned keys and deletes explicit null', () => {

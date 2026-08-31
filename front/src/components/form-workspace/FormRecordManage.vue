@@ -25,6 +25,7 @@
       @saved="onDetailSaved"
     />
     <FormRecordCreateDrawer
+      ref="createDrawerRef"
       v-model="createVisible"
       :app-id="appId"
       :fields="fields"
@@ -50,9 +51,10 @@ import {
 import {
   buildRecordData,
   emptyRecordValues,
-  validateRequired,
+  firstRequiredError,
 } from '../form-fill/fillValues.js'
 import { isSelectType as isSelectField } from '../form-design/fieldTypes'
+import { flattenFields } from '../form-design/tabsField.js'
 import { normalizeRecordActions } from '../../utils/recordActions'
 import FormRecordList from './FormRecordList.vue'
 import FormRecordCreateDrawer from './FormRecordCreateDrawer.vue'
@@ -64,6 +66,7 @@ const props = defineProps({
 })
 
 const listRef = ref(null)
+const createDrawerRef = ref(null)
 const schemaLoading = ref(false)
 const saving = ref(false)
 const form = ref(null)
@@ -88,7 +91,7 @@ function resetValues() {
 const dictCodes = computed(() => {
   const codes = []
   const seen = new Set()
-  for (const field of fields.value) {
+  for (const field of flattenFields(fields.value)) {
     const usesDict =
       (field.type === 'radio' ||
         field.type === 'checkbox' ||
@@ -187,9 +190,10 @@ function onDetailSaved(updated) {
 }
 
 async function onCreate() {
-  const message = validateRequired(fields.value, values)
-  if (message) {
-    ElMessage.warning(message)
+  const err = firstRequiredError(fields.value, values)
+  if (err) {
+    ElMessage.warning(err.message)
+    createDrawerRef.value?.revealField(err.key)
     return
   }
   if (!form.value?.id) {

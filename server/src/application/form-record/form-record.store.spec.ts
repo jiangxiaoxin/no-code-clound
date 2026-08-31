@@ -61,6 +61,30 @@ describe('FormRecordStore', () => {
     expect(collection.dropIndex).not.toHaveBeenCalledWith('idx_updatedAt');
   });
 
+  it('creates indexes for filterable fields inside tabs panes', async () => {
+    collection.indexes.mockResolvedValue([]);
+    collection.createIndex.mockResolvedValue('ok');
+
+    await store.syncIndexes(12, [
+      {
+        key: 'tabs_1',
+        type: 'tabs',
+        panes: [
+          {
+            id: 'p1',
+            title: 'A',
+            fields: [{ key: 'inner', type: 'input' }],
+          },
+        ],
+      },
+    ]);
+
+    expect(collection.createIndex).toHaveBeenCalledWith(
+      { 'data.inner': 1 },
+      { name: 'idx_data_inner' },
+    );
+  });
+
   it('ignores missing collection on drop', async () => {
     collection.drop.mockRejectedValue(
       Object.assign(new Error('ns'), { code: 26 }),
