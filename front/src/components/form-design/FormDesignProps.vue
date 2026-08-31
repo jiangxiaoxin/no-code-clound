@@ -203,6 +203,96 @@
           </div>
         </div>
       </el-form-item>
+      <template v-if="isMemberFieldType">
+        <el-form-item label="可选范围">
+          <el-radio-group :model-value="field.memberScope || 'all'" @change="onMemberScopeChange">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="custom">自定义</el-radio-button>
+            <el-radio-button value="dept_field">按部门字段</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="(field.memberScope || 'all') === 'custom'" label="自定义范围">
+          <div class="linkage-row">
+            <div
+              class="filter-trigger"
+              :class="{ 'is-placeholder': !hasCustomScope }"
+              @click="openMemberScopeDialog"
+            >
+              {{ hasCustomScope ? '已设置可选范围' : '设置可选范围' }}
+            </div>
+            <el-icon
+              v-if="hasCustomScope"
+              class="linkage-clear"
+              @click.stop="confirmClearMemberScope"
+            >
+              <CircleClose />
+            </el-icon>
+          </div>
+        </el-form-item>
+        <el-form-item v-if="(field.memberScope || 'all') === 'dept_field'" label="部门字段">
+          <el-select
+            v-model="field.sourceDeptFieldKey"
+            clearable
+            :placeholder="deptFieldOptions.length ? '请选择' : '请先添加部门选择字段'"
+          >
+            <el-option
+              v-for="item in deptFieldOptions"
+              :key="item.key"
+              :label="item.title || item.key"
+              :value="item.key"
+            />
+          </el-select>
+        </el-form-item>
+        <el-dialog
+          v-model="memberScopeVisible"
+          title="设置可选范围"
+          width="720px"
+          draggable
+          @open="onMemberScopeDialogOpen"
+        >
+          <div class="member-scope-dialog">
+            <div class="member-scope-col">
+              <div class="member-scope-col-title">部门</div>
+              <el-tree
+                ref="scopeDeptTreeRef"
+                :data="orgDepartments"
+                node-key="id"
+                show-checkbox
+                default-expand-all
+                :props="{ label: 'name', children: 'children' }"
+              />
+            </div>
+            <div class="member-scope-col">
+              <div class="member-scope-col-title">角色</div>
+              <el-checkbox-group v-model="scopeRoleIds">
+                <el-checkbox
+                  v-for="role in orgRoles"
+                  :key="role.id"
+                  :value="role.id"
+                >
+                  {{ role.name }}
+                </el-checkbox>
+              </el-checkbox-group>
+            </div>
+            <div class="member-scope-col">
+              <div class="member-scope-col-title">人员</div>
+              <el-checkbox-group v-model="scopeUserIds">
+                <el-checkbox
+                  v-for="user in orgUsers"
+                  :key="user.id"
+                  :value="user.id"
+                >
+                  {{ user.displayName }}
+                </el-checkbox>
+              </el-checkbox-group>
+            </div>
+          </div>
+          <template #footer>
+            <el-button @click="closeMemberScopeDialog">取消</el-button>
+            <el-button type="primary" @click="confirmMemberScope">确定</el-button>
+          </template>
+        </el-dialog>
+      </template>
       <el-form-item v-if="field.type === 'number'" label="格式">
         <div class="required-row">
           <span>保持</span>
@@ -666,7 +756,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { CircleClose, Delete, Plus, Rank } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { formatOptions, formColumnOptions, fieldTypes, fieldTypeLabel, isSelectType } from './fieldTypes'
@@ -710,10 +800,17 @@ import {
   serialRefFields,
   serialSegmentSummary,
 } from './serialField.js'
+import {
+  deptFieldsForMemberScope,
+  hasCustomMemberScope,
+  isMemberField,
+  positiveIntIds,
+} from './memberField.js'
 import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
 import { FILE_FORMAT_OPTIONS } from '../form-fill/fileField'
 import { ADDRESS_FORMAT_OPTIONS } from '../form-fill/addressField'
 import { listDictionaryOptionsApi, listFormFieldsApi } from '../../api/apps'
+import { listOrgDepartmentsApi, listOrgRolesApi, listOrgUsersApi } from '../../api/org'
 
 const props = defineProps({
   tab: { type: String, required: true },
@@ -1025,6 +1122,78 @@ const isCurrentDisplayField = computed(
 )
 
 const isSerialField = computed(() => props.field?.type === 'serialNumber')
+
+const isMemberFieldType = computed(() => isMemberField(props.field))
+const hasCustomScope = computed(() => hasCustomMemberScope(props.field))
+const deptFieldOptions = computed(() =>
+  deptFieldsForMemberScope(props.fields).filter(
+    (item) => item.key !== props.field?.key,
+  ),
+)
+const memberScopeVisible = ref(false)
+const scopeDeptTreeRef = ref(null)
+const orgDepartments = ref([])
+const orgRoles = ref([])
+const orgUsers = ref([])
+const scopeRoleIds = ref([])
+const scopeUserIds = ref([])
+
+function onMemberScopeChange(value) {
+  if (!props.field) return
+  props.field.memberScope = value
+}
+
+function openMemberScopeDialog() {
+  memberScopeVisible.value = true
+}
+
+function closeMemberScopeDialog() {
+  memberScopeVisible.value = false
+}
+
+async function onMemberScopeDialogOpen() {
+  const cfg = props.field?.memberScopeConfig || {}
+  scopeRoleIds.value = positiveIntIds(cfg.roleIds)
+  scopeUserIds.value = positiveIntIds(cfg.userIds)
+  const [depts, roleRows, userRows] = await Promise.all([
+    listOrgDepartmentsApi(),
+    listOrgRolesApi(),
+    listOrgUsersApi(),
+  ])
+  orgDepartments.value = depts || []
+  orgRoles.value = roleRows || []
+  orgUsers.value = userRows || []
+  await nextTick()
+  scopeDeptTreeRef.value?.setCheckedKeys(positiveIntIds(cfg.departmentIds))
+}
+
+function confirmMemberScope() {
+  if (!props.field) return
+  props.field.memberScopeConfig = {
+    departmentIds: scopeDeptTreeRef.value?.getCheckedKeys(false) || [],
+    roleIds: [...scopeRoleIds.value],
+    userIds: [...scopeUserIds.value],
+  }
+  closeMemberScopeDialog()
+}
+
+async function confirmClearMemberScope() {
+  try {
+    await ElMessageBox.confirm('确定清除已设置的可选范围？', '清除', {
+      confirmButtonText: '清除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  if (!props.field) return
+  props.field.memberScopeConfig = {
+    departmentIds: [],
+    roleIds: [],
+    userIds: [],
+  }
+}
 
 const serialRefOptions = computed(() =>
   serialRefFields(props.fields, props.field?.key),
@@ -1527,6 +1696,23 @@ watch(
 .serial-rule-add {
   display: flex;
   flex-wrap: wrap;
+}
+
+.member-scope-dialog {
+  display: flex;
+  min-height: 320px;
+}
+
+.member-scope-col {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 0 8px;
+}
+
+.member-scope-col-title {
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 
 </style>

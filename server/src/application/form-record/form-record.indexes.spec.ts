@@ -23,6 +23,8 @@ describe('form-record.indexes', () => {
       { key: 'f1', type: 'file' },
       { key: 's1', type: 'subform' },
       { key: 'sn', type: 'serialNumber' },
+      { key: 'm1', type: 'member' },
+      { key: 'mm', type: 'member-multiple' },
       {
         key: 'tabs_1',
         type: 'tabs',
@@ -40,6 +42,7 @@ describe('form-record.indexes', () => {
       'idx_data_t2',
       'idx_data_t3',
       'idx_data_sn',
+      'idx_data_m1',
       'idx_data_inner',
     ]);
   });

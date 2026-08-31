@@ -122,6 +122,7 @@ describe('FormRecordService', () => {
       updatedByName: '李四',
       updatedAt: now,
       data: { name: '张三' },
+      userNames: { '1': '李四' },
     });
     expect(result).not.toHaveProperty('_id');
   });

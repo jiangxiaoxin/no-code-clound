@@ -17,6 +17,7 @@
         :dict-items-by-code="dictItemsByCode"
         :disabled="!editing"
         :updating="true"
+        :user-names="record?.userNames || {}"
       />
     </div>
     <template #footer>
@@ -121,6 +122,7 @@ async function saveDetail() {
     editing.value = false
     ElMessage.success('保存成功')
     emit('saved', updated)
+    closeDrawer()
   } catch {
     return
   } finally {
@@ -129,7 +131,7 @@ async function saveDetail() {
 }
 
 watch(
-  () => [props.modelValue, props.record?.id, props.startEditing],
+  [() => props.modelValue, () => props.record?.id, () => props.startEditing],
   () => {
     if (props.modelValue && props.record) {
       editing.value = Boolean(props.startEditing && props.canEdit)

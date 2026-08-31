@@ -7,6 +7,7 @@ import { AdminModule } from './admin/admin.module';
 import { ApplicationModule } from './application/application.module';
 import { AuthModule } from './auth/auth.module';
 import { MongoModule } from './mongo/mongo.module';
+import { OrgModule } from './org/org.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { MongoModule } from './mongo/mongo.module';
     }),
     AuthModule,
     AdminModule,
+    OrgModule,
     ApplicationModule,
   ],
   controllers: [AppController],

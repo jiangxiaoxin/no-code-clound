@@ -40,8 +40,9 @@ export const fieldTypes = [
   { type: 'image', label: '图片上传', icon: Picture, component: 'el-upload', placeholder: '' },
   { type: 'file', label: '文件上传', icon: Upload, component: 'FileUpload', placeholder: '' },
   { type: 'serialNumber', label: '流水号生成', icon: CollectionTag, component: 'SerialNumber', placeholder: '保存后自动生成' },
+  { type: 'member', label: '人员单选', icon: User, component: 'MemberSelect', placeholder: '请选择' },
+  { type: 'member-multiple', label: '人员多选', icon: User, component: 'MemberSelect', placeholder: '请选择' },
   // -----------以下未完成------
-  { type: 'member', label: '成员选择', icon: User, component: 'MemberSelect', placeholder: '请选择' },
   { type: 'dept', label: '部门选择', icon: OfficeBuilding, component: 'DeptSelect', placeholder: '请选择' },
   { type: 'relate', label: '关联数据', icon: Link, component: 'RelateData', placeholder: '请选择' },
  

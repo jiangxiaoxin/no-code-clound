@@ -139,12 +139,18 @@
         :value="item.value"
       />
     </el-select>
+    <FormMemberSelect
+      v-else-if="field.type === 'member' || field.type === 'member-multiple'"
+      class="fill-full"
+      :field="field"
+      :model-value="modelValue"
+      :disabled="isDisabled"
+      :record-values="recordValues"
+      :user-names="userNames"
+      @update:model-value="onUpdateModelValue"
+    />
     <el-select
-      v-else-if="
-        field.type === 'member' ||
-        field.type === 'dept' ||
-        field.type === 'relate'
-      "
+      v-else-if="field.type === 'dept' || field.type === 'relate'"
       disabled
       class="fill-full"
       :placeholder="field.placeholder"
@@ -238,6 +244,7 @@ import FormImageUpload from './FormImageUpload.vue'
 import FormFileUpload from './FormFileUpload.vue'
 import FormAddressSelect from './FormAddressSelect.vue'
 import FormSubform from './FormSubform.vue'
+import FormMemberSelect from './FormMemberSelect.vue'
 import CurrentUserName from './CurrentUserName.vue'
 import CurrentUserDept from './CurrentUserDept.vue'
 
@@ -255,6 +262,7 @@ const props = defineProps({
   plain: { type: Boolean, default: false },
   multiple: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
+  userNames: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:modelValue', 'fill', 'fill-rows'])

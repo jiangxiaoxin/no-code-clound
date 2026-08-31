@@ -17,6 +17,7 @@ export const IMPORT_SKIP_TYPES = new Set([
   'file',
   'subform',
   'member',
+  'member-multiple',
   'dept',
   'data',
   'relate',

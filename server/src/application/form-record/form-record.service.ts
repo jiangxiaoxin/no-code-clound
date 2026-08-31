@@ -43,8 +43,9 @@ export type FormRecordView = {
   updatedBy: number;
   updatedByName: string;
   updatedAt: Date;
-  data: Record<string, unknown>;
-};
+    data: Record<string, unknown>;
+    userNames?: Record<string, string>;
+  };
 
 @Injectable()
 export class FormRecordService {
@@ -84,7 +85,7 @@ export class FormRecordService {
     });
     const doc = await this.store.findById(formId, inserted.id);
     if (!doc) throw new NotFoundException('记录不存在');
-    return this.toView(doc, await this.loadUserNames([doc]));
+    return this.toView(doc, await this.loadUserNames([doc], fields));
   }
 
   async query(
@@ -118,12 +119,14 @@ export class FormRecordService {
         : body.groups,
     });
     const { items, total } = await this.store.query(formId, built);
-    const names = await this.loadUserNames(items);
+    const names = await this.loadUserNames(items, fields);
+    const userNames = this.userNamesRecord(names);
     return {
       items: items.map((item) => this.toView(item, names)),
       total,
       page: built.page,
       pageSize: built.pageSize,
+      userNames,
     };
   }
 
@@ -133,10 +136,13 @@ export class FormRecordService {
     formId: number,
     recordId: string,
   ): Promise<FormRecordView> {
-    await this.requireForm(ownerId, appId, formId);
+    const form = await this.requireForm(ownerId, appId, formId);
     const doc = await this.store.findById(formId, recordId);
     if (!doc) throw new NotFoundException('记录不存在');
-    return this.toView(doc, await this.loadUserNames([doc]));
+    return this.toView(
+      doc,
+      await this.loadUserNames([doc], this.readFields(form)),
+    );
   }
 
   async update(
@@ -155,7 +161,7 @@ export class FormRecordService {
     await this.assertUniqueFields(formId, fields, merged, recordId);
     const doc = await this.store.replaceData(formId, recordId, merged, ownerId);
     if (!doc) throw new NotFoundException('记录不存在');
-    return this.toView(doc, await this.loadUserNames([doc]));
+    return this.toView(doc, await this.loadUserNames([doc], fields));
   }
 
   async remove(
@@ -455,12 +461,29 @@ export class FormRecordService {
 
   private async loadUserNames(
     docs: FormRecordDoc[],
+    fields?: FormField[] | null,
   ): Promise<Map<number, string>> {
     const ids = new Set<number>();
     for (const doc of docs) {
       if (Number.isFinite(doc.createdBy)) ids.add(doc.createdBy);
       const updatedBy = doc.updatedBy ?? doc.createdBy;
       if (Number.isFinite(updatedBy)) ids.add(updatedBy);
+      const data = doc.data ?? {};
+      for (const field of flattenFields(fields ?? [])) {
+        if (field.type === 'member') {
+          const value = data[field.key];
+          if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+            ids.add(value);
+          }
+        }
+        if (field.type === 'member-multiple' && Array.isArray(data[field.key])) {
+          for (const item of data[field.key] as unknown[]) {
+            if (typeof item === 'number' && Number.isInteger(item) && item > 0) {
+              ids.add(item);
+            }
+          }
+        }
+      }
     }
     const names = new Map<number, string>();
     if (!ids.size) return names;
@@ -472,6 +495,14 @@ export class FormRecordService {
       names.set(user.id, user.displayName);
     }
     return names;
+  }
+
+  private userNamesRecord(names: Map<number, string>): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const [id, name] of names) {
+      out[String(id)] = name;
+    }
+    return out;
   }
 
   private toView(
@@ -490,6 +521,7 @@ export class FormRecordService {
       updatedByName: names.get(updatedBy) ?? '',
       updatedAt: doc.updatedAt ?? doc.createdAt,
       data: doc.data ?? {},
+      userNames: this.userNamesRecord(names),
     };
   }
 }

@@ -142,6 +142,25 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
         ? value
         : invalid();
     case 'member':
+      if (isEmpty(value)) return undefined;
+      return typeof value === 'number' && Number.isInteger(value) && value > 0
+        ? value
+        : invalid();
+    case 'member-multiple': {
+      if (isEmpty(value)) return undefined;
+      if (!Array.isArray(value)) invalid();
+      const ids: number[] = [];
+      const seen = new Set<number>();
+      for (const item of value) {
+        if (typeof item !== 'number' || !Number.isInteger(item) || item <= 0) {
+          invalid();
+        }
+        if (seen.has(item)) continue;
+        seen.add(item);
+        ids.push(item);
+      }
+      return ids.length ? ids : undefined;
+    }
     case 'dept':
       if (isEmpty(value)) return undefined;
       return typeof value === 'number' && Number.isInteger(value)

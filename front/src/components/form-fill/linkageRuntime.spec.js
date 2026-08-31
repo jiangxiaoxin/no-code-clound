@@ -354,3 +354,59 @@ test('address condition is not ready when path is empty', () => {
     false,
   )
 })
+
+test('member single: 0 clears, 1 writes, many clears with message', () => {
+  const field = {
+    title: '负责人',
+    type: 'member',
+    linkage: { ...linkage, sourceKey: 'owner' },
+  }
+  assert.deepEqual(applyLinkageResult(field, { items: [], total: 0 }, 8), {
+    value: undefined,
+    items: [],
+    message: '',
+  })
+  assert.deepEqual(
+    applyLinkageResult(
+      field,
+      { items: [{ data: { owner: 9 } }], total: 1 },
+      undefined,
+    ),
+    { value: 9, items: [], message: '' },
+  )
+  const many = applyLinkageResult(
+    field,
+    { items: [{ data: { owner: 9 } }, { data: { owner: 10 } }], total: 2 },
+    9,
+  )
+  assert.equal(many.value, undefined)
+  assert.equal(many.message.includes('多条数据'), true)
+})
+
+test('member-multiple collects ids across records without capping', () => {
+  const field = {
+    title: '成员',
+    type: 'member-multiple',
+    linkage: { ...linkage, sourceKey: 'owners' },
+  }
+  assert.deepEqual(linkageQueryPaging(field), { page: 1, pageSize: 100 })
+  assert.deepEqual(
+    applyLinkageResult(field, { items: [], total: 0 }, [1]),
+    { value: [], items: [], message: '' },
+  )
+  assert.deepEqual(
+    applyLinkageResult(
+      field,
+      {
+        items: [
+          { data: { owners: [2, 3] } },
+          { data: { owners: 3 } },
+          { data: { owners: [4] } },
+        ],
+        total: 3,
+      },
+      [],
+    ),
+    { value: [2, 3, 4], items: [], message: '' },
+  )
+})
