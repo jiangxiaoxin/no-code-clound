@@ -1,6 +1,6 @@
 # 数据联动手工测试用例
 
-按编号顺序做。前面的表和数据会被后面的用例复用，不要中途改字段标题。
+建议先读本目录 [README.md](./README.md)，做完组合冒烟再跑本专项。按编号顺序做。前面的表和数据会被后面的用例复用，不要中途改字段标题。
 
 对应实现：`optionSource: 'linkage'` + `linkage`，设计弹框 `DataLinkageDialog.vue`，填报 `FormFillGrid.vue`。
 
