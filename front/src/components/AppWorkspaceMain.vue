@@ -13,7 +13,7 @@
             :key="tabItem.key"
             class="form-work-tab"
             :class="{ 'is-active': tab === tabItem.key }"
-            @click="tab = tabItem.key"
+            @click="setTab(tabItem.key)"
           >
             {{ tabItem.label }}
           </span>
@@ -42,7 +42,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { EditPen } from '@element-plus/icons-vue'
 import {
@@ -65,7 +65,9 @@ const props = defineProps({
   form: { type: Object, default: null },
 })
 
+const route = useRoute()
 const router = useRouter()
+const WORKSPACE_TAB_KEYS = new Set(['create', 'list'])
 
 function goDesign() {
   if (!props.form?.id) {
@@ -77,7 +79,20 @@ function goDesign() {
   })
 }
 
-const tab = ref('create')
+function tabFromQuery() {
+  const value = route.query.tab
+  return typeof value === 'string' && WORKSPACE_TAB_KEYS.has(value) ? value : ''
+}
+
+function setTab(next) {
+  const key = WORKSPACE_TAB_KEYS.has(next) ? next : 'create'
+  if (!props.form?.id || route.query.tab === key) return
+  router.replace({
+    name: 'app-workspace-form',
+    params: { id: props.appId, formId: props.form.id },
+    query: { ...route.query, tab: key },
+  })
+}
 const schemaLoading = ref(false)
 const saving = ref(false)
 const fields = ref([])
@@ -101,6 +116,9 @@ const workspaceTabs = computed(() => {
   })
   return order.map((key) => ({ key, label: labels[key] }))
 })
+
+const defaultTab = computed(() => workspaceTabs.value[0]?.key || 'create')
+const tab = computed(() => tabFromQuery() || defaultTab.value)
 
 function resetValues() {
   console.log('--resteValues');
@@ -165,7 +183,6 @@ async function loadWorkspaceConfig() {
     if (session !== loadSession.value) return
     if (Array.isArray(config?.workspaceTabOrder)) {
       workspaceTabOrder.value = config.workspaceTabOrder
-      tab.value = workspaceTabs.value[0]?.key || 'create'
     }
   } catch {
     return
@@ -217,7 +234,6 @@ watch(
   () => [props.appId, props.form?.id],
   () => {
     loadSession.value += 1
-    tab.value = workspaceTabs.value[0]?.key || 'create'
     loadSchema()
     loadWorkspaceConfig()
   },

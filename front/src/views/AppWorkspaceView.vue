@@ -283,6 +283,7 @@ function onNodeClick(data) {
     router.push({
       name: 'app-workspace-form',
       params: { id: appId.value, formId: data.id },
+      query: route.query,
     })
     return
   }
