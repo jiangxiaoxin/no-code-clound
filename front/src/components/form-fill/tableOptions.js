@@ -112,6 +112,23 @@ export function mergeFilterQueries(...parts) {
   }
 }
 
+export function optionFieldLoadKey(field, values) {
+  const formId = Number(field.sourceFormId)
+  const resolved = Number.isInteger(formId) && formId > 0 ? formId : 0
+  const refs = (field.optionFilters?.conditions || [])
+    .filter((item) => item.valueType === 'field' && item.value)
+    .map(
+      (item) => `${item.value}=${JSON.stringify(values?.[item.value])}`,
+    )
+  return [
+    resolved,
+    field.sourceFieldKey,
+    field.optionFilters?.match,
+    JSON.stringify(field.optionFilters?.conditions || []),
+    refs.join('&'),
+  ].join(':')
+}
+
 export function recordsToSelectItems(records, fieldKey) {
   const seen = new Set()
   const items = []

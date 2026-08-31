@@ -21,7 +21,8 @@
 1. 先做 **§0 冒烟**。过不了就停，先修主路径。
 2. 再按 §1～§6 做组合能力。
 3. 子表单细节、联动 0/1/多条、人员选框与范围，回到对应专项文档接着勾。
-4. 改条件字段后大约等 **1 秒** 再看联动结果（防抖）。
+4. 改条件字段后大约等 **1 秒** 再看联动结果（防抖）。子表 / 主表下拉「其他表数据」也一样：只有过滤里用到的字段变了才重查。
+5. 测 F-33 / C-14 时打开浏览器 Network，过滤 `records/query`。
 
 建议同一应用里造下面几张表，后面用例会复用。
 
@@ -32,7 +33,7 @@
 | 能力 | 状态 | 手工测不测 |
 |---|---|---|
 | 标签页 `tabs` | 已实现 | 测 |
-| 子表单 `subform` | 已实现 | 测；可放进标签页 |
+| 子表单 `subform` | 已实现 | 测；可放进标签页；子表下拉「其他表数据」只在过滤依赖变化时请求源表 |
 | 数据联动 / 选择数据 | 已实现 | 测；条件可引用标签页内主表字段 |
 | 流水号 `serialNumber` | 已实现 | 测；可放进标签页；**不能**进子表 |
 | 人员单选 `member` / 人员多选 `member-multiple` | 已实现 | 测；可放进标签页；**不能**进子表；选人走 `/api/org/*` |
@@ -205,6 +206,8 @@ T-16 会拆掉主测表。测完请 **撤销/重新拖回** 标签页结构，�
 | C-11 | 改设备编号为不存在的值 | 子表变成空，不多条提示 | |
 | C-12 | 打开已保存记录，不改设备编号 | 不覆盖你手改过的子表行 | |
 | C-13 | 列表快捷搜索按「工厂」搜 | 能搜到；不会误拿子表列当主表筛选项 | |
+| C-14 | 订单明细加一列下拉，选项=其他表数据、无选项过滤。Network 开着，在标签页2里切换该下拉 | 打开时查一次源表即可；只改本列选项不再打 `records/query` | |
+| C-15 | 该下拉选项过滤绑标签页1的「工厂」。只切下拉；再改工厂 | 切下拉不请求。改工厂约 1 秒后请求，选项随过滤变。未打开过标签页2时改工厂，切过去下拉已是过滤后的选项 | |
 
 C-09 有破坏性。需要的话先复制一份表或测完重建子表。
 
@@ -290,6 +293,7 @@ P-08、P-09 需要人员专项里的「人员源」表。没有该表时跳过�
 | G-03 | 下拉「其他表数据」+ 选项过滤 | 过滤里的当前表字段来自 flatten 后的主表字段（含 tab 内），不含子表列 | |
 | G-04 | 登录人姓名 / 登录人部门 | 填报能显示，不入库、列表无列 | |
 | G-05 | 数字 `0`、主表「不允许重复值」 | `0` 仍算有值、仍参与查重 | |
+| G-06 | 主表下拉「其他表数据」（可放在标签页内）、无过滤。只改该下拉自己的值 | 打开时查一次源表；之后不重查（与子表 C-14 相同） | |
 
 ---
 
@@ -315,7 +319,7 @@ P-08、P-09 需要人员专项里的「人员源」表。没有该表时跳过�
 
 | 主题 | 文档 | 建议 |
 |---|---|---|
-| 子表设计 / 填报 / 唯一 / 选择数据 / 行内联动 / 整表联动 | `docs/testcases/2026-08-30-subform-test-cases.md` | 用「采购单」当当前表、「配件台账」当他表 |
+| 子表设计 / 填报 / 唯一 / 选择数据 / 行内联动 / 整表联动 / 子表下拉其他表数据何时请求 | `docs/testcases/2026-08-30-subform-test-cases.md` | 用「采购单」当当前表、「配件台账」当他表；Network 查 F-33～F-36 |
 | 主表数据联动 T1–T17 | `docs/testcases/2026-08-27-data-linkage-test-cases.md` | 可另建「奖金申报」，不必和采购单绑死 |
 | 人员单选 / 多选 | `docs/testcases/2026-08-31-member-select-test-cases.md` | 可另建「人员源 / 人员填报」；组合 §6 只覆盖和标签页叠在一起 |
 | 流水号规格验收 1–12 | `docs/superpowers/specs/2026-08-31-serial-number-design.md` §10 | 与本文 §2 对应；跨日重置、并发占号以规格为准 |
@@ -326,14 +330,14 @@ P-08、P-09 需要人员专项里的「人员源」表。没有该表时跳过�
 
 这些是单元测试，**不能代替**上面的界面操作。跑过结果：
 
-- 前端 `node --test`：`tabsField`、`serialField`、`fillValues`、`subformField`、`linkage`、`linkageRuntime` → **63 通过**
+- 前端 `node --test`：`tabsField`、`serialField`、`fillValues`、`subformField`、`tableOptions`、`linkage`、`linkageRuntime`（`tableOptions` 覆盖子表「其他表数据」缓存键）
 - 后端 Jest `src/application/form-record` → **84 通过**
 - 后端 Jest `application.service.spec.ts`（含一表一个流水号 / 标签页字段列表）→ **33 通过**
 
 本地命令：
 
 ```text
-node --test front/src/components/form-design/tabsField.spec.js front/src/components/form-design/serialField.spec.js front/src/components/form-fill/fillValues.spec.js front/src/components/form-fill/subformField.spec.js front/src/components/form-fill/linkageRuntime.spec.js front/src/components/form-design/linkage.spec.js
+node --test front/src/components/form-design/tabsField.spec.js front/src/components/form-design/serialField.spec.js front/src/components/form-fill/fillValues.spec.js front/src/components/form-fill/subformField.spec.js front/src/components/form-fill/tableOptions.spec.js front/src/components/form-fill/linkageRuntime.spec.js front/src/components/form-design/linkage.spec.js
 
 cd server
 npx jest src/application/form-record src/application/application.service.spec.ts --no-coverage
@@ -343,6 +347,7 @@ npx jest src/application/form-record src/application/application.service.spec.ts
 
 - 设计器拖放、pane 删除确认、校验失败跳 pane
 - 填报页签切换、整表联动在未打开 pane 时是否已写入
+- 子表下拉「其他表数据」只改本列时 Network 不再出现源表 `records/query`
 - 流水号真实占号、导入生成、列表展示
 - 工作台 `?tab=` 刷新
 - 选人弹框、`/api/org/*` 对普通账号、列表姓名随 displayName 刷新
@@ -358,8 +363,8 @@ npx jest src/application/form-record src/application/application.service.spec.ts
 | 冒烟 | S-01～S-09 | / 9 |
 | 标签页 | T-01～T-16 | / 16 |
 | 流水号 | N-01～N-18 | / 18 |
-| 标签页+子表 | C-01～C-13 | / 13 |
+| 标签页+子表 | C-01～C-15 | / 15 |
 | 标签页+联动 | L-01～L-10 | / 10 |
 | 工作台 | W-01～W-05 | / 5 |
 | 人员+标签页/子表/联动 | P-01～P-12 | / 12 |
-| 回归 | G-01～G-05 | / 5 |
+| 回归 | G-01～G-06 | / 6 |

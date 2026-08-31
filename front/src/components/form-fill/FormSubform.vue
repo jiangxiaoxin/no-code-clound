@@ -13,9 +13,9 @@
       >
         <el-table-column
           v-if="!locked"
-          label=""
+          label="操作"
           width="168"
-          fixed
+          fixed="right"
         >
           <template #default="{ $index }">
             <!-- <el-button link type="primary" :disabled="atLimit" @click="insertRow($index)">
@@ -94,7 +94,11 @@ import {
   linkageQueryPaging,
 } from './linkageRuntime'
 import { queryFormRecordsApi } from '../../api/apps'
-import { buildSourceQuery } from './tableOptions'
+import {
+  buildSourceQuery,
+  optionFieldLoadKey,
+  recordsToSelectItems,
+} from './tableOptions'
 
 const SUBFORM_MAX_ROWS = 200
 
@@ -132,21 +136,23 @@ const rows = ref([])
 let uid = 0
 let syncing = false
 const linkageItems = ref({})
+const tableItems = ref({})
 const pendingQueries = new Map()
 let linkageTimer = 0
 let linkagePrimed = false
 let lastLinkageKeys = {}
+let tableSeq = 0
 
 function nextUid() {
   uid += 1
   return uid
 }
 
-function wrapRow(row) {
+function wrapRow(row, uidValue) {
   return {
     ...emptySubformRow(children.value),
     ...(row && typeof row === 'object' ? row : {}),
-    __uid: nextUid(),
+    __uid: uidValue ?? nextUid(),
   }
 }
 
@@ -172,7 +178,8 @@ watch(
       return
     }
     const list = Array.isArray(value) ? value : []
-    rows.value = list.map((row) => wrapRow(row))
+    const prev = rows.value
+    rows.value = list.map((row, index) => wrapRow(row, prev[index]?.__uid))
   },
   { immediate: true },
 )
@@ -200,8 +207,73 @@ function itemsFor(child, row) {
   if (hasLinkage(child) && isSelectType(child.type)) {
     return linkageItems.value[`${row.__uid}:${child.key}`] || []
   }
+  if (isTableSelect(child)) {
+    return tableItems.value[tableCacheKey(child, rowValues(row))] || []
+  }
   return props.dictItemsByCode[child.dictCode] || []
 }
+
+function resolveSourceFormId(field) {
+  const n = Number(field.sourceFormId)
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
+
+function isTableSelect(child) {
+  return (
+    isSelectType(child.type) &&
+    child.optionSource === 'table_data' &&
+    resolveSourceFormId(child) &&
+    child.sourceFieldKey
+  )
+}
+
+function tableCacheKey(child, values) {
+  return `${props.appId}:${optionFieldLoadKey(child, values)}`
+}
+
+function linkageConditionKey(child, values) {
+  const refs = (child.linkage?.conditions || [])
+    .filter((item) => item.valueType === 'field' && item.value)
+    .map((item) => `${item.value}=${JSON.stringify(values[item.value])}`)
+  return [
+    child.linkage?.sourceFormId,
+    child.linkage?.sourceKey,
+    child.linkage?.match,
+    refs.join('&'),
+  ].join(':')
+}
+
+const tableLoadSignature = computed(() => {
+  const keys = new Set()
+  for (const row of rows.value) {
+    const values = rowValues(row)
+    for (const child of children.value.filter(isTableSelect)) {
+      keys.add(tableCacheKey(child, values))
+    }
+  }
+  return [...keys].sort().join('|')
+})
+
+const linkageLoadSignature = computed(() => {
+  if (props.disabled) {
+    return `off:${props.appId}`
+  }
+  const linked = children.value.filter((child) => hasLinkage(child))
+  if (!linked.length) {
+    return 'none'
+  }
+  return rows.value
+    .map((row, index) =>
+      linked
+        .map((child) => `${index}:${child.key}:${linkageConditionKey(child, rowValues(row))}`)
+        .join(','),
+    )
+    .join('|')
+})
+
+const optionLoadKey = computed(
+  () => `${props.appId}#${props.disabled}#${tableLoadSignature.value}#${linkageLoadSignature.value}`,
+)
 
 function isDataMultiple(child, row) {
   if (child.type !== 'data') {
@@ -305,6 +377,58 @@ function queryRecordsOnce(appId, formId, query) {
   return pending
 }
 
+async function loadTableItems() {
+  const seq = ++tableSeq
+  if (!props.appId) {
+    tableItems.value = {}
+    return
+  }
+  const needed = new Map()
+  for (const row of rows.value) {
+    const values = rowValues(row)
+    for (const child of children.value.filter(isTableSelect)) {
+      const key = tableCacheKey(child, values)
+      if (!needed.has(key)) {
+        needed.set(key, { child, values })
+      }
+    }
+  }
+  const nextItems = { ...tableItems.value }
+  for (const key of Object.keys(nextItems)) {
+    if (!needed.has(key)) {
+      delete nextItems[key]
+    }
+  }
+  await Promise.all(
+    [...needed.entries()].map(async ([key, { child, values }]) => {
+      if (Array.isArray(nextItems[key])) {
+        return
+      }
+      try {
+        const result = await queryRecordsOnce(
+          props.appId,
+          resolveSourceFormId(child),
+          buildSourceQuery(
+            child.optionFilters,
+            values,
+            rowFormFields.value,
+          ),
+        )
+        nextItems[key] = recordsToSelectItems(
+          result?.items,
+          child.sourceFieldKey,
+        )
+      } catch {
+        nextItems[key] = []
+      }
+    }),
+  )
+  if (seq !== tableSeq) {
+    return
+  }
+  tableItems.value = nextItems
+}
+
 function canWriteChild(child) {
   if (props.disabled) {
     return false
@@ -330,14 +454,7 @@ async function loadRowLinkages() {
         .filter((child) => hasLinkage(child))
         .map(async (child) => {
           const values = rowValues(row)
-          const refs = (child.linkage?.conditions || [])
-            .filter((item) => item.valueType === 'field' && item.value)
-            .map((item) => `${item.value}=${JSON.stringify(values[item.value])}`)
-          const key = [
-            child.linkage?.sourceFormId,
-            child.linkage?.sourceKey,
-            refs.join('&'),
-          ].join(':')
+          const key = linkageConditionKey(child, values)
           const itemKey = `${row.__uid}:${child.key}`
           nextKeys[itemKey] = key
           if (lastLinkageKeys[itemKey] === key) {
@@ -393,22 +510,24 @@ async function loadRowLinkages() {
   linkagePrimed = true
 }
 
-watch(
-  () => [props.appId, props.recordValues, rows.value, props.disabled],
-  () => {
-    window.clearTimeout(linkageTimer)
-    const delay = linkagePrimed ? 1000 : 0
-    if (delay) {
-      linkageTimer = window.setTimeout(loadRowLinkages, delay)
-    } else {
-      loadRowLinkages()
-    }
-  },
-  { deep: true },
-)
+watch(optionLoadKey, () => {
+  window.clearTimeout(linkageTimer)
+  const delay = linkagePrimed ? 1000 : 0
+  if (delay) {
+    linkageTimer = window.setTimeout(runChildOptionLoads, delay)
+  } else {
+    runChildOptionLoads()
+  }
+}, { immediate: true })
+
+function runChildOptionLoads() {
+  loadTableItems()
+  loadRowLinkages()
+}
 
 onUnmounted(() => {
   window.clearTimeout(linkageTimer)
+  tableSeq += 1
 })
 </script>
 
