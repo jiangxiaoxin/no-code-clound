@@ -39,10 +39,30 @@
       @open="onPickerOpen"
     >
       <div class="member-picker">
+        
+        <div class="member-picker-selected">
+          <div v-if="draftIds.length" class="member-select-tags">
+            <span
+              v-for="id in draftIds"
+              :key="id"
+              class="member-select-tag"
+            >
+              <span>{{ nameOf(id) }}</span>
+              <el-icon
+                class="member-select-tag-close"
+                @click.stop="onRemoveDraft(id)"
+              >
+                <Close />
+              </el-icon>
+            </span>
+          </div>
+          <div v-else class="member-picker-selected-empty">未选择人员</div>
+        </div>
         <el-input
           v-model="keyword"
           clearable
           placeholder="按姓名 / 用户名搜索"
+          @change="onKeywordChange"
         />
         <div v-if="emptyCustom" class="member-picker-empty">没有可选择的人员</div>
         <div v-else class="member-picker-body">
@@ -102,13 +122,22 @@
               v-for="user in visibleUsers"
               :key="user.id"
               class="member-picker-user"
+              :class="{ 'is-active': draftIds.includes(user.id) }"
               @click="onPickUser(user)"
             >
               <el-checkbox
                 v-if="multiple"
                 :model-value="draftIds.includes(user.id)"
-              />
-              <span>{{ user.displayName }}</span>
+              >
+                {{ user.displayName }}
+              </el-checkbox>
+              <el-radio
+                v-else
+                :model-value="draftIds[0]"
+                :value="user.id"
+              >
+                {{ user.displayName }}
+              </el-radio>
             </div>
             <div v-if="!visibleUsers.length" class="member-picker-hint">暂无人员</div>
           </div>
@@ -116,7 +145,7 @@
       </div>
       <template #footer>
         <el-button @click="closePicker">取消</el-button>
-        <el-button v-if="multiple" type="primary" @click="confirmPick">确定</el-button>
+        <el-button type="primary" @click="confirmPick">确定</el-button>
       </template>
     </el-dialog>
   </div>
@@ -193,9 +222,12 @@ const departmentTree = computed(() => {
   return found ? [found] : []
 })
 
-const visibleUsers = computed(() => {
+const visibleUsers = ref([])
+
+function refreshVisibleUsers() {
   const q = keyword.value.trim().toLowerCase()
   let list = candidates.value
+  // debugger
   if (browseMode.value === 'dept' && selectedDeptId.value) {
     const node = findDeptNode(departments.value, selectedDeptId.value)
     const ids = collectDeptIds(node)
@@ -204,13 +236,21 @@ const visibleUsers = computed(() => {
   if (browseMode.value === 'role' && selectedRoleId.value) {
     list = list.filter((user) => (user.roleIds || []).includes(selectedRoleId.value))
   }
-  if (!q) return list
-  return list.filter(
+  if (!q) {
+    visibleUsers.value = list
+    return
+  }
+  // displayName 是人名  username 是用户名
+  visibleUsers.value = list.filter(
     (user) =>
       user.displayName.toLowerCase().includes(q) ||
       String(user.username || '').toLowerCase().includes(q),
   )
-})
+}
+
+function onKeywordChange() {
+  refreshVisibleUsers()
+}
 
 function nameOf(id) {
   return memberDisplayName(id, orgNames.value)
@@ -248,27 +288,32 @@ function onPickUser(user) {
     onToggleUser(user.id)
     return
   }
-  onPickSingle(user.id)
+  draftIds.value = [user.id]
 }
 
 function onBrowseDept() {
   browseMode.value = 'dept'
+  refreshVisibleUsers()
 }
 
 function onBrowseRole() {
   browseMode.value = 'role'
+  refreshVisibleUsers()
 }
 
 function onBrowseUser() {
   browseMode.value = 'user'
+  refreshVisibleUsers()
 }
 
 function onDeptNodeClick(node) {
   selectedDeptId.value = node.id
+  refreshVisibleUsers()
 }
 
 function onSelectRole(role) {
   selectedRoleId.value = role.id
+  refreshVisibleUsers()
 }
 
 function onRemove(id) {
@@ -283,6 +328,10 @@ function onRemove(id) {
   emit('update:modelValue', undefined)
 }
 
+function onRemoveDraft(id) {
+  draftIds.value = draftIds.value.filter((item) => item !== id)
+}
+
 function onToggleUser(id) {
   if (draftIds.value.includes(id)) {
     draftIds.value = draftIds.value.filter((item) => item !== id)
@@ -291,13 +340,12 @@ function onToggleUser(id) {
   draftIds.value = [...draftIds.value, id]
 }
 
-function onPickSingle(id) {
-  emit('update:modelValue', id)
-  closePicker()
-}
-
 function confirmPick() {
-  emit('update:modelValue', [...draftIds.value])
+  if (multiple.value) {
+    emit('update:modelValue', [...draftIds.value])
+  } else {
+    emit('update:modelValue', draftIds.value[0])
+  }
   closePicker()
 }
 
@@ -326,6 +374,7 @@ async function onPickerOpen() {
       props.recordValues,
     ).some((item) => item.id === id),
   )
+  refreshVisibleUsers()
 }
 
 onMounted(() => {
@@ -354,7 +403,7 @@ watch(
 )
 </script>
 
-<style scoped>
+<style scoped lang="less">
 .member-select-trigger {
   min-height: 32px;
   padding: 4px 8px;
@@ -402,6 +451,24 @@ watch(
   gap: 12px;
 }
 
+.member-picker-selected {
+  display: flex;
+  align-items: flex-start;
+  min-height: 120px;
+  padding: 6px 8px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+}
+
+.member-picker-selected-empty {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: var(--el-text-color-placeholder);
+}
+
 .member-picker-body {
   display: flex;
   min-height: 320px;
@@ -416,7 +483,7 @@ watch(
 }
 
 .member-picker-nav-item,
-.member-picker-role,
+
 .member-picker-user-btn {
   border: 0;
   background: transparent;
@@ -425,6 +492,13 @@ watch(
   cursor: pointer;
 }
 
+.member-picker-role{
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  padding: 4px;
+}
 .member-picker-nav-item.is-active,
 .member-picker-role.is-active {
   background: var(--el-color-primary-light-9);
@@ -450,13 +524,26 @@ watch(
 .member-picker-user {
   display: flex;
   align-items: center;
-  gap: 8px;
+  cursor: pointer;
+  padding: 4px;
+
+  :deep(.el-radio),
+  :deep(.el-checkbox) {
+    margin-right: 0;
+    height: auto;
+  }
+}
+
+.member-picker-user.is-active {
+  background: var(--el-color-primary-light-9);
+  color: var(--el-color-primary);
 }
 
 .member-picker-empty,
 .member-picker-hint {
   color: var(--el-text-color-secondary);
-  padding: 16px;
+  padding: 10px 12px;
+  text-align: center;
 }
 
 .member-picker-roles {
