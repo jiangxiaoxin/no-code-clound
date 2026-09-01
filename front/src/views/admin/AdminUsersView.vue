@@ -55,6 +55,7 @@
 
     <div class="table-wrap">
     <el-table v-loading="loading" :data="items" border stripe height="100%">
+      <el-table-column type="index" width="55" label="序号" fixed="left" />
       <el-table-column label="姓名 / 账号" min-width="160">
         <template #default="{ row }">
           <div class="user-cell">
@@ -139,11 +140,14 @@
     <div class="pager">
       <el-pagination
         background
-        layout="total, prev, pager, next"
+        layout="total, sizes, prev, pager, next"
         :current-page="page"
         :page-size="pageSize"
+        :page-sizes="PAGE_SIZES"
         :total="total"
+        size="small"
         @current-change="onPageChange"
+        @size-change="onPageSizeChange"
       />
     </div>
 
@@ -196,6 +200,7 @@ import {
   updateAdminUserStatusApi,
 } from '../../api/admin'
 import { useUserStore } from '../../stores/user'
+import { PAGE_SIZES } from '../../utils/pagination'
 import { Search } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
@@ -207,7 +212,7 @@ const departments = ref([])
 const roles = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = 20
+const pageSize = ref(20)
 const formVisible = ref(false)
 const editing = ref(null)
 const resetVisible = ref(false)
@@ -252,7 +257,7 @@ async function loadUsers() {
   try {
     const result = await listAdminUsersApi({
       page: page.value,
-      pageSize,
+      pageSize: pageSize.value,
       keyword: filters.keyword || undefined,
       departmentId: filters.departmentId || undefined,
       roleId: filters.roleId || undefined,
@@ -274,6 +279,12 @@ function reloadFirstPage() {
 
 function onPageChange(next) {
   page.value = next
+  loadUsers()
+}
+
+function onPageSizeChange(next) {
+  pageSize.value = next
+  page.value = 1
   loadUsers()
 }
 

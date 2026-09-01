@@ -39,7 +39,6 @@
       @open="onPickerOpen"
     >
       <div class="member-picker">
-        
         <div class="member-picker-selected">
           <div v-if="draftIds.length" class="member-select-tags">
             <span
@@ -58,12 +57,6 @@
           </div>
           <div v-else class="member-picker-selected-empty">未选择人员</div>
         </div>
-        <el-input
-          v-model="keyword"
-          clearable
-          placeholder="按姓名 / 用户名搜索"
-          @change="onKeywordChange"
-        />
         <div v-if="emptyCustom" class="member-picker-empty">没有可选择的人员</div>
         <div v-else class="member-picker-body">
           <div class="member-picker-nav">
@@ -98,6 +91,7 @@
               v-if="browseMode === 'dept'"
               :data="departmentTree"
               node-key="id"
+              :current-node-key="selectedDeptId || undefined"
               :props="{ label: 'name', children: 'children' }"
               highlight-current
               default-expand-all
@@ -115,31 +109,51 @@
                 {{ role.name }}
               </button>
             </div>
-            <div v-else class="member-picker-hint">范围内全部人员</div>
-          </div>
-          <div class="member-picker-list">
-            <div
-              v-for="user in visibleUsers"
-              :key="user.id"
-              class="member-picker-user"
-              :class="{ 'is-active': draftIds.includes(user.id) }"
-              @click="onPickUser(user)"
-            >
-              <el-checkbox
-                v-if="multiple"
-                :model-value="draftIds.includes(user.id)"
-              >
-                {{ user.displayName }}
-              </el-checkbox>
-              <el-radio
-                v-else
-                :model-value="draftIds[0]"
-                :value="user.id"
-              >
-                {{ user.displayName }}
-              </el-radio>
+            <div v-else class="member-picker-user-filter">
+              <el-input
+                v-model="keyword"
+                clearable
+                placeholder="按姓名 / 用户名搜索"
+                @change="onKeywordChange"
+              />
             </div>
-            <div v-if="!visibleUsers.length" class="member-picker-hint">暂无人员</div>
+          </div>
+          <div class="member-picker-result">
+            <div class="member-picker-list">
+              <div
+                v-for="user in visibleUsers"
+                :key="user.id"
+                class="member-picker-user"
+                :class="{ 'is-active': draftIds.includes(user.id) }"
+                @click="onPickUser(user)"
+              >
+                <el-checkbox
+                  v-if="multiple"
+                  :model-value="draftIds.includes(user.id)"
+                >
+                  {{ user.displayName }}
+                </el-checkbox>
+                <el-radio
+                  v-else
+                  :model-value="draftIds[0]"
+                  :value="user.id"
+                >
+                  {{ user.displayName }}
+                </el-radio>
+              </div>
+              <div v-if="listHint" class="member-picker-hint">{{ listHint }}</div>
+            </div>
+            <div v-if="showPickerPager" class="member-picker-pager">
+              <el-pagination
+                background
+                layout="total, prev, pager, next"
+                :current-page="pickerPage"
+                :page-size="PICKER_PAGE_SIZE"
+                :total="pickerTotal"
+                size="small"
+                @current-change="onPickerPageChange"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -156,12 +170,15 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 import { listOrgDepartmentsApi, listOrgRolesApi, listOrgUsersApi } from '../../api/org'
 import {
-  candidateUsers,
+  hasCustomMemberScope,
   memberDisplayName,
   memberValueIds,
   normalizeMemberScope,
+  positiveIntIds,
   pruneMembersOutOfScope,
 } from '../form-design/memberField.js'
+
+const PICKER_PAGE_SIZE = 10
 
 const props = defineProps({
   field: { type: Object, required: true },
@@ -186,26 +203,26 @@ const selectedDeptId = ref(null)
 const selectedRoleId = ref(null)
 const departments = ref([])
 const roles = ref([])
-const users = ref([])
+const visibleUsers = ref([])
+const extraUserNames = ref({})
 const draftIds = ref([])
+const pickerPage = ref(1)
+const pickerTotal = ref(0)
+let userQuerySeq = 0
 
 const showRoles = computed(
   () => normalizeMemberScope(props.field.memberScope) !== 'dept_field',
 )
 
-const candidates = computed(() =>
-  candidateUsers(props.field, users.value, departments.value, props.recordValues),
-)
-
 const emptyCustom = computed(
   () =>
     normalizeMemberScope(props.field.memberScope) === 'custom' &&
-    !candidates.value.length,
+    !hasCustomMemberScope(props.field),
 )
 
 const orgNames = computed(() => {
-  const map = { ...props.userNames }
-  for (const user of users.value) {
+  const map = { ...props.userNames, ...extraUserNames.value }
+  for (const user of visibleUsers.value) {
     map[user.id] = user.displayName
     map[String(user.id)] = user.displayName
   }
@@ -216,43 +233,124 @@ const departmentTree = computed(() => {
   if (normalizeMemberScope(props.field.memberScope) !== 'dept_field') {
     return departments.value
   }
-  const rootId = Number(props.recordValues?.[props.field.sourceDeptFieldKey])
-  if (!Number.isInteger(rootId) || rootId <= 0) return []
+  const rootId = deptFieldRootId()
+  if (!rootId) return []
   const found = findDeptNode(departments.value, rootId)
   return found ? [found] : []
 })
 
-const visibleUsers = ref([])
+const canQueryPicker = computed(() => {
+  if (emptyCustom.value) return false
+  if (
+    normalizeMemberScope(props.field.memberScope) === 'dept_field' &&
+    !deptFieldRootId()
+  ) {
+    return false
+  }
+  if (browseMode.value === 'dept') return Boolean(selectedDeptId.value)
+  if (browseMode.value === 'role') return Boolean(selectedRoleId.value)
+  return Boolean(keyword.value.trim())
+})
 
-function refreshVisibleUsers() {
-  const q = keyword.value.trim().toLowerCase()
-  let list = candidates.value
-  // debugger
-  if (browseMode.value === 'dept' && selectedDeptId.value) {
-    const node = findDeptNode(departments.value, selectedDeptId.value)
-    const ids = collectDeptIds(node)
-    list = list.filter((user) => ids.has(user.departmentId))
+const listHint = computed(() => {
+  if (canQueryPicker.value) {
+    return visibleUsers.value.length ? '' : '暂无人员'
   }
-  if (browseMode.value === 'role' && selectedRoleId.value) {
-    list = list.filter((user) => (user.roleIds || []).includes(selectedRoleId.value))
+  if (browseMode.value === 'user') {
+    return keyword.value.trim() ? '暂无人员' : '请输入姓名或用户名搜索'
   }
-  if (!q) {
-    visibleUsers.value = list
-    return
+  if (browseMode.value === 'role') return '请选择角色'
+  return '请选择部门'
+})
+
+const showPickerPager = computed(
+  () => canQueryPicker.value && pickerTotal.value > 0,
+)
+
+function deptFieldRootId() {
+  const raw = props.recordValues?.[props.field.sourceDeptFieldKey]
+  const n = Number(raw)
+  return Number.isInteger(n) && n > 0 ? n : 0
+}
+
+function rememberUserNames(users) {
+  const next = { ...extraUserNames.value }
+  for (const user of users || []) {
+    if (!user?.id) continue
+    next[user.id] = user.displayName
+    next[String(user.id)] = user.displayName
+  }
+  extraUserNames.value = next
+}
+
+function usersFromResult(data) {
+  if (Array.isArray(data)) return data
+  return data?.items || []
+}
+
+function customScopeParams() {
+  if (normalizeMemberScope(props.field.memberScope) !== 'custom') return {}
+  const cfg = props.field.memberScopeConfig || {}
+  const departmentIds = positiveIntIds(cfg.departmentIds)
+  const roleIds = positiveIntIds(cfg.roleIds)
+  const userIds = positiveIntIds(cfg.userIds)
+  return {
+    memberScope: 'custom',
+    scopeDepartmentIds: departmentIds.length ? departmentIds.join(',') : undefined,
+    scopeRoleIds: roleIds.length ? roleIds.join(',') : undefined,
+    scopeUserIds: userIds.length ? userIds.join(',') : undefined,
+  }
+}
+
+function browseQueryParams() {
+  if (browseMode.value === 'dept') {
+    return { departmentId: selectedDeptId.value }
+  }
+  if (browseMode.value === 'role') {
+    return { roleId: selectedRoleId.value }
   }
   // displayName 是人名  username 是用户名
-  visibleUsers.value = list.filter(
-    (user) =>
-      user.displayName.toLowerCase().includes(q) ||
-      String(user.username || '').toLowerCase().includes(q),
-  )
+  const params = { keyword: keyword.value.trim() }
+  if (normalizeMemberScope(props.field.memberScope) === 'dept_field') {
+    params.departmentId = deptFieldRootId()
+  }
+  return params
+}
+
+async function loadVisibleUsers() {
+  if (!canQueryPicker.value) {
+    visibleUsers.value = []
+    pickerTotal.value = 0
+    return
+  }
+  // debugger
+  const seq = ++userQuerySeq
+  visibleUsers.value = []
+  pickerTotal.value = 0
+  const data = await listOrgUsersApi({
+    page: pickerPage.value,
+    pageSize: PICKER_PAGE_SIZE,
+    ...browseQueryParams(),
+    ...customScopeParams(),
+  })
+  if (seq !== userQuerySeq) return
+  visibleUsers.value = usersFromResult(data)
+  pickerTotal.value = data?.total || 0
+  rememberUserNames(visibleUsers.value)
 }
 
 function onKeywordChange() {
-  refreshVisibleUsers()
+  pickerPage.value = 1
+  loadVisibleUsers()
+}
+
+function onPickerPageChange(page) {
+  pickerPage.value = page
+  loadVisibleUsers()
 }
 
 function nameOf(id) {
+  debugger
   return memberDisplayName(id, orgNames.value)
 }
 
@@ -263,15 +361,6 @@ function findDeptNode(nodes, id) {
     if (child) return child
   }
   return null
-}
-
-function collectDeptIds(node, ids = new Set()) {
-  if (!node) return ids
-  ids.add(node.id)
-  for (const child of node.children || []) {
-    collectDeptIds(child, ids)
-  }
-  return ids
 }
 
 function onOpenPicker() {
@@ -293,27 +382,32 @@ function onPickUser(user) {
 
 function onBrowseDept() {
   browseMode.value = 'dept'
-  refreshVisibleUsers()
+  pickerPage.value = 1
+  loadVisibleUsers()
 }
 
 function onBrowseRole() {
   browseMode.value = 'role'
-  refreshVisibleUsers()
+  pickerPage.value = 1
+  loadVisibleUsers()
 }
 
 function onBrowseUser() {
   browseMode.value = 'user'
-  refreshVisibleUsers()
+  pickerPage.value = 1
+  loadVisibleUsers()
 }
 
 function onDeptNodeClick(node) {
   selectedDeptId.value = node.id
-  refreshVisibleUsers()
+  pickerPage.value = 1
+  loadVisibleUsers()
 }
 
 function onSelectRole(role) {
   selectedRoleId.value = role.id
-  refreshVisibleUsers()
+  pickerPage.value = 1
+  loadVisibleUsers()
 }
 
 function onRemove(id) {
@@ -350,14 +444,41 @@ function confirmPick() {
 }
 
 async function loadOrg() {
-  const [deptRows, roleRows, userRows] = await Promise.all([
+  const [deptRows, roleRows] = await Promise.all([
     listOrgDepartmentsApi(),
     showRoles.value ? listOrgRolesApi() : Promise.resolve([]),
-    listOrgUsersApi(),
   ])
   departments.value = deptRows || []
   roles.value = roleRows || []
-  users.value = userRows || []
+}
+
+async function hydrateDraft() {
+  const ids = selectedIds.value
+  if (!ids.length) {
+    draftIds.value = []
+    return
+  }
+  const named = usersFromResult(await listOrgUsersApi({ ids: ids.join(',') }))
+  rememberUserNames(named)
+  const scope = normalizeMemberScope(props.field.memberScope)
+  if (scope === 'dept_field' && !deptFieldRootId()) {
+    draftIds.value = []
+    return
+  }
+  if (scope === 'all') {
+    const allowed = new Set(named.map((user) => user.id))
+    draftIds.value = ids.filter((id) => allowed.has(id))
+    return
+  }
+  const scoped = usersFromResult(
+    await listOrgUsersApi({
+      ids: ids.join(','),
+      ...(scope === 'dept_field' ? { departmentId: deptFieldRootId() } : {}),
+      ...customScopeParams(),
+    }),
+  )
+  const allowed = new Set(scoped.map((user) => user.id))
+  draftIds.value = ids.filter((id) => allowed.has(id))
 }
 
 async function onPickerOpen() {
@@ -365,40 +486,52 @@ async function onPickerOpen() {
   browseMode.value = 'dept'
   selectedDeptId.value = null
   selectedRoleId.value = null
+  pickerPage.value = 1
+  visibleUsers.value = []
+  pickerTotal.value = 0
+  extraUserNames.value = {}
   await loadOrg()
-  draftIds.value = selectedIds.value.filter((id) =>
-    candidateUsers(
-      props.field,
-      users.value,
-      departments.value,
-      props.recordValues,
-    ).some((item) => item.id === id),
+  await hydrateDraft()
+}
+
+async function pruneByDeptField() {
+  if (normalizeMemberScope(props.field.memberScope) !== 'dept_field') return
+  const ids = selectedIds.value
+  if (!ids.length) return
+  const rootId = deptFieldRootId()
+  if (!rootId) {
+    const next = pruneMembersOutOfScope(props.field.type, props.modelValue, new Set())
+    const current = multiple.value ? selectedIds.value : selectedIds.value[0]
+    if (JSON.stringify(next ?? null) === JSON.stringify(current ?? null)) return
+    emit('update:modelValue', next)
+    return
+  }
+  const scoped = usersFromResult(
+    await listOrgUsersApi({ ids: ids.join(','), departmentId: rootId }),
   )
-  refreshVisibleUsers()
+  const allowed = new Set(scoped.map((user) => user.id))
+  const next = pruneMembersOutOfScope(
+    props.field.type,
+    props.modelValue,
+    allowed,
+  )
+  const current = multiple.value
+    ? selectedIds.value
+    : selectedIds.value[0]
+  if (JSON.stringify(next ?? null) === JSON.stringify(current ?? null)) return
+  emit('update:modelValue', next)
 }
 
 onMounted(() => {
   if (normalizeMemberScope(props.field.memberScope) === 'dept_field') {
-    loadOrg()
+    pruneByDeptField()
   }
 })
 
 watch(
   () => props.recordValues?.[props.field.sourceDeptFieldKey],
   () => {
-    if (normalizeMemberScope(props.field.memberScope) !== 'dept_field') return
-    if (!users.value.length) return
-    const allowed = new Set(candidates.value.map((item) => item.id))
-    const next = pruneMembersOutOfScope(
-      props.field.type,
-      props.modelValue,
-      allowed,
-    )
-    const current = multiple.value
-      ? selectedIds.value
-      : selectedIds.value[0]
-    if (JSON.stringify(next ?? null) === JSON.stringify(current ?? null)) return
-    emit('update:modelValue', next)
+    pruneByDeptField()
   },
 )
 </script>
@@ -472,6 +605,7 @@ watch(
 .member-picker-body {
   display: flex;
   min-height: 320px;
+  max-height: 500px;
   border: 1px solid var(--el-border-color-lighter);
 }
 
@@ -512,6 +646,18 @@ watch(
   padding: 8px;
 }
 
+.member-picker-user-filter {
+  display: flex;
+  flex-direction: column;
+}
+
+.member-picker-result {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .member-picker-list {
   flex: 1;
   overflow: auto;
@@ -519,6 +665,13 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.member-picker-pager {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  padding: 4px 8px 8px;
 }
 
 .member-picker-user {

@@ -110,4 +110,99 @@ describe('OrgService', () => {
     const byRole = await service.listUsers({ roleId: 8 });
     expect(byRole.map((item) => item.id)).toEqual([1]);
   });
+
+  it('pages users instead of returning the full list', async () => {
+    userRepo.find.mockResolvedValue([
+      { id: 1, displayName: '甲', username: 'a', status: 'active' },
+      { id: 2, displayName: '乙', username: 'b', status: 'active' },
+      { id: 3, displayName: '丙', username: 'c', status: 'active' },
+      { id: 4, displayName: '丁', username: 'd', status: 'disabled' },
+    ]);
+    userDepartmentRepo.find.mockResolvedValue([]);
+    userRoleRepo.find.mockResolvedValue([]);
+    departmentRepo.find.mockResolvedValue([]);
+
+    await expect(service.listUsers({ page: 1, pageSize: 2 })).resolves.toEqual({
+      items: [
+        { id: 1, displayName: '甲', departmentId: null, roleIds: [] },
+        { id: 2, displayName: '乙', departmentId: null, roleIds: [] },
+      ],
+      total: 3,
+      page: 1,
+      pageSize: 2,
+    });
+    await expect(service.listUsers({ page: 2, pageSize: 2 })).resolves.toEqual({
+      items: [{ id: 3, displayName: '丙', departmentId: null, roleIds: [] }],
+      total: 3,
+      page: 2,
+      pageSize: 2,
+    });
+  });
+
+  it('filters users by ids without paging', async () => {
+    userRepo.find.mockResolvedValue([
+      { id: 1, displayName: '甲', username: 'a', status: 'active' },
+      { id: 2, displayName: '乙', username: 'b', status: 'disabled' },
+      { id: 3, displayName: '丙', username: 'c', status: 'active' },
+      { id: 5, displayName: '戊', username: 'e', status: 'active' },
+    ]);
+    userDepartmentRepo.find.mockResolvedValue([]);
+    userRoleRepo.find.mockResolvedValue([]);
+    departmentRepo.find.mockResolvedValue([]);
+
+    const users = await service.listUsers({ ids: [3, 2, 1, 1] });
+    expect(users).toEqual([
+      { id: 1, displayName: '甲', departmentId: null, roleIds: [] },
+      { id: 3, displayName: '丙', departmentId: null, roleIds: [] },
+    ]);
+  });
+
+  it('applies custom scope union and can intersect a department browse', async () => {
+    userRepo.find.mockResolvedValue([
+      { id: 1, displayName: '张三', username: 'zhang', status: 'active' },
+      { id: 2, displayName: '李四', username: 'li', status: 'active' },
+      { id: 3, displayName: '王五', username: 'wang', status: 'active' },
+    ]);
+    userDepartmentRepo.find.mockResolvedValue([
+      { userId: 1, departmentId: 11 },
+      { userId: 2, departmentId: 10 },
+      { userId: 3, departmentId: 12 },
+    ]);
+    userRoleRepo.find.mockResolvedValue([
+      { userId: 1, roleId: 8 },
+      { userId: 2, roleId: 9 },
+    ]);
+    departmentRepo.find.mockResolvedValue([
+      { id: 10, parentId: null, status: 'active' },
+      { id: 11, parentId: 10, status: 'active' },
+      { id: 12, parentId: null, status: 'active' },
+    ]);
+
+    const union = await service.listUsers({
+      memberScope: 'custom',
+      scopeRoleIds: [8],
+      scopeUserIds: [3],
+      page: 1,
+      pageSize: 10,
+    });
+    expect(union).toEqual({
+      items: [
+        { id: 1, displayName: '张三', departmentId: 11, roleIds: [8] },
+        { id: 3, displayName: '王五', departmentId: 12, roleIds: [] },
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 10,
+    });
+
+    const inDept = await service.listUsers({
+      memberScope: 'custom',
+      scopeRoleIds: [8],
+      departmentId: 10,
+      page: 1,
+      pageSize: 10,
+    });
+    expect(inDept.items.map((item) => item.id)).toEqual([1]);
+    expect(inDept.total).toBe(1);
+  });
 });

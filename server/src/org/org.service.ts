@@ -27,10 +27,24 @@ export type OrgUserItem = {
   roleIds: number[];
 };
 
+export type OrgUserPage = {
+  items: OrgUserItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export type OrgUserQuery = {
   keyword?: string;
   departmentId?: number;
   roleId?: number;
+  ids?: number[];
+  page?: number;
+  pageSize?: number;
+  memberScope?: 'all' | 'custom' | 'dept_field';
+  scopeDepartmentIds?: number[];
+  scopeRoleIds?: number[];
+  scopeUserIds?: number[];
 };
 
 @Injectable()
@@ -88,7 +102,32 @@ export class OrgService {
       }));
   }
 
-  async listUsers(query: OrgUserQuery): Promise<OrgUserItem[]> {
+  async listUsers(
+    query: OrgUserQuery,
+  ): Promise<OrgUserItem[] | OrgUserPage> {
+    const all = await this.collectUsers(query);
+    const idFilter = uniquePositiveIds(query.ids);
+    const filtered = idFilter.length
+      ? all.filter((item) => idFilter.includes(item.id))
+      : all;
+    if (idFilter.length) {
+      return filtered;
+    }
+    if (query.page == null && query.pageSize == null) {
+      return filtered;
+    }
+    const page = Math.max(1, query.page || 1);
+    const pageSize = clampPageSize(query.pageSize);
+    const start = (page - 1) * pageSize;
+    return {
+      items: filtered.slice(start, start + pageSize),
+      total: filtered.length,
+      page,
+      pageSize,
+    };
+  }
+
+  private async collectUsers(query: OrgUserQuery): Promise<OrgUserItem[]> {
     const users = await this.userRepo.find({
       select: { id: true, displayName: true, username: true, status: true },
       order: { id: 'ASC' },
@@ -111,6 +150,13 @@ export class OrgService {
     const allowedDeptIds = query.departmentId
       ? this.descendantDepartmentIds(query.departmentId, departments)
       : null;
+    const customScope =
+      query.memberScope === 'custom'
+        ? this.customScopeSets(query, departments)
+        : null;
+    if (customScope && customScope.empty) {
+      return [];
+    }
     const keyword = query.keyword?.trim().toLowerCase() || '';
     const roleId = query.roleId;
     const out: OrgUserItem[] = [];
@@ -131,6 +177,14 @@ export class OrgService {
       if (roleId && !roleIds.includes(roleId)) {
         continue;
       }
+      if (
+        customScope &&
+        !customScope.departmentIds.has(departmentId ?? -1) &&
+        !roleIds.some((id) => customScope.roleIds.has(id)) &&
+        !customScope.userIds.has(user.id)
+      ) {
+        continue;
+      }
       out.push({
         id: user.id,
         displayName: user.displayName,
@@ -139,6 +193,31 @@ export class OrgService {
       });
     }
     return out;
+  }
+
+  private customScopeSets(
+    query: OrgUserQuery,
+    departments: Department[],
+  ): {
+    empty: boolean;
+    departmentIds: Set<number>;
+    roleIds: Set<number>;
+    userIds: Set<number>;
+  } {
+    const departmentIds = new Set<number>();
+    for (const id of uniquePositiveIds(query.scopeDepartmentIds)) {
+      for (const childId of this.descendantDepartmentIds(id, departments)) {
+        departmentIds.add(childId);
+      }
+    }
+    const roleIds = new Set(uniquePositiveIds(query.scopeRoleIds));
+    const userIds = new Set(uniquePositiveIds(query.scopeUserIds));
+    return {
+      empty: !departmentIds.size && !roleIds.size && !userIds.size,
+      departmentIds,
+      roleIds,
+      userIds,
+    };
   }
 
   private descendantDepartmentIds(
@@ -163,4 +242,20 @@ export class OrgService {
     walk(rootId);
     return ids;
   }
+}
+
+function uniquePositiveIds(raw?: number[]) {
+  const out: number[] = [];
+  const seen = new Set<number>();
+  for (const item of raw || []) {
+    if (!Number.isInteger(item) || item <= 0 || seen.has(item)) continue;
+    seen.add(item);
+    out.push(item);
+  }
+  return out;
+}
+
+function clampPageSize(value?: number) {
+  if (!Number.isInteger(value) || !value || value < 1) return 20;
+  return Math.min(value, 100);
 }

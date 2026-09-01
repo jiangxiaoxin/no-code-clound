@@ -110,6 +110,7 @@ export function getFormRecordApi(appId, formId, recordId, config = {}) {
 }
 
 export function queryFormRecordsApi(appId, formId, payload) {
+  // debugger
   return http.post(`/apps/${appId}/forms/${formId}/records/query`, payload)
 }
 

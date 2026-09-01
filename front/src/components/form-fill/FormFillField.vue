@@ -225,6 +225,7 @@
       :record-values="recordValues"
       :form-fields="formFields"
       :dict-items-by-code="dictItemsByCode"
+      :user-names="userNames"
       @update:model-value="onUpdateModelValue"
     />
   </div>

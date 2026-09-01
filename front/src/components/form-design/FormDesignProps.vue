@@ -245,47 +245,134 @@
         </el-form-item>
         <el-dialog
           v-model="memberScopeVisible"
-          title="设置可选范围"
+          title="设置可选范围（选择的合集作为备选）"
           width="720px"
           draggable
           @open="onMemberScopeDialogOpen"
         >
           <div class="member-scope-dialog">
-            <div class="member-scope-col">
-              <div class="member-scope-col-title">部门</div>
-              <el-tree
-                ref="scopeDeptTreeRef"
-                :data="orgDepartments"
-                node-key="id"
-                show-checkbox
-                default-expand-all
-                :props="{ label: 'name', children: 'children' }"
-              />
+            <div v-if="hasScopePicked" class="member-scope-picked">
+              <div v-if="scopeDeptIds.length" class="member-scope-picked-row">
+                <span class="member-scope-picked-label">部门</span>
+                <div class="member-scope-picked-tags">
+                  <span
+                    v-for="id in scopeDeptIds"
+                    :key="'dept-' + id"
+                    class="member-scope-picked-tag"
+                  >
+                    <span>{{ scopeDeptName(id) }}</span>
+                    <el-icon
+                      class="member-scope-picked-close"
+                      @click="onRemoveScopeDept(id)"
+                    >
+                      <Close />
+                    </el-icon>
+                  </span>
+                </div>
+              </div>
+              <div v-if="scopeRoleIds.length" class="member-scope-picked-row">
+                <span class="member-scope-picked-label">角色</span>
+                <div class="member-scope-picked-tags">
+                  <span
+                    v-for="id in scopeRoleIds"
+                    :key="'role-' + id"
+                    class="member-scope-picked-tag"
+                  >
+                    <span>{{ scopeRoleName(id) }}</span>
+                    <el-icon
+                      class="member-scope-picked-close"
+                      @click="onRemoveScopeRole(id)"
+                    >
+                      <Close />
+                    </el-icon>
+                  </span>
+                </div>
+              </div>
+              <div v-if="scopeUserIds.length" class="member-scope-picked-row">
+                <span class="member-scope-picked-label">人员</span>
+                <div class="member-scope-picked-tags">
+                  <span
+                    v-for="id in scopeUserIds"
+                    :key="'user-' + id"
+                    class="member-scope-picked-tag"
+                  >
+                    <span>{{ scopeUserName(id) }}</span>
+                    <el-icon
+                      class="member-scope-picked-close"
+                      @click="onRemoveScopeUser(id)"
+                    >
+                      <Close />
+                    </el-icon>
+                  </span>
+                </div>
+              </div>
             </div>
-            <div class="member-scope-col">
-              <div class="member-scope-col-title">角色</div>
-              <el-checkbox-group v-model="scopeRoleIds">
-                <el-checkbox
-                  v-for="role in orgRoles"
-                  :key="role.id"
-                  :value="role.id"
-                >
-                  {{ role.name }}
-                </el-checkbox>
-              </el-checkbox-group>
-            </div>
-            <div class="member-scope-col">
-              <div class="member-scope-col-title">人员</div>
-              <el-checkbox-group v-model="scopeUserIds">
-                <el-checkbox
-                  v-for="user in orgUsers"
-                  :key="user.id"
-                  :value="user.id"
-                >
-                  {{ user.displayName }}
-                </el-checkbox>
-              </el-checkbox-group>
-            </div>
+            <el-tabs
+              v-model="memberScopeTab"
+              class="member-scope-tabs"
+              @tab-change="onMemberScopeTabChange"
+            >
+              <el-tab-pane label="部门" name="dept">
+                <div class="member-scope-pane">
+                  <el-tree
+                    ref="scopeDeptTreeRef"
+                    :data="orgDepartments"
+                    node-key="id"
+                    show-checkbox
+                    default-expand-all
+                    :props="{ label: 'name', children: 'children' }"
+                    @check="syncScopeDeptIds"
+                  />
+                </div>
+              </el-tab-pane>
+              <el-tab-pane label="角色" name="role">
+                <div class="member-scope-pane">
+                  <el-checkbox-group v-model="scopeRoleIds">
+                    <el-checkbox
+                      v-for="role in orgRoles"
+                      :key="role.id"
+                      :value="role.id"
+                    >
+                      {{ role.name }}
+                    </el-checkbox>
+                  </el-checkbox-group>
+                </div>
+              </el-tab-pane>
+              <el-tab-pane label="人员" name="user">
+                <div class="member-scope-pane member-scope-users">
+                  <el-input
+                    v-model="scopeUserKeyword"
+                    clearable
+                    placeholder="按姓名 / 用户名搜索"
+                    @change="onScopeUserKeywordChange"
+                  />
+                  <div class="member-scope-user-list">
+                    <el-checkbox-group v-model="scopeUserIds">
+                      <el-checkbox
+                        v-for="user in orgUsers"
+                        :key="user.id"
+                        :value="user.id"
+                      >
+                        {{ user.displayName }}
+                      </el-checkbox>
+                    </el-checkbox-group>
+                  </div>
+                  <div class="member-scope-pager">
+                    <el-pagination
+                      background
+                      layout="total, sizes, prev, pager, next"
+                      :current-page="scopeUserPage"
+                      :page-size="scopeUserPageSize"
+                      :page-sizes="PAGE_SIZES"
+                      :total="scopeUserTotal"
+                      size="small"
+                      @current-change="onScopeUserPageChange"
+                      @size-change="onScopeUserPageSizeChange"
+                    />
+                  </div>
+                </div>
+              </el-tab-pane>
+            </el-tabs>
           </div>
           <template #footer>
             <el-button @click="closeMemberScopeDialog">取消</el-button>
@@ -782,7 +869,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { CircleClose, Delete, Plus, Rank } from '@element-plus/icons-vue'
+import { CircleClose, Close, Delete, Plus, Rank } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { formatOptions, formColumnOptions, fieldTypes, fieldTypeLabel, isSelectType } from './fieldTypes'
 import {
@@ -831,6 +918,7 @@ import {
   deptFieldsForMemberScope,
   hasCustomMemberScope,
   isMemberField,
+  memberDisplayName,
   positiveIntIds,
 } from './memberField.js'
 import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
@@ -838,6 +926,7 @@ import { FILE_FORMAT_OPTIONS } from '../form-fill/fileField'
 import { ADDRESS_FORMAT_OPTIONS } from '../form-fill/addressField'
 import { listDictionaryOptionsApi, listFormFieldsApi } from '../../api/apps'
 import { listOrgDepartmentsApi, listOrgRolesApi, listOrgUsersApi } from '../../api/org'
+import { PAGE_SIZES } from '../../utils/pagination.js'
 
 const props = defineProps({
   tab: { type: String, required: true },
@@ -1218,12 +1307,115 @@ const deptFieldOptions = computed(() =>
   ),
 )
 const memberScopeVisible = ref(false)
+const memberScopeTab = ref('dept')
 const scopeDeptTreeRef = ref(null)
 const orgDepartments = ref([])
 const orgRoles = ref([])
 const orgUsers = ref([])
+const scopeDeptIds = ref([])
 const scopeRoleIds = ref([])
 const scopeUserIds = ref([])
+const scopeUserKeyword = ref('')
+const scopeUserPage = ref(1)
+const scopeUserPageSize = ref(20)
+const scopeUserTotal = ref(0)
+const scopeUserNameById = ref({})
+
+const hasScopePicked = computed(
+  () =>
+    scopeDeptIds.value.length +
+      scopeRoleIds.value.length +
+      scopeUserIds.value.length >
+    0,
+)
+
+const scopeDeptNameById = computed(() => {
+  const map = {}
+  const walk = (nodes) => {
+    for (const node of nodes || []) {
+      map[node.id] = node.name
+      walk(node.children)
+    }
+  }
+  walk(orgDepartments.value)
+  return map
+})
+
+const scopeRoleNameById = computed(() => {
+  const map = {}
+  for (const role of orgRoles.value) {
+    map[role.id] = role.name
+  }
+  return map
+})
+
+function scopeDeptName(id) {
+  return scopeDeptNameById.value[id] || `部门#${id}`
+}
+
+function scopeRoleName(id) {
+  return scopeRoleNameById.value[id] || `角色#${id}`
+}
+
+function scopeUserName(id) {
+  return memberDisplayName(id, scopeUserNameById.value)
+}
+
+function rememberUserNames(users) {
+  const next = { ...scopeUserNameById.value }
+  for (const user of users || []) {
+    if (!user?.id) continue
+    next[user.id] = user.displayName
+  }
+  scopeUserNameById.value = next
+}
+
+async function loadScopeUsers() {
+  const keyword = scopeUserKeyword.value.trim()
+  const data = await listOrgUsersApi({
+    keyword: keyword || undefined,
+    page: scopeUserPage.value,
+    pageSize: scopeUserPageSize.value,
+  })
+  orgUsers.value = data?.items || []
+  scopeUserTotal.value = data?.total || 0
+  rememberUserNames(orgUsers.value)
+}
+
+async function loadSelectedUserNames(ids) {
+  if (!ids.length) return
+  const rows = await listOrgUsersApi({ ids: ids.join(',') })
+  rememberUserNames(Array.isArray(rows) ? rows : rows?.items || [])
+}
+
+function onScopeUserKeywordChange() {
+  scopeUserPage.value = 1
+  loadScopeUsers()
+}
+
+function onScopeUserPageChange(page) {
+  scopeUserPage.value = page
+  loadScopeUsers()
+}
+
+function onScopeUserPageSizeChange(size) {
+  scopeUserPageSize.value = size
+  scopeUserPage.value = 1
+  loadScopeUsers()
+}
+
+function onRemoveScopeDept(id) {
+  scopeDeptIds.value = scopeDeptIds.value.filter((item) => item !== id)
+  nextTick(applyScopeDeptChecked)
+}
+
+function onRemoveScopeRole(id) {
+  scopeRoleIds.value = scopeRoleIds.value.filter((item) => item !== id)
+}
+
+function onRemoveScopeUser(id) {
+  scopeUserIds.value = scopeUserIds.value.filter((item) => item !== id)
+}
 
 function onMemberScopeChange(value) {
   if (!props.field) return
@@ -1238,26 +1430,47 @@ function closeMemberScopeDialog() {
   memberScopeVisible.value = false
 }
 
+function syncScopeDeptIds() {
+  scopeDeptIds.value = scopeDeptTreeRef.value?.getCheckedKeys(false) || scopeDeptIds.value
+}
+
+function applyScopeDeptChecked() {
+  scopeDeptTreeRef.value?.setCheckedKeys(scopeDeptIds.value)
+}
+
+function onMemberScopeTabChange(name) {
+  if (name !== 'dept') return
+  nextTick(applyScopeDeptChecked)
+}
+
 async function onMemberScopeDialogOpen() {
+  memberScopeTab.value = 'dept'
   const cfg = props.field?.memberScopeConfig || {}
+  scopeDeptIds.value = positiveIntIds(cfg.departmentIds)
   scopeRoleIds.value = positiveIntIds(cfg.roleIds)
   scopeUserIds.value = positiveIntIds(cfg.userIds)
-  const [depts, roleRows, userRows] = await Promise.all([
+  scopeUserKeyword.value = ''
+  scopeUserPage.value = 1
+  scopeUserNameById.value = {}
+  const [depts, roleRows] = await Promise.all([
     listOrgDepartmentsApi(),
     listOrgRolesApi(),
-    listOrgUsersApi(),
+    loadScopeUsers(),
+    loadSelectedUserNames(scopeUserIds.value),
   ])
   orgDepartments.value = depts || []
   orgRoles.value = roleRows || []
-  orgUsers.value = userRows || []
   await nextTick()
-  scopeDeptTreeRef.value?.setCheckedKeys(positiveIntIds(cfg.departmentIds))
+  applyScopeDeptChecked()
 }
 
 function confirmMemberScope() {
   if (!props.field) return
+  if (memberScopeTab.value === 'dept') {
+    syncScopeDeptIds()
+  }
   props.field.memberScopeConfig = {
-    departmentIds: scopeDeptTreeRef.value?.getCheckedKeys(false) || [],
+    departmentIds: [...scopeDeptIds.value],
     roleIds: [...scopeRoleIds.value],
     userIds: [...scopeUserIds.value],
   }
@@ -1848,19 +2061,91 @@ watch(
 
 .member-scope-dialog {
   display: flex;
-  min-height: 320px;
+  flex-direction: column;
+  min-height: 360px;
 }
 
-.member-scope-col {
-  flex: 1;
-  min-width: 0;
-  overflow: auto;
-  padding: 0 8px;
-}
-
-.member-scope-col-title {
+.member-scope-picked {
+  display: flex;
+  flex-direction: column;
+  max-height: 140px;
   margin-bottom: 8px;
-  font-weight: 600;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+}
+
+.member-scope-picked-row {
+  display: flex;
+  align-items: flex-start;
+}
+
+.member-scope-picked-row + .member-scope-picked-row {
+  margin-top: 8px;
+}
+
+.member-scope-picked-label {
+  flex: none;
+  width: 40px;
+  margin-top: 2px;
+  color: var(--el-text-color-secondary);
+}
+
+.member-scope-picked-tags {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.member-scope-picked-tag {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px;
+  background: var(--el-fill-color);
+  border-radius: 4px;
+}
+
+.member-scope-picked-close {
+  cursor: pointer;
+}
+
+.member-scope-tabs :deep(.el-tabs__header) {
+  margin: 0 0 8px;
+}
+
+.member-scope-pane {
+  min-height: 280px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.member-scope-users {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.member-scope-user-list {
+  flex: 1;
+  min-height: 180px;
+  margin-top: 8px;
+  overflow: auto;
+}
+
+.member-scope-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.member-scope-pane :deep(.el-checkbox-group) {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 </style>

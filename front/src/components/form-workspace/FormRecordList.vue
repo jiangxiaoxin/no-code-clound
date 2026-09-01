@@ -56,6 +56,7 @@
         </div>
       </div>
       <div class="table-wrap">
+        <!-- TODO 要增加统计列 -->
         <el-table
           v-loading="listLoading"
           :data="records"

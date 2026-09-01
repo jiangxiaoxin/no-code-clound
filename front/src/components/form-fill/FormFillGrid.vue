@@ -23,7 +23,7 @@
                 :record-values="values"
                 :form-fields="flatFields"
                 :dict-items-by-code="dictItemsByCode"
-                :user-names="userNames"
+                :user-names="fillUserNames"
                 @fill="onFill"
               />
             </div>
@@ -42,7 +42,7 @@
         :record-values="values"
         :form-fields="flatFields"
         :dict-items-by-code="dictItemsByCode"
-        :user-names="userNames"
+        :user-names="fillUserNames"
         @fill="onFill"
       />
     </template>
@@ -83,6 +83,12 @@ const props = defineProps({
   updating: { type: Boolean, default: false },
   userNames: { type: Object, default: () => ({}) },
 })
+
+const linkageUserNames = ref({})
+const fillUserNames = computed(() => ({
+  ...props.userNames,
+  ...linkageUserNames.value,
+}))
 
 const fillTips = computed(() => fillInfluencerTips(props.fields))
 const flatFields = computed(() => flattenFields(props.fields))
@@ -252,9 +258,17 @@ function queryRecordsOnce(appId, formId, query) {
   const key = `${appId}:${formId}:${JSON.stringify(query)}`
   const hit = pendingQueries.get(key)
   if (hit) return hit
-  const pending = queryFormRecordsApi(appId, formId, query).finally(() => {
-    pendingQueries.delete(key)
-  })
+  const pending = queryFormRecordsApi(appId, formId, query)
+    .then((result) => {
+      const extra = result?.userNames
+      if (extra && typeof extra === 'object') {
+        linkageUserNames.value = { ...linkageUserNames.value, ...extra }
+      }
+      return result
+    })
+    .finally(() => {
+      pendingQueries.delete(key)
+    })
   pendingQueries.set(key, pending)
   return pending
 }

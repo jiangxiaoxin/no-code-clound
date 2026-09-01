@@ -56,6 +56,7 @@
               :updating="updating"
               :record-values="rowValues(row)"
               :form-fields="rowFormFields"
+              :user-names="fillUserNames"
               :multiple="isDataMultiple(child, row)"
               :compact="child.type === 'data'"
               @update:model-value="onCellChange($index, child.key, $event)"
@@ -112,9 +113,16 @@ const props = defineProps({
   formFields: { type: Array, default: () => [] },
   dictItemsByCode: { type: Object, default: () => ({}) },
   linkageItemsByKey: { type: Object, default: () => ({}) },
+  userNames: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:modelValue'])
+
+const linkageUserNames = ref({})
+const fillUserNames = computed(() => ({
+  ...props.userNames,
+  ...linkageUserNames.value,
+}))
 
 const children = computed(() =>
   Array.isArray(props.field.fields) ? props.field.fields : [],
@@ -370,9 +378,17 @@ function queryRecordsOnce(appId, formId, query) {
   if (hit) {
     return hit
   }
-  const pending = queryFormRecordsApi(appId, formId, query).finally(() => {
-    pendingQueries.delete(key)
-  })
+  const pending = queryFormRecordsApi(appId, formId, query)
+    .then((result) => {
+      const extra = result?.userNames
+      if (extra && typeof extra === 'object') {
+        linkageUserNames.value = { ...linkageUserNames.value, ...extra }
+      }
+      return result
+    })
+    .finally(() => {
+      pendingQueries.delete(key)
+    })
   pendingQueries.set(key, pending)
   return pending
 }
