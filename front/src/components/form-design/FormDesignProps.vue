@@ -733,13 +733,14 @@
         </el-radio-group>
       </el-form-item>
       </template>
-      <div v-else class="pane-list">
+      <div v-else class="pane-list" :class="{ 'is-reordering': isPaneReordering }">
         <div class="pane-list-title">标签页</div>
         <div
           v-for="pane in field.panes"
           :key="pane.id"
           class="pane-row"
-          @dragover="onPaneDragOver"
+          :class="paneRowClass(pane)"
+          @dragover="onPaneDragOver(pane, $event)"
           @drop="onPaneDrop(pane, $event)"
         >
           <span
@@ -768,6 +769,7 @@
           :icon="Plus"
           :disabled="!canAddPane(field.panes)"
           @click="onAddPane"
+          type="primary"
         >
           添加标签页
         </el-button>
@@ -861,7 +863,9 @@ function onWidthChange(value) {
 
 let paneTitleBeforeEdit = ''
 const draggingPaneId = ref('')
+const dragOverPaneId = ref('')
 const draggingSerialId = ref('')
+const isPaneReordering = computed(() => Boolean(draggingPaneId.value))
 const activeSerialSegId = ref('')
 const serialSegDialogVisible = ref(false)
 
@@ -903,25 +907,42 @@ async function onRemovePane(pane) {
   props.field.panes = props.field.panes.filter((item) => item.id !== pane.id)
 }
 
-function onPaneDragStart(pane, event) {
-  draggingPaneId.value = pane.id
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', pane.id)
+function paneRowClass(pane) {
+  return {
+    'is-dragging': draggingPaneId.value === pane.id,
+    'is-drop-target': dragOverPaneId.value === pane.id && draggingPaneId.value !== pane.id,
+  }
 }
 
-function onPaneDragOver(event) {
+function clearPaneDrag() {
+  draggingPaneId.value = ''
+  dragOverPaneId.value = ''
+}
+
+function onPaneDragStart(pane, event) {
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', pane.id)
+  // 下一帧再加样式，避免浏览器抓到的拖拽影子也变成半透明
+  requestAnimationFrame(() => {
+    draggingPaneId.value = pane.id
+  })
+}
+
+function onPaneDragOver(pane, event) {
   event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+  dragOverPaneId.value = pane.id === draggingPaneId.value ? '' : pane.id
 }
 
 function onPaneDrop(pane, event) {
   event.preventDefault()
   const fromId = draggingPaneId.value || event.dataTransfer.getData('text/plain')
   reorderPanes(props.field.panes, fromId, pane.id)
-  draggingPaneId.value = ''
+  clearPaneDrag()
 }
 
 function onPaneDragEnd() {
-  draggingPaneId.value = ''
+  clearPaneDrag()
 }
 
 function onSerialSeparatorInput(value) {
@@ -1686,10 +1707,28 @@ watch(
 }
 
 .pane-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.pane-list.is-reordering .pane-row:not(.is-dragging):not(.is-drop-target) {
+  opacity: 0.55;
+}
+
+.pane-row.is-dragging {
+  opacity: 0.45;
+}
+
+.pane-row.is-dragging .pane-handle {
+  color: var(--el-color-primary);
+  cursor: grabbing;
+}
+
+.pane-row.is-drop-target {
+  outline: 1px dashed var(--el-color-primary);
 }
 
 .pane-handle {
