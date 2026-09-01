@@ -41,7 +41,7 @@ const SHOW_CANVAS_JSON_HELPER = true
 点击 **转换** 才执行，一次性完成：
 
 1. 左栏去掉首尾空白后必须是合法 JSON（数组或对象均可，通常是画布 `fields`）。
-2. 按当前路由的 `appId` 重新请求应用目录（表 id → 表名）。不缓存。
+2. 按当前路由的 `appId` 重新请求应用目录（表 id → 表名）和启用字典（编码 → 名称）。不缓存。
 3. 从本次 JSON 收集出现过的 `sourceFormId`，对每一张源表重新请求完整字段。不缓存。
 4. 按 §5 写出带行末注释的文本，写入右栏。
 
@@ -67,7 +67,11 @@ const SHOW_CANVAS_JSON_HELPER = true
 - `displayFieldKeys` 等字段 key 数组里的每一项
 - 过滤 / 联动条件里指向字段的 `key`
 
-不注释字典编码、选项 value、与表/字段无关的 id。
+**字典**
+
+- `dictCode`
+
+不注释选项 value、与表/字段/字典无关的 id。
 
 ### 5.2 名称从哪来
 
@@ -76,7 +80,8 @@ const SHOW_CANVAS_JSON_HELPER = true
 1. 本次 JSON 里同时带 `key` 和 `title` 的对象（当前画布字段、子表列、标签页内字段）。
 2. 本次拉到的源表字段（跨表引用）。
 3. 系统列：`createdBy` 创建人、`updatedBy` 更新人、`createdAt` 创建时间、`updatedAt` 更新时间。
-4. 表：应用目录里的表 id → 表名。
+4. 表：应用目录里的表 id → 表名；源表接口返回的表名作补充。
+5. 字典：当前应用启用字典的 `code` → `name`。
 
 查到则 `// 姓名` / `// 客户表`。查不到则该行仍加注释：`// 未查找到`。查不到名字**不算失败**。
 
@@ -86,6 +91,7 @@ const SHOW_CANVAS_JSON_HELPER = true
 "key": "fld_name",          // 姓名
 "sourceFormId": 12,         // 客户表
 "sourceFieldKey": "fld_n1"  // 客户名称
+"dictCode": "leave_type"    // 请假类型
 "sourceFieldKey": "gone"    // 未查找到
 ```
 
@@ -105,7 +111,7 @@ const SHOW_CANVAS_JSON_HELPER = true
 
 - 一个浮层组件，与 `RouterView` 并排挂在 `App.vue`，用路由名判断是否显示。
 - 注解逻辑做成纯函数，便于单测：输入（解析后的配置 + 表名表 + 字段名表）→ 带注释的字符串。
-- 现有 `getDirectoryApi`、`getFormApi` 够用，不新增后端接口。
+- 现有 `getDirectoryApi`、`getFormApi`、`listDictionaryOptionsApi` 够用，不新增后端接口。
 - 不写 `docs/testcases/`：这是开发辅助，不改变表单设计 / 填报行为。
 
 ## 8. 测试

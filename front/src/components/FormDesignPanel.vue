@@ -55,7 +55,7 @@
 </template>
 
 <script setup>
-import { computed, ref, toRaw, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, toRaw, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import FormDesignToolbar from './form-design/FormDesignToolbar.vue'
 import FormDesignPalette from './form-design/FormDesignPalette.vue'
@@ -630,6 +630,41 @@ async function saveFields() {
     return
   }
 }
+
+let saveConfirmOpen = false
+
+async function confirmSaveFields() {
+  if (saveConfirmOpen) return
+  saveConfirmOpen = true
+  try {
+    await ElMessageBox.confirm('当前是要保存配置吗？', '保存', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'info',
+    })
+  } catch {
+    return
+  } finally {
+    saveConfirmOpen = false
+  }
+  await saveFields()
+}
+
+function onPanelKeydown(event) {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+  if (event.code !== 'KeyS') return
+  event.preventDefault()
+  if (event.repeat) return
+  confirmSaveFields()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onPanelKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onPanelKeydown)
+})
 
 function cloneFields(value) {
   const raw = toRaw(value)

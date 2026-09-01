@@ -604,12 +604,13 @@
             @input="onSerialSeparatorInput"
           />
         </el-form-item>
-        <div class="serial-rule-list">
+        <div class="serial-rule-list" :class="{ 'is-reordering': isSerialReordering }">
           <div
             v-for="seg in field.serialRule"
             :key="seg.id"
             class="serial-rule-row"
-            @dragover="onSerialDragOver"
+            :class="serialRowClass(seg)"
+            @dragover="onSerialDragOver(seg, $event)"
             @drop="onSerialDrop(seg, $event)"
           >
             <span
@@ -734,7 +735,7 @@
       </el-form-item>
       </template>
       <div v-else class="pane-list" :class="{ 'is-reordering': isPaneReordering }">
-        <div class="pane-list-title">标签页</div>
+        <div class="pane-list-title">标签页（最多 {{ MAX_TAB_PANES }} 个，最少 {{ MIN_TAB_PANES }} 个）</div>
         <div
           v-for="pane in field.panes"
           :key="pane.id"
@@ -785,6 +786,8 @@ import { CircleClose, Delete, Plus, Rank } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { formatOptions, formColumnOptions, fieldTypes, fieldTypeLabel, isSelectType } from './fieldTypes'
 import {
+  MIN_TAB_PANES,
+  MAX_TAB_PANES,
   canAddPane,
   canRemovePane,
   flattenFields,
@@ -865,7 +868,9 @@ let paneTitleBeforeEdit = ''
 const draggingPaneId = ref('')
 const dragOverPaneId = ref('')
 const draggingSerialId = ref('')
+const dragOverSerialId = ref('')
 const isPaneReordering = computed(() => Boolean(draggingPaneId.value))
+const isSerialReordering = computed(() => Boolean(draggingSerialId.value))
 const activeSerialSegId = ref('')
 const serialSegDialogVisible = ref(false)
 
@@ -987,25 +992,42 @@ function onRemoveSerialSeg(seg) {
   }
 }
 
-function onSerialDragStart(seg, event) {
-  draggingSerialId.value = seg.id
-  event.dataTransfer.effectAllowed = 'move'
-  event.dataTransfer.setData('text/plain', seg.id)
+function serialRowClass(seg) {
+  return {
+    'is-dragging': draggingSerialId.value === seg.id,
+    'is-drop-target': dragOverSerialId.value === seg.id && draggingSerialId.value !== seg.id,
+  }
 }
 
-function onSerialDragOver(event) {
+function clearSerialDrag() {
+  draggingSerialId.value = ''
+  dragOverSerialId.value = ''
+}
+
+function onSerialDragStart(seg, event) {
+  event.dataTransfer.effectAllowed = 'move'
+  event.dataTransfer.setData('text/plain', seg.id)
+  // 下一帧再加样式，避免浏览器抓到的拖拽影子也变成半透明
+  requestAnimationFrame(() => {
+    draggingSerialId.value = seg.id
+  })
+}
+
+function onSerialDragOver(seg, event) {
   event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+  dragOverSerialId.value = seg.id === draggingSerialId.value ? '' : seg.id
 }
 
 function onSerialDrop(seg, event) {
   event.preventDefault()
   const fromId = draggingSerialId.value || event.dataTransfer.getData('text/plain')
   reorderSerialRule(props.field.serialRule, fromId, seg.id)
-  draggingSerialId.value = ''
+  clearSerialDrag()
 }
 
 function onSerialDragEnd() {
-  draggingSerialId.value = ''
+  clearSerialDrag()
 }
 
 function onSerialFixedKeydown(event) {
@@ -1755,9 +1777,27 @@ watch(
 }
 
 .serial-rule-row {
+  position: relative;
   display: flex;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.serial-rule-list.is-reordering .serial-rule-row:not(.is-dragging):not(.is-drop-target) {
+  opacity: 0.55;
+}
+
+.serial-rule-row.is-dragging {
+  opacity: 0.45;
+}
+
+.serial-rule-row.is-dragging .serial-rule-handle {
+  color: var(--el-color-primary);
+  cursor: grabbing;
+}
+
+.serial-rule-row.is-drop-target {
+  outline: 1px dashed var(--el-color-primary);
 }
 
 .serial-rule-handle {
