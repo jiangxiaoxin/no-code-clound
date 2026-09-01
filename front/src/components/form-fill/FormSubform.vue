@@ -86,6 +86,7 @@ import { hasLinkage } from '../form-design/linkage'
 import { isSelectType } from '../form-design/fieldTypes'
 import FormFillField from './FormFillField.vue'
 import {
+  applyCellWrites,
   emptySubformRow,
   shouldSubformDataSelectMultiple,
 } from './subformField.js'
@@ -150,6 +151,7 @@ let linkageTimer = 0
 let linkagePrimed = false
 let lastLinkageKeys = {}
 let tableSeq = 0
+let rowLinkageSeq = 0
 
 function nextUid() {
   uid += 1
@@ -456,6 +458,7 @@ function canWriteChild(child) {
 }
 
 async function loadRowLinkages() {
+  const seq = ++rowLinkageSeq
   if (!props.appId || props.disabled) {
     linkagePrimed = false
     lastLinkageKeys = {}
@@ -463,6 +466,8 @@ async function loadRowLinkages() {
   }
   const nextItems = { ...linkageItems.value }
   const nextKeys = {}
+  const writes = []
+  const messages = []
   const writeValues = !props.disabled && (!props.updating || linkagePrimed)
   await Promise.all(
     rows.value.flatMap((row) =>
@@ -502,15 +507,14 @@ async function loadRowLinkages() {
             }
             if (writeValues && canWriteChild(child)) {
               if (row[child.key] !== applied.value) {
-                const index = rows.value.findIndex((item) => item.__uid === row.__uid)
-                if (index >= 0) {
-                  const next = rows.value.slice()
-                  next[index] = { ...next[index], [child.key]: applied.value }
-                  commit(next)
-                }
+                writes.push({
+                  uid: row.__uid,
+                  key: child.key,
+                  value: applied.value,
+                })
               }
               if (applied.message) {
-                ElMessage.warning(applied.message)
+                messages.push(applied.message)
               }
             }
           } catch {
@@ -521,9 +525,18 @@ async function loadRowLinkages() {
         }),
     ),
   )
+  if (seq !== rowLinkageSeq) {
+    return
+  }
   lastLinkageKeys = nextKeys
   linkageItems.value = nextItems
   linkagePrimed = true
+  if (writes.length) {
+    commit(applyCellWrites(rows.value, writes))
+  }
+  for (const message of messages) {
+    ElMessage.warning(message)
+  }
 }
 
 watch(optionLoadKey, () => {
@@ -544,6 +557,7 @@ function runChildOptionLoads() {
 onUnmounted(() => {
   window.clearTimeout(linkageTimer)
   tableSeq += 1
+  rowLinkageSeq += 1
 })
 </script>
 

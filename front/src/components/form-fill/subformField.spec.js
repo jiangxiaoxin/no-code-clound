@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
+  applyCellWrites,
   applyRowLinkages,
   isSubformChildType,
   mapSourceSubformRows,
@@ -119,4 +120,17 @@ test('applyRowLinkages writes only the current row cell', () => {
   assert.equal(next.name, '螺丝')
   assert.equal(next.code, 'A')
   assert.equal(row.name, '')
+})
+
+test('applyCellWrites merges concurrent cell updates onto the same row', () => {
+  const rows = [{ __uid: 1, price: '', amount: '', name: 'keep' }]
+  const next = applyCellWrites(rows, [
+    { uid: 1, key: 'price', value: 10 },
+    { uid: 1, key: 'amount', value: 20 },
+  ])
+  assert.equal(next[0].price, 10)
+  assert.equal(next[0].amount, 20)
+  assert.equal(next[0].name, 'keep')
+  assert.equal(rows[0].price, '')
+  assert.equal(rows[0].amount, '')
 })
