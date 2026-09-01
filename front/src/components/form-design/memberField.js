@@ -147,8 +147,40 @@ export function pruneMembersOutOfScope(type, value, allowed) {
   return ids[0]
 }
 
+export function dropMissingMemberNames(names, selectedIds, foundIds) {
+  const found = new Set(foundIds)
+  const next = { ...(names || {}) }
+  for (const id of selectedIds || []) {
+    if (found.has(id)) continue
+    delete next[id]
+    delete next[String(id)]
+  }
+  return next
+}
+
+export function pickerDraftIds(selectedIds, existingUsers, scopedIds) {
+  const byId = new Map()
+  for (const user of existingUsers || []) {
+    if (!user?.id) continue
+    byId.set(user.id, user)
+  }
+  return (selectedIds || []).filter((id) => {
+    const user = byId.get(id)
+    if (!user) return false
+    if (user.status === 'disabled') return true
+    if (!scopedIds) return true
+    return scopedIds.has(id)
+  })
+}
+
 export function memberDisplayName(id, names) {
   if (!id) return ''
   const name = names?.[id] ?? names?.[String(id)]
+  if(!!name == false) {
+    console.log('没有名字', id);
+    console.log(names);
+    
+    
+  }
   return name || DELETED_MEMBER_LABEL
 }

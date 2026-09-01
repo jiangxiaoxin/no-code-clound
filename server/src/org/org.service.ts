@@ -25,6 +25,7 @@ export type OrgUserItem = {
   displayName: string;
   departmentId: number | null;
   roleIds: number[];
+  status: 'active' | 'disabled';
 };
 
 export type OrgUserPage = {
@@ -157,11 +158,12 @@ export class OrgService {
     if (customScope && customScope.empty) {
       return [];
     }
+    const lookupByIds = uniquePositiveIds(query.ids).length > 0;
     const keyword = query.keyword?.trim().toLowerCase() || '';
     const roleId = query.roleId;
     const out: OrgUserItem[] = [];
     for (const user of users) {
-      if (user.status === 'disabled') continue;
+      if (!lookupByIds && user.status === 'disabled') continue;
       if (
         keyword &&
         !user.displayName.toLowerCase().includes(keyword) &&
@@ -190,6 +192,7 @@ export class OrgService {
         displayName: user.displayName,
         departmentId,
         roleIds,
+        status: user.status,
       });
     }
     return out;

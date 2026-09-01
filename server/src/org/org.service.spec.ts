@@ -74,7 +74,13 @@ describe('OrgService', () => {
     departmentRepo.find.mockResolvedValue([]);
     const users = await service.listUsers({});
     expect(users).toEqual([
-      { id: 1, displayName: '甲', departmentId: 10, roleIds: [7] },
+      {
+        id: 1,
+        displayName: '甲',
+        departmentId: 10,
+        roleIds: [7],
+        status: 'active',
+      },
     ]);
     expect(users[0]).not.toHaveProperty('password');
     expect(users[0]).not.toHaveProperty('email');
@@ -124,15 +130,35 @@ describe('OrgService', () => {
 
     await expect(service.listUsers({ page: 1, pageSize: 2 })).resolves.toEqual({
       items: [
-        { id: 1, displayName: '甲', departmentId: null, roleIds: [] },
-        { id: 2, displayName: '乙', departmentId: null, roleIds: [] },
+        {
+          id: 1,
+          displayName: '甲',
+          departmentId: null,
+          roleIds: [],
+          status: 'active',
+        },
+        {
+          id: 2,
+          displayName: '乙',
+          departmentId: null,
+          roleIds: [],
+          status: 'active',
+        },
       ],
       total: 3,
       page: 1,
       pageSize: 2,
     });
     await expect(service.listUsers({ page: 2, pageSize: 2 })).resolves.toEqual({
-      items: [{ id: 3, displayName: '丙', departmentId: null, roleIds: [] }],
+      items: [
+        {
+          id: 3,
+          displayName: '丙',
+          departmentId: null,
+          roleIds: [],
+          status: 'active',
+        },
+      ],
       total: 3,
       page: 2,
       pageSize: 2,
@@ -152,8 +178,27 @@ describe('OrgService', () => {
 
     const users = await service.listUsers({ ids: [3, 2, 1, 1] });
     expect(users).toEqual([
-      { id: 1, displayName: '甲', departmentId: null, roleIds: [] },
-      { id: 3, displayName: '丙', departmentId: null, roleIds: [] },
+      {
+        id: 1,
+        displayName: '甲',
+        departmentId: null,
+        roleIds: [],
+        status: 'active',
+      },
+      {
+        id: 2,
+        displayName: '乙',
+        departmentId: null,
+        roleIds: [],
+        status: 'disabled',
+      },
+      {
+        id: 3,
+        displayName: '丙',
+        departmentId: null,
+        roleIds: [],
+        status: 'active',
+      },
     ]);
   });
 
@@ -187,8 +232,20 @@ describe('OrgService', () => {
     });
     expect(union).toEqual({
       items: [
-        { id: 1, displayName: '张三', departmentId: 11, roleIds: [8] },
-        { id: 3, displayName: '王五', departmentId: 12, roleIds: [] },
+        {
+          id: 1,
+          displayName: '张三',
+          departmentId: 11,
+          roleIds: [8],
+          status: 'active',
+        },
+        {
+          id: 3,
+          displayName: '王五',
+          departmentId: 12,
+          roleIds: [],
+          status: 'active',
+        },
       ],
       total: 2,
       page: 1,

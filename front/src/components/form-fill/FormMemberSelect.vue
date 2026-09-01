@@ -33,7 +33,7 @@
       v-if="!preview"
       v-model="pickerVisible"
       title="选择人员"
-      width="720px"
+      width="840px"
       draggable
       destroy-on-close
       @open="onPickerOpen"
@@ -170,10 +170,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 import { listOrgDepartmentsApi, listOrgRolesApi, listOrgUsersApi } from '../../api/org'
 import {
+  dropMissingMemberNames,
   hasCustomMemberScope,
   memberDisplayName,
   memberValueIds,
   normalizeMemberScope,
+  pickerDraftIds,
   positiveIntIds,
   pruneMembersOutOfScope,
 } from '../form-design/memberField.js'
@@ -221,11 +223,20 @@ const emptyCustom = computed(
 )
 
 const orgNames = computed(() => {
+  console.log('calc orgNames========');
+  console.log(props.userNames);
+  console.log(extraUserNames.value);
+  console.log('visibleUsers', visibleUsers.value);
+  
+    
   const map = { ...props.userNames, ...extraUserNames.value }
   for (const user of visibleUsers.value) {
     map[user.id] = user.displayName
     map[String(user.id)] = user.displayName
   }
+
+  console.log('orgnames000000000000', map);
+  
   return map
 })
 
@@ -274,12 +285,15 @@ function deptFieldRootId() {
 }
 
 function rememberUserNames(users) {
+  // debugger
   const next = { ...extraUserNames.value }
   for (const user of users || []) {
     if (!user?.id) continue
     next[user.id] = user.displayName
     next[String(user.id)] = user.displayName
-  }
+  } 
+  console.log('rememberUserNames000', next);
+  
   extraUserNames.value = next
 }
 
@@ -350,7 +364,6 @@ function onPickerPageChange(page) {
 }
 
 function nameOf(id) {
-  debugger
   return memberDisplayName(id, orgNames.value)
 }
 
@@ -364,6 +377,8 @@ function findDeptNode(nodes, id) {
 }
 
 function onOpenPicker() {
+  console.log('--onOpenPicker');
+  
   if (props.disabled || props.preview) return
   pickerVisible.value = true
 }
@@ -373,6 +388,8 @@ function closePicker() {
 }
 
 function onPickUser(user) {
+  console.log('--onPickUser', user);
+  
   if (multiple.value) {
     onToggleUser(user.id)
     return
@@ -460,14 +477,18 @@ async function hydrateDraft() {
   }
   const named = usersFromResult(await listOrgUsersApi({ ids: ids.join(',') }))
   rememberUserNames(named)
+  extraUserNames.value = dropMissingMemberNames(
+    extraUserNames.value,
+    ids,
+    named.map((user) => user.id),
+  )
   const scope = normalizeMemberScope(props.field.memberScope)
   if (scope === 'dept_field' && !deptFieldRootId()) {
     draftIds.value = []
     return
   }
   if (scope === 'all') {
-    const allowed = new Set(named.map((user) => user.id))
-    draftIds.value = ids.filter((id) => allowed.has(id))
+    draftIds.value = pickerDraftIds(ids, named)
     return
   }
   const scoped = usersFromResult(
@@ -477,8 +498,11 @@ async function hydrateDraft() {
       ...customScopeParams(),
     }),
   )
-  const allowed = new Set(scoped.map((user) => user.id))
-  draftIds.value = ids.filter((id) => allowed.has(id))
+  draftIds.value = pickerDraftIds(
+    ids,
+    named,
+    new Set(scoped.map((user) => user.id)),
+  )
 }
 
 async function onPickerOpen() {
@@ -487,9 +511,8 @@ async function onPickerOpen() {
   selectedDeptId.value = null
   selectedRoleId.value = null
   pickerPage.value = 1
-  visibleUsers.value = []
   pickerTotal.value = 0
-  extraUserNames.value = {}
+  visibleUsers.value = []
   await loadOrg()
   await hydrateDraft()
 }
@@ -640,7 +663,7 @@ watch(
 }
 
 .member-picker-side {
-  width: 180px;
+  width: 220px;
   overflow: auto;
   border-right: 1px solid var(--el-border-color-lighter);
   padding: 8px;

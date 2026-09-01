@@ -133,7 +133,7 @@
    - 左侧切换：**部门** / **角色** / **人员**。按部门字段时不提供「角色」（避免和根部门交叉放大范围），只留部门树（以引用部门为根）和人员（该子树内按关键字搜）。
    - 中间：部门树 / 角色列表 / 搜索框（占位「按姓名 / 用户名搜索」）。**中间没有查询条件时一律不请求右侧人员**。
    - 右侧：人员列表。按当前中间条件分页查询，`pageSize` 固定 10。点部门节点带 `departmentId`（含下级）；点角色带 `roleId`；人员 Tab 必须先输入关键字（失焦或回车）才查，输入过程中不请求。
-3. 底部：取消、确定。单选点一行只改弹框内选中态，不关闭；点确定才写入并关弹框。多选勾选后确定，可重复打开继续改。取消不改控件上的人选。
+3. 底部：取消、确定。单选点一行只改弹框内选中态，不关闭；点确定才写入并关弹框。多选勾选后确定，可重复打开继续改。取消不改控件上的人选。再次打开时控件上已选姓名保持不变，不要先闪「已删除」；右侧名单清空。只有按 id 补姓名确认人不在库里，才改成「已删除」。已经选中后又停用的人：控件和弹框已选区仍显示现名，右侧不能新选；点确定不要把他们从已选里拿掉。
 
 部门树用现有部门父子关系。点部门节点，右侧列出该节点及其下级的候选人（在当前 `memberScope` 内）。点角色，右侧列出拥有该角色且落在范围内的启用用户。人员 Tab 不再默认列出范围内全部人。
 
@@ -155,7 +155,7 @@
 
 - `GET /api/org/departments`：启用部门树（id、name、parentId、children）
 - `GET /api/org/roles`：启用角色（id、name、code）
-- `GET /api/org/users`：启用用户（id、displayName、departmentId、roleIds），支持 `keyword`、`departmentId`（含下级）、`roleId`、`page` / `pageSize`（填报选人右侧固定 `pageSize=10`）。自定义范围另传 `memberScope=custom` 与 `scopeDepartmentIds` / `scopeRoleIds` / `scopeUserIds`（逗号分隔），与当前浏览条件取交集。`ids` 用于按主键补姓名，不走分页。
+- `GET /api/org/users`：浏览名单只含启用用户（id、displayName、departmentId、roleIds、status），支持 `keyword`、`departmentId`（含下级）、`roleId`、`page` / `pageSize`（填报选人右侧固定 `pageSize=10`）。自定义范围另传 `memberScope=custom` 与 `scopeDepartmentIds` / `scopeRoleIds` / `scopeUserIds`（逗号分隔），与当前浏览条件取交集。`ids` 用于按主键补姓名和回显已选，**含停用用户**，不走分页。
 
 前端选人弹框只打这些接口。不要在填报页复用管理端的增删改。
 

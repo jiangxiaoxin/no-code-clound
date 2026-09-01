@@ -4,9 +4,11 @@ import {
   candidateUsers,
   createDefaultMemberField,
   deptFieldsForMemberScope,
+  dropMissingMemberNames,
   isMemberField,
   memberValueIds,
   normalizeMemberScope,
+  pickerDraftIds,
   positiveIntIds,
   pruneMembersOutOfScope,
 } from './memberField.js'
@@ -123,4 +125,32 @@ test('pruneMembersOutOfScope clears single and filters multiple', () => {
     pruneMembersOutOfScope('member-multiple', [1, 3, 2], allowed),
     [1, 2],
   )
+})
+
+test('dropMissingMemberNames keeps found selected names and drops gone ones', () => {
+  const names = { 4: '姜 1', '4': '姜 1', 8: '乙', 9: '浏览过的人' }
+  const next = dropMissingMemberNames(names, [4, 8], [4])
+  assert.equal(next[4], '姜 1')
+  assert.equal(next['4'], '姜 1')
+  assert.equal(next[8], undefined)
+  assert.equal(next['8'], undefined)
+  assert.equal(next[9], '浏览过的人')
+})
+
+test('pickerDraftIds keeps disabled selected users and drops deleted', () => {
+  const users = [
+    { id: 1, displayName: '甲', status: 'active' },
+    { id: 2, displayName: '打老虎', status: 'disabled' },
+  ]
+  assert.deepEqual(pickerDraftIds([1, 2, 9], users), [1, 2])
+})
+
+test('pickerDraftIds keeps disabled selected users outside custom scope', () => {
+  const users = [
+    { id: 1, displayName: '甲', status: 'active' },
+    { id: 2, displayName: '打老虎', status: 'disabled' },
+    { id: 3, displayName: '乙', status: 'active' },
+  ]
+  const scoped = new Set([1])
+  assert.deepEqual(pickerDraftIds([1, 2, 3], users, scoped), [1, 2])
 })
