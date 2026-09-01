@@ -16,18 +16,22 @@ export const RECORD_ACTION_KEYS = [
   'downloadTemplate',
 ] as const;
 
+function actionFlag(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback;
+}
+
 export function normalizeRecordActions(raw: unknown): FormRecordActions {
   const src =
     raw && typeof raw === 'object' && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)
       : {};
   return {
-    create: src.create !== false,
-    edit: src.edit !== false,
-    delete: src.delete !== false,
-    import: src.import !== false,
-    export: src.export !== false,
-    downloadTemplate: src.downloadTemplate !== false,
+    create: actionFlag(src.create, true),
+    edit: actionFlag(src.edit, true),
+    delete: actionFlag(src.delete, true),
+    import: actionFlag(src.import, false),
+    export: actionFlag(src.export, false),
+    downloadTemplate: actionFlag(src.downloadTemplate, false),
   };
 }
 

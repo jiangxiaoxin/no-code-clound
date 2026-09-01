@@ -30,7 +30,7 @@
           <template #header>
             <div class="publish-card-title">数据管理按钮</div>
           </template>
-          <p class="publish-desc">默认全部开启，关闭后数据管理页不显示对应按钮。导出暂未开放。</p>
+          <p class="publish-desc">新增、编辑、删除默认开启；导入、导出、下载导入模版默认关闭。关闭后数据管理页不显示对应按钮。导出暂未开放。</p>
           <div class="action-list">
             <el-checkbox v-model="actions.create">新增</el-checkbox>
             <el-checkbox v-model="actions.edit">编辑</el-checkbox>

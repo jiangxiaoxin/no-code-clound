@@ -7,11 +7,20 @@ export const RECORD_ACTION_KEYS = [
   'downloadTemplate',
 ]
 
+const RECORD_ACTION_DEFAULTS = {
+  create: true,
+  edit: true,
+  delete: true,
+  import: false,
+  export: false,
+  downloadTemplate: false,
+}
+
 export function normalizeRecordActions(raw) {
   const src = raw && typeof raw === 'object' ? raw : {}
   const next = {}
   for (const key of RECORD_ACTION_KEYS) {
-    next[key] = src[key] !== false
+    next[key] = typeof src[key] === 'boolean' ? src[key] : RECORD_ACTION_DEFAULTS[key]
   }
   return next
 }
