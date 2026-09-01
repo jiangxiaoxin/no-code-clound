@@ -64,6 +64,7 @@ import FormFillField from './FormFillField.vue'
 import { emptyValue } from './fillValues'
 import {
   applyLinkageResult,
+  applyPendingValueWrites,
   linkageConditionsReady,
   linkageManyMessage,
   linkageQueryPaging,
@@ -274,6 +275,7 @@ async function loadSubformLinkages() {
   const fields = flatFields.value.filter(isSubformLinkageField)
   const writeValues = shouldWriteLinkageValues()
   const nextKeys = {}
+  const writes = []
   await Promise.all(
     fields.map(async (field) => {
       const key = `${linkageFieldLoadKey(field)}:${field.linkage?.sourceSubformKey}`
@@ -285,7 +287,7 @@ async function loadSubformLinkages() {
         return
       }
       if (!linkageConditionsReady(field.linkage, props.values)) {
-        props.values[field.key] = []
+        writes.push({ key: field.key, value: [] })
         return
       }
       try {
@@ -307,12 +309,15 @@ async function loadSubformLinkages() {
             ? result.total
             : result?.items?.length || 0
         if (total <= 0) {
-          props.values[field.key] = []
+          writes.push({ key: field.key, value: [] })
           return
         }
         if (total > 1) {
-          props.values[field.key] = []
-          ElMessage.warning(linkageManyMessage(field))
+          writes.push({
+            key: field.key,
+            value: [],
+            message: linkageManyMessage(field),
+          })
           return
         }
         const sourceRows = result?.items?.[0]?.data?.[field.linkage.sourceSubformKey]
@@ -321,17 +326,27 @@ async function loadSubformLinkages() {
           mappings: field.linkage.fieldMappings,
           targetFields: field.fields,
         })
-        if (Array.isArray(sourceRows) && sourceRows.length > 200) {
-          ElMessage.warning('子表单最多 200 行')
-        }
-        props.values[field.key] = mapped
+        writes.push({
+          key: field.key,
+          value: mapped,
+          message:
+            Array.isArray(sourceRows) && sourceRows.length > 200
+              ? '子表单最多 200 行'
+              : '',
+        })
       } catch {
-        props.values[field.key] = []
+        writes.push({ key: field.key, value: [] })
       }
     }),
   )
-  if (seq === subformSeq) {
-    lastSubformKeys = nextKeys
+  if (!applyPendingValueWrites(props.values, writes, seq, subformSeq)) {
+    return
+  }
+  lastSubformKeys = nextKeys
+  for (const item of writes) {
+    if (item.message) {
+      ElMessage.warning(item.message)
+    }
   }
 }
 
@@ -339,14 +354,16 @@ function shouldWriteLinkageValues() {
   return !props.disabled && (!props.updating || linkagePrimed)
 }
 
-function applyNotReady(field, writeValues) {
+function applyNotReady(field) {
   if (isSelectType(field.type)) {
     return []
   }
-  if (writeValues && canWriteLinkageValue(field)) {
-    props.values[field.key] = emptyValue(field)
-  }
   return null
+}
+
+function pendingEmptyWrite(field, writeValues) {
+  if (!writeValues || !canWriteLinkageValue(field)) return null
+  return { key: field.key, value: emptyValue(field) }
 }
 
 async function loadTableItems() {
@@ -404,6 +421,7 @@ async function loadLinkage() {
   const writeValues = shouldWriteLinkageValues()
   const next = { ...linkageItemsByKey.value }
   const nextKeys = {}
+  const writes = []
   for (const key of Object.keys(next)) {
     if (!fields.some((field) => field.key === key)) {
       delete next[key]
@@ -417,8 +435,10 @@ async function loadLinkage() {
         return
       }
       if (!linkageConditionsReady(field.linkage, props.values)) {
-        const items = applyNotReady(field, writeValues)
+        const items = applyNotReady(field)
         if (items) next[field.key] = items
+        const emptyWrite = pendingEmptyWrite(field, writeValues)
+        if (emptyWrite) writes.push(emptyWrite)
         return
       }
       try {
@@ -448,21 +468,31 @@ async function loadLinkage() {
           next[field.key] = applied.items
         }
         if (writeValues && canWriteLinkageValue(field)) {
-          props.values[field.key] = applied.value
-          if (applied.message) {
-            ElMessage.warning(applied.message)
-          }
+          writes.push({
+            key: field.key,
+            value: applied.value,
+            message: applied.message || '',
+          })
         }
       } catch {
-        const items = applyNotReady(field, writeValues)
+        const items = applyNotReady(field)
         if (items) next[field.key] = items
+        const emptyWrite = pendingEmptyWrite(field, writeValues)
+        if (emptyWrite) writes.push(emptyWrite)
       }
     }),
   )
-  if (seq === linkageSeq) {
-    lastLinkageKeys = nextKeys
-    linkageItemsByKey.value = next
-    linkagePrimed = true
+  if (seq !== linkageSeq) {
+    return
+  }
+  lastLinkageKeys = nextKeys
+  linkageItemsByKey.value = next
+  linkagePrimed = true
+  applyPendingValueWrites(props.values, writes, seq, linkageSeq)
+  for (const item of writes) {
+    if (item.message) {
+      ElMessage.warning(item.message)
+    }
   }
 }
 

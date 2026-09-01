@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   applyLinkageResult,
+  applyPendingValueWrites,
   linkageConditionsReady,
   linkageFileOverflowMessage,
   linkageImageOverflowMessage,
@@ -353,4 +354,32 @@ test('address condition is not ready when path is empty', () => {
     ),
     false,
   )
+})
+
+test('applyPendingValueWrites ignores stale seq so an older query cannot overwrite', () => {
+  const values = { lines: [{ name: 'B' }], title: '新' }
+  const applied = applyPendingValueWrites(
+    values,
+    [
+      { key: 'lines', value: [{ name: 'A' }] },
+      { key: 'title', value: '旧' },
+    ],
+    1,
+    2,
+  )
+  assert.equal(applied, false)
+  assert.deepEqual(values.lines, [{ name: 'B' }])
+  assert.equal(values.title, '新')
+})
+
+test('applyPendingValueWrites applies current seq', () => {
+  const values = { lines: [] }
+  const applied = applyPendingValueWrites(
+    values,
+    [{ key: 'lines', value: [{ name: 'B' }] }],
+    2,
+    2,
+  )
+  assert.equal(applied, true)
+  assert.deepEqual(values.lines, [{ name: 'B' }])
 })

@@ -94,6 +94,16 @@ function collectImageUrls(items, sourceKey) {
   return urls
 }
 
+export function applyPendingValueWrites(values, writes, seq, currentSeq) {
+  if (seq !== currentSeq) return false
+  if (!values || typeof values !== 'object') return true
+  for (const item of writes || []) {
+    if (!item?.key) continue
+    values[item.key] = item.value
+  }
+  return true
+}
+
 export function applyLinkageResult(field, result, currentValue, extra = {}) {
   const sourceKey = field?.linkage?.sourceKey
   const items = result?.items || []

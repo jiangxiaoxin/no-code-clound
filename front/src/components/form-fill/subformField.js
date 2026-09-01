@@ -405,3 +405,31 @@ export function applyRowLinkages({
   void parentValues
   return next
 }
+
+export function applyCellWrites(rows, writes) {
+  if (!Array.isArray(rows) || !writes?.length) {
+    return rows
+  }
+  const byUid = new Map()
+  for (const write of writes) {
+    if (write?.uid == null || !write.key) {
+      continue
+    }
+    let bag = byUid.get(write.uid)
+    if (!bag) {
+      bag = {}
+      byUid.set(write.uid, bag)
+    }
+    bag[write.key] = write.value
+  }
+  if (!byUid.size) {
+    return rows
+  }
+  return rows.map((row) => {
+    const bag = byUid.get(row.__uid)
+    if (!bag) {
+      return row
+    }
+    return { ...row, ...bag }
+  })
+}
