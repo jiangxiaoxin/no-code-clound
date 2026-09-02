@@ -10,7 +10,7 @@
         size="small"
         class="subform-table"
         :row-key="rowKey"
-        :fit="false"
+        :fit="true"
         @header-dragend="onHeaderDragend"
       >
         <el-table-column
@@ -612,6 +612,14 @@ onUnmounted(() => {
   margin-top: 8px;
   align-self: flex-start;
 }
+
+// .subform-table {
+//   border-bottom: 1px solid var(--el-table-border-color);
+// }
+
+// .subform-table :deep(.el-table__inner-wrapper::before) {
+//   display: none;
+// }
 
 .subform-cell.is-subform-image :deep(.el-upload--picture-card) {
   width: 64px;

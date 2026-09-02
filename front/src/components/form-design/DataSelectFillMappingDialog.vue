@@ -112,9 +112,9 @@ function confirm() {
   gap: 4px;
 }
 
-.mapping-row + .mapping-row {
-  border-top: 1px solid var(--el-border-color-lighter);
-}
+// .mapping-row + .mapping-row {
+//   border-top: 1px solid var(--el-border-color-lighter);
+// }
 
 .mapping-select {
   width: 160px;
