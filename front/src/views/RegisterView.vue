@@ -5,7 +5,7 @@
     </el-col>
     <el-col :xs="24" :md="10" class="auth-panel">
       <div class="auth-card">
-        <el-text class="auth-kicker" tag="p">No-Code Cloud</el-text>
+        <el-text class="auth-kicker" tag="p">简简单单搞个低代码</el-text>
         <el-text class="auth-title" tag="h1">注册</el-text>
         <el-form
           ref="formRef"

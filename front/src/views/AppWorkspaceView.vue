@@ -141,6 +141,7 @@ import {
   renameGroupApi,
 } from '../api/apps'
 import AppWorkspaceMain from '../components/AppWorkspaceMain.vue'
+import { useDocumentTitle } from '../utils/documentTitle.js'
 
 const route = useRoute()
 const router = useRouter()
@@ -165,6 +166,7 @@ const nameRules = {
 }
 
 const appId = computed(() => Number(route.params.id))
+useDocumentTitle(() => app.value?.name)
 const formId = computed(() => {
   const n = Number(route.params.formId)
   return Number.isInteger(n) && n > 0 ? n : null

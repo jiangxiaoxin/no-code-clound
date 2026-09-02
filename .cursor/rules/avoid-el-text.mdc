@@ -12,12 +12,12 @@ alwaysApply: false
 
 ```vue
 <!-- ❌ BAD -->
-<el-text size="large" tag="b">No-Code Cloud</el-text>
+<el-text size="large" tag="b">简简单单搞个低代码</el-text>
 <el-text type="info">{{ userStore.user?.username }}</el-text>
 <el-text truncated>{{ name }}</el-text>
 
 <!-- ✅ GOOD -->
-<b class="app-title">No-Code Cloud</b>
+<b class="app-title">简简单单搞个低代码</b>
 <span class="username">{{ userStore.user?.username }}</span>
 <span class="name">{{ name }}</span>
 ```

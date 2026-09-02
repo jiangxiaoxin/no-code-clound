@@ -32,10 +32,12 @@ import { computed, ref, watch } from 'vue'
 import { RouterView, useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, CollectionTag } from '@element-plus/icons-vue'
 import { getAppApi } from '../api/apps'
+import { useDocumentTitle } from '../utils/documentTitle.js'
 
 const route = useRoute()
 const router = useRouter()
 const appName = ref('')
+useDocumentTitle(appName)
 const appId = computed(() => Number(route.params.id))
 const activeMenu = computed(() => route.path)
 

@@ -63,11 +63,13 @@ import { getFormApi } from '../api/apps'
 import FormDesignPanel from '../components/FormDesignPanel.vue'
 import FormPublishPanel from '../components/FormPublishPanel.vue'
 import FormRecordManage from '../components/form-workspace/FormRecordManage.vue'
+import { useDocumentTitle } from '../utils/documentTitle.js'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
 const form = ref(null)
+useDocumentTitle(() => form.value?.name)
 
 const appId = computed(() => Number(route.params.id))
 const formId = computed(() => Number(route.params.formId))

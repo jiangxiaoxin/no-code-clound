@@ -1,6 +1,6 @@
 <template>
   <el-header class="app-header">
-    <b class="app-title">No-Code Cloud</b>
+    <b class="app-title">简简单单搞个低代码</b>
     <el-dropdown
       trigger="hover"
       placement="bottom-end"
