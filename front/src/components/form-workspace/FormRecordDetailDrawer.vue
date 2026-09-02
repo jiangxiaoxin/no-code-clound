@@ -19,6 +19,16 @@
         :updating="true"
         :user-names="record?.userNames || {}"
       />
+      <div v-if="!editing" class="record-audit">
+        <div class="record-audit-row">
+          <span>创建人：{{ createdByLabel }}</span>
+          <span>创建时间：{{ createdAtLabel }}</span>
+        </div>
+        <div class="record-audit-row">
+          <span>更新人：{{ updatedByLabel }}</span>
+          <span>更新时间：{{ updatedAtLabel }}</span>
+        </div>
+      </div>
     </div>
     <template #footer>
       <div class="record-detail-footer">
@@ -42,11 +52,12 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { updateFormRecordApi } from '../../api/apps'
 import FormFillGrid from '../form-fill/FormFillGrid.vue'
 import { cloneRecordValues, firstRequiredError, buildRecordData } from '../form-fill/fillValues.js'
+import { formatDateTime } from '../../utils/timeValue.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -66,6 +77,11 @@ const saving = ref(false)
 const detailValues = reactive({})
 const snapshot = ref({})
 const gridRef = ref(null)
+
+const createdByLabel = computed(() => props.record?.createdByName || '')
+const updatedByLabel = computed(() => props.record?.updatedByName || '')
+const createdAtLabel = computed(() => formatDateTime(props.record?.createdAt))
+const updatedAtLabel = computed(() => formatDateTime(props.record?.updatedAt))
 
 function applyValues(data) {
   for (const key of Object.keys(detailValues)) {
@@ -143,6 +159,24 @@ watch(
 
 <style scoped lang="less">
 @import '../form-fill/fillLayout.less';
+
+.record-audit {
+  display: flex;
+  flex-direction: column;
+  margin-top: 32px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  background-color: var(--el-disabled-bg-color);
+  padding: 6px;
+  border-radius: 6px;
+}
+
+.record-audit-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+}
 
 .record-detail-footer {
   display: flex;
