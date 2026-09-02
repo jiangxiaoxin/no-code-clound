@@ -22,7 +22,7 @@
         </div>
       </div>
       <el-dialog v-if="!preview" v-model="pickerVisible" title="选择数据" width="800px" align-center draggable
-        destroy-on-close @open="onPickerOpen">
+        destroy-on-close @open="onPickerOpen" :append-to-body="true">
         <div class="data-select-toolbar">
           <el-input v-model="keyword" clearable placeholder="快捷搜索" @clear="onSearchNow" @keyup.enter="onSearchNow"
             size="small">
