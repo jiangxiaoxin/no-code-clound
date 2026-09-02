@@ -468,22 +468,7 @@ export class FormRecordService {
       if (Number.isFinite(doc.createdBy)) ids.add(doc.createdBy);
       const updatedBy = doc.updatedBy ?? doc.createdBy;
       if (Number.isFinite(updatedBy)) ids.add(updatedBy);
-      const data = doc.data ?? {};
-      for (const field of flattenFields(fields ?? [])) {
-        if (field.type === 'member') {
-          const value = data[field.key];
-          if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
-            ids.add(value);
-          }
-        }
-        if (field.type === 'member-multiple' && Array.isArray(data[field.key])) {
-          for (const item of data[field.key] as unknown[]) {
-            if (typeof item === 'number' && Number.isInteger(item) && item > 0) {
-              ids.add(item);
-            }
-          }
-        }
-      }
+      collectMemberIds(fields ?? [], doc.data ?? {}, ids);
     }
     const names = new Map<number, string>();
     if (!ids.size) return names;
@@ -526,6 +511,41 @@ export class FormRecordService {
   }
 }
 
+function collectMemberIds(
+  fields: FormField[],
+  data: Record<string, unknown>,
+  ids: Set<number>,
+) {
+  for (const field of flattenFields(fields)) {
+    if (field.type === 'subform') {
+      const rows = Array.isArray(data[field.key]) ? data[field.key] : [];
+      for (const row of rows) {
+        if (row && typeof row === 'object') {
+          collectMemberIds(
+            field.fields || [],
+            row as Record<string, unknown>,
+            ids,
+          );
+        }
+      }
+      continue;
+    }
+    if (field.type === 'member') {
+      const value = data[field.key];
+      if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+        ids.add(value);
+      }
+    }
+    if (field.type === 'member-multiple' && Array.isArray(data[field.key])) {
+      for (const item of data[field.key] as unknown[]) {
+        if (typeof item === 'number' && Number.isInteger(item) && item > 0) {
+          ids.add(item);
+        }
+      }
+    }
+  }
+}
+
 function uniqueChildComparableValue(
   field: FormField,
   value: unknown,
@@ -557,9 +577,14 @@ function isSubformChildEmpty(field: FormField, value: unknown): boolean {
     field.type === 'checkbox' ||
     field.type === 'select-multiple' ||
     field.type === 'image' ||
-    field.type === 'file'
+    field.type === 'file' ||
+    field.type === 'member-multiple' ||
+    field.type === 'dept-multiple'
   ) {
     return !Array.isArray(value) || value.length === 0;
+  }
+  if (field.type === 'member' || field.type === 'dept') {
+    return typeof value !== 'number' || !Number.isInteger(value) || value <= 0;
   }
   if (field.type === 'address') {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {

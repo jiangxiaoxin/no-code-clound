@@ -61,6 +61,28 @@ test('deptFieldsForMemberScope only type dept after flatten', () => {
   )
 })
 
+test('deptFieldsForMemberScope includes sibling dept in same subform', () => {
+  const fields = [
+    { key: 'd1', type: 'dept', title: '主表部门' },
+    {
+      key: 'sf',
+      type: 'subform',
+      fields: [
+        { key: 'd3', type: 'dept', title: '行部门' },
+        { key: 'm2', type: 'member', title: '行人员' },
+      ],
+    },
+  ]
+  assert.deepEqual(
+    deptFieldsForMemberScope(fields, 'm2').map((item) => item.key),
+    ['d1', 'd3'],
+  )
+  assert.deepEqual(
+    deptFieldsForMemberScope(fields, 'm1').map((item) => item.key),
+    ['d1'],
+  )
+})
+
 test('candidateUsers all / custom union / empty custom / dept_field', () => {
   const users = [
     { id: 1, displayName: '甲', departmentId: 10, roleIds: [100], status: 'active' },

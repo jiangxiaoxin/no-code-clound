@@ -19,13 +19,17 @@ import {
   memberDisplayName,
   memberValueIds,
 } from '../form-design/memberField.js'
+import {
+  deptDisplayName,
+  deptValueIds,
+  isDeptField,
+} from '../form-design/deptField.js'
 
 const SKIP_TYPES = new Set([
   'divider',
   'currentUser',
   'currentUserDept',
   'subform',
-  'dept',
   'data',
   'relate',
   'tabs',
@@ -57,7 +61,8 @@ export function emptyValue(field) {
     field.type === 'select-multiple' ||
     field.type === 'image' ||
     field.type === 'file' ||
-    field.type === 'member-multiple'
+    field.type === 'member-multiple' ||
+    field.type === 'dept-multiple'
   ) {
     return []
   }
@@ -156,8 +161,11 @@ export function isEmptyValue(field, value) {
   if (field.type === 'member') {
     return typeof value !== 'number' || !Number.isInteger(value) || value <= 0
   }
-  if (field.type === 'member-multiple') {
+  if (field.type === 'member-multiple' || field.type === 'dept-multiple') {
     return !Array.isArray(value) || value.length === 0
+  }
+  if (field.type === 'dept') {
+    return typeof value !== 'number' || !Number.isInteger(value) || value <= 0
   }
   return value == null || value === ''
 }
@@ -183,6 +191,11 @@ export function serializeValue(field, value) {
     const ids = memberValueIds(field.type, value)
     if (!ids.length) return undefined
     return field.type === 'member-multiple' ? ids : ids[0]
+  }
+  if (isDeptField(field)) {
+    const ids = deptValueIds(field.type, value)
+    if (!ids.length) return undefined
+    return field.type === 'dept-multiple' ? ids : ids[0]
   }
   if (field.type === 'image') {
     const urls = imageUrlsOf(value)
@@ -314,13 +327,21 @@ export function valuesEqual(field, a, b) {
   )
 }
 
-function formatSubformCellValue(field, value, dictItemsByCode) {
+function formatSubformCellValue(field, value, dictItemsByCode, userNames, deptNames) {
   const rows = stripEmptySubformRows(field.fields, value)
   if (!rows.length) return ''
   return rows
     .map((row) =>
       (field.fields || [])
-        .map((child) => formatCellValue(child, row[child.key], dictItemsByCode))
+        .map((child) =>
+          formatCellValue(
+            child,
+            row[child.key],
+            dictItemsByCode,
+            userNames,
+            deptNames,
+          ),
+        )
         .filter(Boolean)
         .join(' / '),
     )
@@ -328,13 +349,23 @@ function formatSubformCellValue(field, value, dictItemsByCode) {
     .join('；')
 }
 
-export function formatCellValue(field, value, dictItemsByCode, userNames) {
+export function formatCellValue(field, value, dictItemsByCode, userNames, deptNames) {
   if (field?.type === 'subform') {
-    return formatSubformCellValue(field, value, dictItemsByCode)
+    return formatSubformCellValue(
+      field,
+      value,
+      dictItemsByCode,
+      userNames,
+      deptNames,
+    )
   }
   if (isMemberField(field)) {
     const ids = memberValueIds(field.type, value)
     return ids.map((id) => memberDisplayName(id, userNames)).join('、')
+  }
+  if (isDeptField(field)) {
+    const ids = deptValueIds(field.type, value)
+    return ids.map((id) => deptDisplayName(id, deptNames)).join('、')
   }
   if (value == null || value === '') return ''
   /**

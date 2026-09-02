@@ -24,6 +24,7 @@
                 :form-fields="flatFields"
                 :dict-items-by-code="dictItemsByCode"
                 :user-names="fillUserNames"
+                :dept-names="fillDeptNames"
                 @fill="onFill"
               />
             </div>
@@ -43,6 +44,7 @@
         :form-fields="flatFields"
         :dict-items-by-code="dictItemsByCode"
         :user-names="fillUserNames"
+        :dept-names="fillDeptNames"
         @fill="onFill"
       />
     </template>
@@ -53,6 +55,8 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { queryFormRecordsApi } from '../../api/apps'
+import { listOrgDepartmentsApi } from '../../api/org'
+import { flattenDeptNames, isDeptField } from '../form-design/deptField.js'
 import { fillInfluencerTips } from '../form-design/dataSelect'
 import { isSelectType } from '../form-design/fieldTypes'
 import { hasLinkage, hasSubformLinkage } from '../form-design/linkage'
@@ -71,7 +75,7 @@ import {
   linkageManyMessage,
   linkageQueryPaging,
 } from './linkageRuntime'
-import { mapSourceSubformRows } from './subformField.js'
+import { mapSourceSubformRows, walkFormFields } from './subformField.js'
 import { addressFormatOf, regionJsonForFormat } from './addressField.js'
 import { buildSourceQuery, recordsToSelectItems } from './tableOptions'
 
@@ -83,6 +87,7 @@ const props = defineProps({
   disabled: { type: Boolean, default: false },
   updating: { type: Boolean, default: false },
   userNames: { type: Object, default: () => ({}) },
+  deptNames: { type: Object, default: () => ({}) },
 })
 
 const linkageUserNames = ref({})
@@ -90,6 +95,37 @@ const fillUserNames = computed(() => ({
   ...props.userNames,
   ...linkageUserNames.value,
 }))
+const localDeptNames = ref({})
+const fillDeptNames = computed(() => ({
+  ...localDeptNames.value,
+  ...props.deptNames,
+}))
+
+function formHasDeptField(fields) {
+  let found = false
+  walkFormFields(fields, (field) => {
+    if (isDeptField(field)) found = true
+  })
+  return found
+}
+
+async function loadDeptNames() {
+  if (!formHasDeptField(props.fields)) return
+  try {
+    const tree = await listOrgDepartmentsApi()
+    localDeptNames.value = flattenDeptNames(tree)
+  } catch {
+    localDeptNames.value = {}
+  }
+}
+
+watch(
+  () => props.fields,
+  () => {
+    loadDeptNames()
+  },
+  { immediate: true },
+)
 
 const fillTips = computed(() => fillInfluencerTips(props.fields))
 const flatFields = computed(() => flattenFields(props.fields))

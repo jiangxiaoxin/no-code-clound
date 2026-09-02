@@ -26,8 +26,8 @@
 
 | 编号 | 步骤 | 期望 | 结果 |
 |---|---|---|---|
-| D-01 | 往子表拖入：单行文本 `input`、多行文本 `textarea`、数字 `number`、日期选择 `date`、时间选择 `time`、日期时间 `datetime`、单选框 `radio`、复选框 `checkbox`、下拉单选框 `select`、下拉多选框 `select-multiple`、地址选择 `address`、图片上传 `image`、文件上传 `file`、选择数据 `data` | 都能成为一列；画布表头出现对应标题 | |
-| D-02 | 往子表拖入：子表单 `subform`、关联子表单 `relate-subform`、分割线 `divider`、标签页 `tabs`、登录人姓名 `currentUser`、登录人部门 `currentUserDept`、人员单选 `member`、人员多选 `member-multiple`、部门选择 `dept`、流水号生成 `serialNumber`、关联数据 `relate` | 不插入；提示「该字段暂不支持添加到子表单」 | |
+| D-01 | 往子表拖入：单行文本 `input`、多行文本 `textarea`、数字 `number`、日期选择 `date`、时间选择 `time`、日期时间 `datetime`、单选框 `radio`、复选框 `checkbox`、下拉单选框 `select`、下拉多选框 `select-multiple`、地址选择 `address`、图片上传 `image`、文件上传 `file`、选择数据 `data`、人员单选 `member`、人员多选 `member-multiple`、部门单选 `dept`、部门多选 `dept-multiple` | 都能成为一列；画布表头出现对应标题 | |
+| D-02 | 往子表拖入：子表单 `subform`、关联子表单 `relate-subform`、分割线 `divider`、标签页 `tabs`、登录人姓名 `currentUser`、登录人部门 `currentUserDept`、流水号生成 `serialNumber`、关联数据 `relate` | 不插入；提示「该字段暂不支持添加到子表单」 | |
 | D-03 | 属性里点「添加子字段」，选单行文本 `input` | 追加一列，与拖入效果相同 | |
 | D-04 | 把字段拖到子表外面的空白画布 | 加到主表，不是子表列 | |
 | D-05 | 尝试把已有主表字段拖进子表，或把子列拖出变主表 | 不能换层级；子列只能在本子表内上移/下移 | |
@@ -91,7 +91,7 @@
 
 | 编号 | 步骤 | 期望 | 结果 |
 |---|---|---|---|
-| F-20 | 单行文本 `input`、数字 `number`、日期选择 `date` / 时间选择 `time` / 日期时间 `datetime`、单选框 `radio` / 复选框 `checkbox`、下拉单选框 `select` / 下拉多选框 `select-multiple`、地址选择 `address` | 与主表同类控件相同，能改、能清 | |
+| F-20 | 单行文本 `input`、数字 `number`、日期选择 `date` / 时间选择 `time` / 日期时间 `datetime`、单选框 `radio` / 复选框 `checkbox`、下拉单选框 `select` / 下拉多选框 `select-multiple`、地址选择 `address`、人员单选 `member` / 人员多选 `member-multiple`、部门单选 `dept` / 部门多选 `dept-multiple` | 与主表同类控件相同，能改、能清 | |
 | F-21 | 数字 `number` 填 0 | 算有值，保存后仍是 0 | |
 | F-22 | 多行文本 `textarea` 很少字 | 行高接近一行 | |
 | F-23 | 多行文本 `textarea` 很多字 | 撑高；到大约 8 行高后格子内部滚动 | |

@@ -19,6 +19,7 @@ export const IMPORT_SKIP_TYPES = new Set([
   'member',
   'member-multiple',
   'dept',
+  'dept-multiple',
   'data',
   'relate',
   'serialNumber',

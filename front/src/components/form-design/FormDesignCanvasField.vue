@@ -144,8 +144,14 @@
       :field="field"
       preview
     />
+    <FormDeptSelect
+      v-else-if="field.type === 'dept' || field.type === 'dept-multiple'"
+      class="canvas-item"
+      :field="field"
+      preview
+    />
     <el-select
-      v-else-if="field.type === 'dept' || field.type === 'relate'"
+      v-else-if="field.type === 'relate'"
       disabled
       class="canvas-item"
       :placeholder="field.placeholder"
@@ -334,6 +340,7 @@ import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import FormFileUpload from '../form-fill/FormFileUpload.vue'
 import FormAddressSelect from '../form-fill/FormAddressSelect.vue'
 import FormMemberSelect from '../form-fill/FormMemberSelect.vue'
+import FormDeptSelect from '../form-fill/FormDeptSelect.vue'
 import CurrentUserName from '../form-fill/CurrentUserName.vue'
 import CurrentUserDept from '../form-fill/CurrentUserDept.vue'
 

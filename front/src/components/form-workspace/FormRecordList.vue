@@ -107,6 +107,7 @@
                 :fields="tableFields"
                 :dict-items-by-code="dictItemsByCode"
                 :user-names="userNames"
+                :dept-names="deptNames"
                 :editing="editingCell === cellKey(row.id, col.key)"
                 @start="editingCell = cellKey(row.id, col.key)"
                 @close="onCellClose(row.id, col.key)"
@@ -144,6 +145,9 @@ import { computed, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { deleteFormRecordApi, downloadRecordImportTemplateApi, queryFormRecordsApi } from '../../api/apps'
+import { listOrgDepartmentsApi } from '../../api/org'
+import { flattenDeptNames, isDeptField } from '../form-design/deptField.js'
+import { walkFormFields } from '../form-fill/subformField.js'
 import { flattenFields } from '../form-design/tabsField.js'
 import { isFillable, isListColumn } from '../form-fill/fillValues.js'
 import { formatDateTime } from '../../utils/timeValue.js'
@@ -187,6 +191,7 @@ const total = ref(0)
 const editingCell = ref('')
 const importVisible = ref(false)
 const userNames = ref({})
+const deptNames = ref({})
 // 切换表单时作废进行中的请求，避免把上一张表的记录写进来
 const loadSession = ref(0)
 const actions = computed(() => normalizeRecordActions(props.recordActions))
@@ -397,6 +402,27 @@ function upsertRecord(updated) {
   }
 }
 
+function formHasDeptField(fields) {
+  let found = false
+  walkFormFields(fields, (field) => {
+    if (isDeptField(field)) found = true
+  })
+  return found
+}
+
+async function loadDeptNames() {
+  if (!formHasDeptField(props.fields)) {
+    deptNames.value = {}
+    return
+  }
+  try {
+    const tree = await listOrgDepartmentsApi()
+    deptNames.value = flattenDeptNames(tree)
+  } catch {
+    deptNames.value = {}
+  }
+}
+
 watch(
   () => [props.appId, props.form?.id],
   () => {
@@ -409,6 +435,14 @@ watch(
     searchKeyword.value = ''
     searchFieldKeys.value = null
     loadRecords()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.fields,
+  () => {
+    loadDeptNames()
   },
   { immediate: true },
 )

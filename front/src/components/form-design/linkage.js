@@ -17,6 +17,8 @@ export const LINKAGE_VALUE_TYPES = [
   'address',
   'member',
   'member-multiple',
+  'dept',
+  'dept-multiple',
 ]
 
 export function hasLinkageSource(type) {

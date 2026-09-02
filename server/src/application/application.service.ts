@@ -40,6 +40,8 @@ const OPTION_FIELD_TYPES = new Set([
   'serialNumber',
   'member',
   'member-multiple',
+  'dept',
+  'dept-multiple',
 ]);
 
 const ICON_COLORS = [

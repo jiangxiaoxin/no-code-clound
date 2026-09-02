@@ -1,4 +1,5 @@
 import { flattenFields } from './tabsField.js'
+import { findParentSubform } from '../form-fill/subformField.js'
 
 export const MEMBER_SCOPES = ['all', 'custom', 'dept_field']
 export const DELETED_MEMBER_LABEL = '已删除'
@@ -45,8 +46,17 @@ export function memberValueIds(type, value) {
   return []
 }
 
-export function deptFieldsForMemberScope(fields) {
-  return flattenFields(fields).filter((field) => field?.type === 'dept' && field.key)
+export function deptFieldsForMemberScope(fields, currentKey) {
+  const fromForm = flattenFields(fields).filter(
+    (field) => field?.type === 'dept' && field.key,
+  )
+  const parent = findParentSubform(fields, currentKey)
+  if (!parent) return fromForm
+  const siblings = (parent.fields || []).filter(
+    (field) => field?.type === 'dept' && field.key,
+  )
+  const seen = new Set(fromForm.map((field) => field.key))
+  return [...fromForm, ...siblings.filter((field) => !seen.has(field.key))]
 }
 
 export function hasCustomMemberScope(field) {

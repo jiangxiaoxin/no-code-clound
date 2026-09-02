@@ -233,7 +233,7 @@
           <el-select
             v-model="field.sourceDeptFieldKey"
             clearable
-            :placeholder="deptFieldOptions.length ? '请选择' : '请先添加部门选择字段'"
+            :placeholder="deptFieldOptions.length ? '请选择' : '请先添加部门单选字段'"
           >
             <el-option
               v-for="item in deptFieldOptions"
@@ -1302,7 +1302,7 @@ const isSerialField = computed(() => props.field?.type === 'serialNumber')
 const isMemberFieldType = computed(() => isMemberField(props.field))
 const hasCustomScope = computed(() => hasCustomMemberScope(props.field))
 const deptFieldOptions = computed(() =>
-  deptFieldsForMemberScope(props.fields).filter(
+  deptFieldsForMemberScope(props.fields, props.field?.key).filter(
     (item) => item.key !== props.field?.key,
   ),
 )

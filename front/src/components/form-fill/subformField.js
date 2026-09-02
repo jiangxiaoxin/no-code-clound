@@ -60,6 +60,10 @@ export const SUBFORM_CHILD_TYPES = [
   'image',
   'file',
   'data',
+  'member',
+  'member-multiple',
+  'dept',
+  'dept-multiple',
 ]
 
 const CHILD_TYPE_SET = new Set(SUBFORM_CHILD_TYPES)
@@ -123,6 +127,15 @@ export function isSubformCellEmpty(field, value) {
   if (field.type === 'checkbox' || field.type === 'select-multiple') {
     return !Array.isArray(value) || value.length === 0
   }
+  if (
+    field.type === 'member-multiple' ||
+    field.type === 'dept-multiple'
+  ) {
+    return !Array.isArray(value) || value.length === 0
+  }
+  if (field.type === 'member' || field.type === 'dept') {
+    return typeof value !== 'number' || !Number.isInteger(value) || value <= 0
+  }
   if (field.type === 'number') {
     return value == null || value === ''
   }
@@ -142,7 +155,9 @@ export function emptySubformRow(fields) {
       field.type === 'checkbox' ||
       field.type === 'select-multiple' ||
       field.type === 'image' ||
-      field.type === 'file'
+      field.type === 'file' ||
+      field.type === 'member-multiple' ||
+      field.type === 'dept-multiple'
     ) {
       row[field.key] = []
     } else {

@@ -200,6 +200,14 @@ describe('mergeRecordData', () => {
     ).toEqual({ owners: [3, 1] });
   });
 
+  it('dept-multiple keeps unique positive ints in order', () => {
+    expect(
+      coerceRecordData([{ key: 'depts', type: 'dept-multiple' }], {
+        depts: [3, 3, 1],
+      }),
+    ).toEqual({ depts: [3, 1] });
+  });
+
   it('rejects non-positive member id', () => {
     expect(() =>
       coerceRecordData([{ key: 'owner', type: 'member' }], { owner: 0 }),

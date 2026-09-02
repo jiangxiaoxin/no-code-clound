@@ -358,3 +358,26 @@ test('member single persists id; multiple persists unique ids; required', () => 
     '甲、乙',
   )
 })
+
+test('dept single persists id; multiple persists unique ids; required', () => {
+  const one = { key: 'dept', type: 'dept', title: '部门', required: true }
+  const many = { key: 'depts', type: 'dept-multiple', title: '部门多选' }
+  assert.equal(isFillable(one), true)
+  assert.equal(isListColumn(one), true)
+  assert.equal(isInlineEditable(one), false)
+  assert.deepEqual(buildRecordData([one], { dept: 8 }), { dept: 8 })
+  assert.deepEqual(
+    buildRecordData([many], { depts: [1, 1, 2] }),
+    { depts: [1, 2] },
+  )
+  assert.equal(validateRequired([one], { dept: undefined }), '请填写「部门」')
+  assert.equal(
+    formatCellValue(one, 8, {}, {}, { 8: '研发' }),
+    '研发',
+  )
+  assert.equal(formatCellValue(one, 8, {}, {}, {}), '已删除')
+  assert.equal(
+    formatCellValue(many, [1, 2], {}, {}, { 1: '总部', 2: '研发' }),
+    '总部、研发',
+  )
+})

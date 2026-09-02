@@ -57,6 +57,7 @@
               :record-values="rowValues(row)"
               :form-fields="rowFormFields"
               :user-names="fillUserNames"
+              :dept-names="fillDeptNames"
               :multiple="isDataMultiple(child, row)"
               :compact="child.type === 'data'"
               @update:model-value="onCellChange($index, child.key, $event)"
@@ -115,6 +116,7 @@ const props = defineProps({
   dictItemsByCode: { type: Object, default: () => ({}) },
   linkageItemsByKey: { type: Object, default: () => ({}) },
   userNames: { type: Object, default: () => ({}) },
+  deptNames: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -123,6 +125,9 @@ const linkageUserNames = ref({})
 const fillUserNames = computed(() => ({
   ...props.userNames,
   ...linkageUserNames.value,
+}))
+const fillDeptNames = computed(() => ({
+  ...props.deptNames,
 }))
 
 const children = computed(() =>

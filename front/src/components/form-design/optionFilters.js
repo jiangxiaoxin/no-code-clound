@@ -115,7 +115,13 @@ export function needsFilterValue(op) {
 
 export function opsForFieldType(type) {
   if (isTimeFilterField(type)) return TIME_FILTER_OPS
-  if (type === 'member') return PERSON_FILTER_OPS
+  if (
+    type === 'member' ||
+    type === 'dept' ||
+    type === 'dept-multiple'
+  ) {
+    return PERSON_FILTER_OPS
+  }
   return FILTER_OPS
 }
 
