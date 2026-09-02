@@ -162,6 +162,7 @@
       :app-id="appId"
       :field="field"
       preview
+      :compact="embedded"
     />
     <CurrentUserName v-else-if="field.type === 'currentUser'" class="canvas-item" />
     <CurrentUserDept v-else-if="field.type === 'currentUserDept'" class="canvas-item" />

@@ -558,7 +558,7 @@
             @select="onSourceFormSelect"
           />
         </el-form-item>
-        <el-form-item v-if="field.sourceFormId" label="显示在表单中的字段">
+        <el-form-item v-if="field.sourceFormId && !isSubformChild" label="显示在表单中的字段">
           <div
             class="filter-trigger"
             :class="{ 'is-placeholder': !hasDisplayFields }"

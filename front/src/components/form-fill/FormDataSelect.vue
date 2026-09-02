@@ -103,6 +103,14 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
 })
 
+/**
+ * 选择数据可以用在主表和子表里
+ * 在主表时，空间足够，可以尽情展示数据
+ * 但在子表里，本身就是表格，一行的空间有限，不宜过度铺开字段，所以使用紧凑模式
+ */
+console.log('data-select compact', props.compact);
+
+
 const emit = defineEmits(['fill', 'update:modelValue', 'fill-rows'])
 
 onMounted(() => {
