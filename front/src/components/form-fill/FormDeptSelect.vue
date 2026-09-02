@@ -57,19 +57,23 @@
           </div>
           <div v-else class="dept-picker-selected-empty">未选择部门</div>
         </div>
-        <div v-if="!departmentTree.length" class="dept-picker-empty">
+        <div v-if="!visibleTree.length" class="dept-picker-empty">
           没有可选择的部门
         </div>
         <el-tree
           v-else
+          ref="treeRef"
           class="dept-picker-tree"
-          :data="departmentTree"
+          :data="visibleTree"
           node-key="id"
           :current-node-key="multiple ? undefined : draftIds[0]"
           :props="{ label: 'name', children: 'children' }"
           highlight-current
           default-expand-all
+          :expand-on-click-node="false"
+          :show-checkbox="multiple"
           @node-click="onDeptNodeClick"
+          @check="onTreeCheck"
         />
       </div>
       <template #footer>
@@ -81,12 +85,16 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { Close } from '@element-plus/icons-vue'
 import { listOrgDepartmentsApi } from '../../api/org'
+import { useUserStore } from '../../stores/user'
 import {
+  allowedDeptIds,
+  defaultDeptValue,
   deptDisplayName,
   deptValueIds,
+  filterDeptTree,
   flattenDeptNames,
 } from '../form-design/deptField.js'
 
@@ -100,6 +108,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
+const userStore = useUserStore()
 const multiple = computed(() => props.field.type === 'dept-multiple')
 const selectedIds = computed(() =>
   deptValueIds(props.field.type, props.modelValue),
@@ -109,11 +118,21 @@ const pickerVisible = ref(false)
 const draftIds = ref([])
 const departmentTree = ref([])
 const extraDeptNames = ref({})
+const treeRef = ref(null)
+let appliedDefault = false
 
 const nameMap = computed(() => ({
   ...props.deptNames,
   ...extraDeptNames.value,
 }))
+
+const allowedIds = computed(() =>
+  allowedDeptIds(props.field, departmentTree.value),
+)
+
+const visibleTree = computed(() =>
+  filterDeptTree(departmentTree.value, allowedIds.value),
+)
 
 function nameOf(id) {
   return deptDisplayName(id, nameMap.value)
@@ -132,8 +151,12 @@ function onRemove(id) {
   emitValue(selectedIds.value.filter((item) => item !== id))
 }
 
-function onRemoveDraft(id) {
+async function onRemoveDraft(id) {
   draftIds.value = draftIds.value.filter((item) => item !== id)
+  if (!multiple.value) return
+  await nextTick()
+  treeRef.value?.setCheckedKeys(draftIds.value)
+  draftIds.value = treeRef.value?.getCheckedKeys(false) || draftIds.value
 }
 
 function onOpenPicker() {
@@ -150,23 +173,26 @@ function confirmPick() {
   closePicker()
 }
 
-function onDeptNodeClick(node) {
-  const id = node?.id
+function rememberName(id, name) {
   if (!id) return
   extraDeptNames.value = {
     ...extraDeptNames.value,
-    [id]: node.name || extraDeptNames.value[id],
-    [String(id)]: node.name || extraDeptNames.value[String(id)],
+    [id]: name || extraDeptNames.value[id],
+    [String(id)]: name || extraDeptNames.value[String(id)],
   }
-  if (multiple.value) {
-    if (draftIds.value.includes(id)) {
-      draftIds.value = draftIds.value.filter((item) => item !== id)
-    } else {
-      draftIds.value = [...draftIds.value, id]
-    }
-    return
-  }
+}
+
+function onDeptNodeClick(node) {
+  if (multiple.value) return
+  const id = node?.id
+  if (!id || !allowedIds.value.has(id)) return
+  rememberName(id, node.name)
   draftIds.value = [id]
+}
+
+function onTreeCheck() {
+  if (!multiple.value) return
+  draftIds.value = treeRef.value?.getCheckedKeys(false) || []
 }
 
 async function loadDepartments() {
@@ -178,15 +204,36 @@ async function loadDepartments() {
   }
 }
 
-async function onPickerOpen() {
-  draftIds.value = [...selectedIds.value]
-  await loadDepartments()
+function applyDefaultIfNeeded() {
+  if (appliedDefault || props.preview || props.disabled) return
+  if (selectedIds.value.length) {
+    appliedDefault = true
+    return
+  }
+  const next = defaultDeptValue(
+    props.field,
+    userStore.user,
+    departmentTree.value,
+  )
+  if (next == null || (Array.isArray(next) && !next.length)) return
+  appliedDefault = true
+  emit('update:modelValue', next)
 }
 
-onMounted(() => {
-  if (selectedIds.value.length) {
-    loadDepartments()
+async function onPickerOpen() {
+  await loadDepartments()
+  draftIds.value = selectedIds.value.filter((id) => allowedIds.value.has(id))
+  await nextTick()
+  if (multiple.value) {
+    treeRef.value?.setCheckedKeys(draftIds.value)
+    draftIds.value = treeRef.value?.getCheckedKeys(false) || draftIds.value
   }
+}
+
+onMounted(async () => {
+  if (props.preview) return
+  await loadDepartments()
+  applyDefaultIfNeeded()
 })
 </script>
 

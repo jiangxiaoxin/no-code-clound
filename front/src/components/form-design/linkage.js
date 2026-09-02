@@ -26,6 +26,13 @@ export function hasLinkageSource(type) {
 }
 
 export function optionSourceChoices(type) {
+  if (type === 'dept' || type === 'dept-multiple') {
+    return [
+      { value: 'custom', label: '自定义' },
+      { value: 'current_user_dept', label: '当前用户所在部门' },
+      { value: 'linkage', label: '数据联动' },
+    ]
+  }
   if (LINKAGE_VALUE_TYPES.includes(type)) {
     return [
       { value: 'custom', label: '自定义' },

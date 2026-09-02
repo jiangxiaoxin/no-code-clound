@@ -32,6 +32,14 @@ test('option source choices: value fields get custom and linkage, select gets th
     optionSourceChoices('address').map((item) => item.value),
     ['custom', 'linkage'],
   )
+  assert.deepEqual(
+    optionSourceChoices('dept').map((item) => item.value),
+    ['custom', 'current_user_dept', 'linkage'],
+  )
+  assert.deepEqual(
+    optionSourceChoices('dept-multiple').map((item) => item.value),
+    ['custom', 'current_user_dept', 'linkage'],
+  )
 })
 
 test('hasLinkage requires source form, trigger field, and at least one complete condition', () => {

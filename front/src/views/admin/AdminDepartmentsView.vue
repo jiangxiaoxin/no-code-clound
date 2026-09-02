@@ -23,6 +23,7 @@
       height="100%"
     >
       <el-table-column prop="name" label="部门名称" min-width="200" />
+      <el-table-column v-if="isDev" prop="id" label="id" width="80" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
@@ -96,6 +97,7 @@ import {
 import { useUserStore } from '../../stores/user'
 
 const userStore = useUserStore()
+const isDev = import.meta.env.DEV
 const loading = ref(false)
 const saving = ref(false)
 const tree = ref([])

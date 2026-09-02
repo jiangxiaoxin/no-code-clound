@@ -89,6 +89,7 @@ import {
   hasSerialNumberField,
 } from './form-design/serialField.js'
 import { isMemberField } from './form-design/memberField.js'
+import { isDeptField } from './form-design/deptField.js'
 import {
   DEFAULT_IMAGE_MAX_COUNT,
   DEFAULT_IMAGE_MAX_SIZE_MB,
@@ -286,6 +287,12 @@ function createFieldFromItem(item, { child = false } = {}) {
     ...(isMemberField(item.type)
       ? {
           memberScope: 'all',
+          optionSource: 'custom',
+        }
+      : {}),
+    ...(isDeptField(item.type)
+      ? {
+          deptScope: 'all',
           optionSource: 'custom',
         }
       : {}),

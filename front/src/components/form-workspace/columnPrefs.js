@@ -1,6 +1,7 @@
 import { computed, ref, unref, watch } from 'vue'
 import { useUserStore } from '../../stores/user'
 
+export const RECORD_ID_KEY = '__recordId'
 export const CREATED_AT_KEY = '__createdAt'
 export const UPDATED_AT_KEY = '__updatedAt'
 export const CREATED_BY_KEY = '__createdBy'
@@ -85,6 +86,13 @@ export function useColumnPrefs({ appId, formId, tableFields, schemaLoading }) {
 
   function defaultColumnPrefs() {
     return [
+      {
+        key: RECORD_ID_KEY,
+        title: 'id',
+        visible: false,
+        fixed: '',
+        minWidth: 220,
+      },
       ...unref(tableFields).map((field) => ({
         key: field.key,
         title: field.title || '未命名',

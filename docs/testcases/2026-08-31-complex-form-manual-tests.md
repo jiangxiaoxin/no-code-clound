@@ -39,7 +39,7 @@
 | 人员单选 / 人员多选 | `member` / `member-multiple` | 已实现 | 测；可放进标签页和子表；选人走 `/api/org/*` |
 | 地址选择 / 图片上传 / 文件上传 / 登录人姓名 / 登录人部门 | `address` / `image` / `file` / `currentUser` / `currentUserDept` | 已实现 | 冒烟带一条即可 |
 | 工作台「添加数据 / 数据管理」URL `?tab=` | — | 已实现 | 测 |
-| 部门单选 / 部门多选 | `dept` / `dept-multiple` | 已实现 | 测；可放进标签页和子表；选部门走 `/api/org/departments` |
+| 部门单选 / 部门多选 | `dept` / `dept-multiple` | 已实现 | 测；可放进标签页和子表；属性有可选范围 / 取值来源；多选勾父级带下级 |
 | 关联数据 / 关联子表单 | `relate` / `relate-subform` | 调色板占位，控件未完成 | **不要当功能测**；拖进子表应被拒绝 |
 
 流水号依赖 MySQL 表 `form_serial_seq`。若尚未建表，先执行：

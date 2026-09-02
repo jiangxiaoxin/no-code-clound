@@ -518,7 +518,9 @@ function collectMemberIds(
 ) {
   for (const field of flattenFields(fields)) {
     if (field.type === 'subform') {
-      const rows = Array.isArray(data[field.key]) ? data[field.key] : [];
+      const rows = Array.isArray(data[field.key])
+        ? (data[field.key] as unknown[])
+        : [];
       for (const row of rows) {
         if (row && typeof row === 'object') {
           collectMemberIds(

@@ -86,7 +86,10 @@
             :class-name="isDataColumn(col.key) ? 'record-data-col' : undefined"
           >
             <template #default="{ row }">
-              <span v-if="col.key === CREATED_AT_KEY" class="sys-cell" :title="formatTime(row.createdAt)">
+              <span v-if="col.key === RECORD_ID_KEY" class="sys-cell" :title="row.id">
+                {{ row.id }}
+              </span>
+              <span v-else-if="col.key === CREATED_AT_KEY" class="sys-cell" :title="formatTime(row.createdAt)">
                 {{ formatTime(row.createdAt) }}
               </span>
               <span v-else-if="col.key === UPDATED_AT_KEY" class="sys-cell" :title="formatTime(row.updatedAt)">
@@ -157,6 +160,7 @@ import FormRecordImportDialog from './FormRecordImportDialog.vue'
 import FormRecordQuickSearch from './FormRecordQuickSearch.vue'
 import FormRecordSortSetup from './FormRecordSortSetup.vue'
 import {
+  RECORD_ID_KEY,
   CREATED_AT_KEY,
   UPDATED_AT_KEY,
   CREATED_BY_KEY,

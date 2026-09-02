@@ -380,6 +380,77 @@
           </template>
         </el-dialog>
       </template>
+      <template v-if="isDeptFieldType">
+        <el-form-item label="可选范围">
+          <el-radio-group :model-value="field.deptScope || 'all'" @change="onDeptScopeChange">
+            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="custom">自定义</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="(field.deptScope || 'all') === 'custom'" label="自定义范围">
+          <div class="linkage-row">
+            <div
+              class="filter-trigger"
+              :class="{ 'is-placeholder': !hasCustomDeptScopeValue }"
+              @click="openDeptScopeDialog"
+            >
+              {{ hasCustomDeptScopeValue ? '已设置可选范围' : '设置可选范围' }}
+            </div>
+            <el-icon
+              v-if="hasCustomDeptScopeValue"
+              class="linkage-clear"
+              @click.stop="confirmClearDeptScope"
+            >
+              <CircleClose />
+            </el-icon>
+          </div>
+        </el-form-item>
+        <el-dialog
+          v-model="deptScopeVisible"
+          title="设置可选范围"
+          width="520px"
+          draggable
+          @open="onDeptScopeDialogOpen"
+        >
+          <div class="member-scope-dialog">
+            <div v-if="deptScopeIds.length" class="member-scope-picked">
+              <div class="member-scope-picked-row">
+                <span class="member-scope-picked-label">部门</span>
+                <div class="member-scope-picked-tags">
+                  <span
+                    v-for="id in deptScopeIds"
+                    :key="'dept-scope-' + id"
+                    class="member-scope-picked-tag"
+                  >
+                    <span>{{ deptScopeName(id) }}</span>
+                    <el-icon
+                      class="member-scope-picked-close"
+                      @click="onRemoveDeptScopeId(id)"
+                    >
+                      <Close />
+                    </el-icon>
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="member-scope-pane">
+              <el-tree
+                ref="deptScopeTreeRef"
+                :data="deptScopeDepartments"
+                node-key="id"
+                show-checkbox
+                default-expand-all
+                :props="{ label: 'name', children: 'children' }"
+                @check="syncDeptScopeIds"
+              />
+            </div>
+          </div>
+          <template #footer>
+            <el-button @click="closeDeptScopeDialog">取消</el-button>
+            <el-button type="primary" @click="confirmDeptScope">确定</el-button>
+          </template>
+        </el-dialog>
+      </template>
       <el-form-item v-if="field.type === 'number'" label="格式">
         <div class="required-row">
           <span>保持</span>
@@ -921,6 +992,11 @@ import {
   memberDisplayName,
   positiveIntIds,
 } from './memberField.js'
+import {
+  flattenDeptNames,
+  hasCustomDeptScope,
+  isDeptField,
+} from './deptField.js'
 import { IMAGE_FORMAT_OPTIONS } from '../form-fill/imageField'
 import { FILE_FORMAT_OPTIONS } from '../form-fill/fileField'
 import { ADDRESS_FORMAT_OPTIONS } from '../form-fill/addressField'
@@ -1300,6 +1376,13 @@ const isCurrentDisplayField = computed(
 const isSerialField = computed(() => props.field?.type === 'serialNumber')
 
 const isMemberFieldType = computed(() => isMemberField(props.field))
+const isDeptFieldType = computed(() => isDeptField(props.field))
+const hasCustomDeptScopeValue = computed(() => hasCustomDeptScope(props.field))
+const deptScopeVisible = ref(false)
+const deptScopeTreeRef = ref(null)
+const deptScopeDepartments = ref([])
+const deptScopeIds = ref([])
+const deptScopeNameById = ref({})
 const hasCustomScope = computed(() => hasCustomMemberScope(props.field))
 const deptFieldOptions = computed(() =>
   deptFieldsForMemberScope(props.fields, props.field?.key).filter(
@@ -1420,6 +1503,69 @@ function onRemoveScopeUser(id) {
 function onMemberScopeChange(value) {
   if (!props.field) return
   props.field.memberScope = value
+}
+
+function onDeptScopeChange(value) {
+  if (!props.field) return
+  props.field.deptScope = value
+}
+
+function deptScopeName(id) {
+  return deptScopeNameById.value[id] || deptScopeNameById.value[String(id)] || String(id)
+}
+
+function openDeptScopeDialog() {
+  deptScopeVisible.value = true
+}
+
+function closeDeptScopeDialog() {
+  deptScopeVisible.value = false
+}
+
+function syncDeptScopeIds() {
+  deptScopeIds.value = deptScopeTreeRef.value?.getCheckedKeys(false) || deptScopeIds.value
+}
+
+function applyDeptScopeChecked() {
+  deptScopeTreeRef.value?.setCheckedKeys(deptScopeIds.value)
+}
+
+async function onDeptScopeDialogOpen() {
+  const cfg = props.field?.deptScopeConfig || {}
+  deptScopeIds.value = positiveIntIds(cfg.departmentIds)
+  const depts = (await listOrgDepartmentsApi()) || []
+  deptScopeDepartments.value = depts
+  deptScopeNameById.value = flattenDeptNames(depts)
+  await nextTick()
+  applyDeptScopeChecked()
+}
+
+function onRemoveDeptScopeId(id) {
+  deptScopeIds.value = deptScopeIds.value.filter((item) => item !== id)
+  applyDeptScopeChecked()
+}
+
+function confirmDeptScope() {
+  if (!props.field) return
+  syncDeptScopeIds()
+  props.field.deptScopeConfig = {
+    departmentIds: [...deptScopeIds.value],
+  }
+  closeDeptScopeDialog()
+}
+
+async function confirmClearDeptScope() {
+  try {
+    await ElMessageBox.confirm('确定清除已设置的可选范围？', '清除', {
+      confirmButtonText: '清除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  if (!props.field) return
+  props.field.deptScopeConfig = { departmentIds: [] }
 }
 
 function openMemberScopeDialog() {
