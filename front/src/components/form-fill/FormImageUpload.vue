@@ -10,7 +10,9 @@
       :auto-upload="true"
       :limit="maxCount"
       :before-upload="beforeUpload"
+      :http-request="doUpload"
       :on-exceed="onExceed"
+      :on-success="onUploadSuccess"
       :on-preview="onPreview"
       :on-remove="onRemove"
       :disabled="disabled"
@@ -105,10 +107,6 @@ async function beforeUpload(file) {
     ElMessage.warning('无法上传图片')
     return false
   }
-  if (urls.value.length >= maxCount.value) {
-    onExceed()
-    return false
-  }
   if (!isAllowedImageFile(props.field, file)) {
     ElMessage.warning(`请上传 ${imageFormatLabels(props.field)} 图片`)
     return false
@@ -122,18 +120,20 @@ async function beforeUpload(file) {
     ElMessage.warning(`每张图片不能超过 ${imageMaxSizeMB(props.field)}MB`)
     return false
   }
-  try {
-    const result = await uploadAppImageApi(props.appId, uploadFile)
-    const url = result?.url
-    if (!url) {
-      ElMessage.error('上传失败')
-      return false
-    }
-    emit('update:modelValue', [...urls.value, url])
-  } catch {
-    return false
+  return uploadFile
+}
+
+function doUpload(options) {
+  return uploadAppImageApi(props.appId, options.file)
+}
+
+function onUploadSuccess(result) {
+  const url = result?.url
+  if (!url) {
+    ElMessage.error('上传失败')
+    return
   }
-  return false
+  emit('update:modelValue', [...urls.value, url])
 }
 </script>
 

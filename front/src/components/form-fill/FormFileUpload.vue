@@ -9,9 +9,12 @@
       :auto-upload="true"
       :limit="maxCount"
       :before-upload="beforeUpload"
+      :http-request="doUpload"
       :on-exceed="onExceed"
+      :on-success="onUploadSuccess"
       :on-remove="onRemove"
       :disabled="disabled"
+      class="my-upload"
     >
       <el-button :disabled="disabled" :icon="Upload">上传文件</el-button>
       <template #file="{ file }">
@@ -99,14 +102,10 @@ async function onDownload(file) {
   }
 }
 
-async function beforeUpload(file) {
+function beforeUpload(file) {
   if (props.disabled) return false
   if (!props.appId) {
     ElMessage.warning('无法上传文件')
-    return false
-  }
-  if (items.value.length >= maxCount.value) {
-    onExceed()
     return false
   }
   if (!isAllowedFile(props.field, file)) {
@@ -117,21 +116,23 @@ async function beforeUpload(file) {
     ElMessage.warning(`每个文件不能超过 ${fileMaxSizeMB(props.field)}MB`)
     return false
   }
-  try {
-    const result = await uploadAppFileApi(props.appId, file)
-    const url = result?.url
-    if (!url) {
-      ElMessage.error('上传失败')
-      return false
-    }
-    emit('update:modelValue', [
-      ...items.value,
-      { url, name: result.name || file.name },
-    ])
-  } catch {
-    return false
+  return true
+}
+
+function doUpload(options) {
+  return uploadAppFileApi(props.appId, options.file)
+}
+
+function onUploadSuccess(result, file) {
+  const url = result?.url
+  if (!url) {
+    ElMessage.error('上传失败')
+    return
   }
-  return false
+  emit('update:modelValue', [
+    ...items.value,
+    { url, name: result.name || file.name },
+  ])
 }
 </script>
 
@@ -169,4 +170,10 @@ async function beforeUpload(file) {
   cursor: pointer;
   color: var(--el-text-color-secondary);
 }
+
+// .my-upload {
+//   :deep(.el-upload) {
+//     width: 100% !important;
+//   }
+// }
 </style>
