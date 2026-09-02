@@ -91,7 +91,7 @@
                 :value="child.key"
               />
             </el-select>
-            <el-button link type="danger" @click="removeMapping(index)">删除</el-button>
+            <el-button link type="danger" :icon="Delete" @click="removeMapping(index)"></el-button>
           </div>
           <el-button type="primary" link @click="addMapping">添加对照</el-button>
         </div>
@@ -116,6 +116,7 @@ import {
   isCompleteCondition,
   isSubformLinkageConfigured,
 } from './linkage'
+import { Delete } from '@element-plus/icons-vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

@@ -266,7 +266,14 @@
                 <Connection />
               </el-icon>
             </el-tooltip>
-            <span>{{ child.title }}</span>
+            <span class="canvas-subform-col-title">{{ child.title }}</span>
+            <el-icon
+              v-if="selectedKey === child.key"
+              class="canvas-subform-col-delete"
+              @click.stop="onRemoveChildCol(child)"
+            >
+              <Delete />
+            </el-icon>
           </div>
           <div class="canvas-subform-col is-add" @click.stop>
             <el-dropdown
@@ -427,6 +434,10 @@ function onRemove() {
 
 function onSelectChild(child) {
   emit('select', child)
+}
+
+function onRemoveChildCol(child) {
+  emit('remove', child)
 }
 
 function onAddChildType(type) {
@@ -725,6 +736,22 @@ function onChildDragEnd() {
   background: var(--el-fill-color-light);
   font-size: 13px;
   font-weight: 600;
+}
+
+.canvas-subform-col-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-subform-col-delete {
+  flex-shrink: 0;
+  margin-left: 4px;
+  color: var(--el-color-danger);
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .canvas-subform-col.is-add,

@@ -583,6 +583,7 @@ onUnmounted(() => {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 8px;
+  min-height: 120px; // 设个最小高度，为空白标签页占个位，不要跟下面的内容连在一起
 }
 
 .fill-tabs {
