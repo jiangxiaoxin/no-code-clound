@@ -105,6 +105,24 @@ test('subform persists stripped rows and validates required', () => {
   assert.equal(formatCellValue(field, [{ name: '', qty: null }]), '')
 })
 
+test('subform list summary skips 选择数据 source id', () => {
+  const field = {
+    key: 'lines',
+    type: 'subform',
+    fields: [
+      { key: 'pick', type: 'data', title: '物料' },
+      { key: 'name', type: 'input', title: '名称' },
+      { key: 'qty', type: 'number', title: '数量' },
+    ],
+  }
+  assert.equal(
+    formatCellValue(field, [
+      { pick: '6a97f031f102bbb6caaa8808', name: '螺丝', qty: 2 },
+    ]),
+    '螺丝 / 2',
+  )
+})
+
 test('serialNumber is shown from record but omitted from create payload', () => {
   const field = { key: 'sn', type: 'serialNumber' }
   assert.equal(isFillable(field), false)

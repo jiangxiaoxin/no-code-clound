@@ -333,6 +333,7 @@ function formatSubformCellValue(field, value, dictItemsByCode, userNames, deptNa
   return rows
     .map((row) =>
       (field.fields || [])
+        .filter(isFillable)
         .map((child) =>
           formatCellValue(
             child,

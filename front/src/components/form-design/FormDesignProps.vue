@@ -1232,11 +1232,7 @@ const subformLinkageVisible = ref(false)
 const formFields = computed(() => {
   if (props.parentSubform) {
     return (props.parentSubform.fields || []).filter(
-      (item) =>
-        item.key !== props.field?.key &&
-        item.type !== 'image' &&
-        item.type !== 'file' &&
-        item.type !== 'data',
+      (item) => isFillable(item) && item.key !== props.field?.key,
     )
   }
   return flattenFields(props.fields || []).filter(
