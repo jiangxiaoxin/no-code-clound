@@ -10,11 +10,14 @@
         size="small"
         class="subform-table"
         :row-key="rowKey"
+        :fit="false"
+        @header-dragend="onHeaderDragend"
       >
         <el-table-column
           v-if="!locked"
           label="操作"
           width="168"
+          min-width="168"
           fixed="right"
         >
           <template #default="{ $index }">
@@ -30,7 +33,7 @@
         <el-table-column
           v-for="(child, colIndex) in children"
           :key="child.key"
-          :min-width="child.type === 'textarea' ? 220 : 160"
+          :min-width="subformColMinWidth(child.type)"
           :fixed="colIndex < frozenCols ? 'left' : false"
         >
           <template #header>
@@ -104,6 +107,19 @@ import {
 } from './tableOptions'
 
 const SUBFORM_MAX_ROWS = 200
+
+function subformColMinWidth(type) {
+  if (type === 'image') return 250
+  if (type === 'textarea') return 220
+  return 160
+}
+
+function onHeaderDragend(newWidth, _delta, column) {
+  const min = Number(column.minWidth) || 80
+  if (newWidth >= min) return
+  column.width = min
+  column.realWidth = min
+}
 
 const props = defineProps({
   appId: { type: Number, default: 0 },

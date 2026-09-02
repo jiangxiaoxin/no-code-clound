@@ -253,7 +253,10 @@
             v-for="child in childFields"
             :key="child.key"
             class="canvas-subform-col"
-            :class="{ 'is-selected': selectedKey === child.key }"
+            :class="{
+              'is-selected': selectedKey === child.key,
+              'is-image': child.type === 'image',
+            }"
             @click.stop="onSelectChild(child)"
           >
             <span v-if="child.required" class="canvas-field-required">*</span>
@@ -724,6 +727,13 @@ function onChildDragEnd() {
   min-width: 160px;
   padding: 8px;
   border-right: 1px solid var(--el-border-color-lighter);
+}
+
+.canvas-subform-col.is-image,
+.canvas-subform-cell.is-image {
+  flex: 0 0 250px;
+  width: 250px;
+  min-width: 250px;
 }
 
 .canvas-subform-col:last-child,
