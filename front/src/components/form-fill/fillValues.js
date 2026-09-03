@@ -250,6 +250,7 @@ export function firstRequiredError(fields, values) {
     if (field.type === 'subform') {
       const required = subformRowsRequiredError(field, values[field.key])
       if (required) {
+        // 直接return，提前拦截，不要每个field 都去处理一遍，节省性能
         return { message: required, key: field.key }
       }
       const unique = uniqueInRowsError(

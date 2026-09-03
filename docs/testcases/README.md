@@ -1,7 +1,7 @@
 # 手工测试用例说明
 
 日期：2026-08-31  
-本目录只放**对照界面执行的测试用例**。功能设计、实施计划仍在 `docs/superpowers/specs/` 与 `docs/superpowers/plans/`。人员单选 / 人员多选的使用逻辑和注意事项见 `docs/guides/2026-09-01-member-select-usage.md`。
+本目录只放**对照界面执行的测试用例**。功能设计、实施计划仍在 `docs/superpowers/specs/` 与 `docs/superpowers/plans/`。人员单选 / 人员多选的使用逻辑和注意事项见 `docs/guides/2026-09-01-member-select-usage.md`；子表单必填与子字段必填见 `docs/guides/2026-09-03-subform-required-usage.md`。
 
 打开本目录后先读这一份，再按顺序打开下面的用例文件。每条用例记「通过 / 失败」，失败立刻记下编号和现场（表名、字段标题、提示原文）。
 
