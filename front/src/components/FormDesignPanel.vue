@@ -101,6 +101,7 @@ import {
   defaultFileFormats,
 } from './form-fill/fileField'
 import { DEFAULT_ADDRESS_FORMAT } from './form-fill/addressField'
+import { insertAfterKey, insertIntoList } from './form-design/canvasInsert.js'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -189,15 +190,6 @@ function closePreview() {
 
 function onCanvasAdd(item, beforeKey, paneId) {
   addField(item, beforeKey, paneId, true)
-}
-
-function insertIntoList(list, field, beforeKey) {
-  if (beforeKey) {
-    const index = list.findIndex((entry) => entry.key === beforeKey)
-    list.splice(index < 0 ? list.length : index, 0, field)
-  } else {
-    list.push(field)
-  }
 }
 
 function findPane(paneId) {
@@ -299,7 +291,16 @@ function createFieldFromItem(item, { child = false } = {}) {
   }
 }
 
+function insertIntoRoot(field, beforeKey, fromPalette) {
+  if (fromPalette) {
+    insertAfterKey(fields.value, field, selectedKey.value)
+    return
+  }
+  insertIntoList(fields.value, field, beforeKey)
+}
+
 function addField(item, beforeKey, paneId, fromCanvas) {
+  const fromPalette = !fromCanvas && !beforeKey && !paneId
   if (item.type === 'serialNumber') {
     if (hasSerialNumberField(fields.value)) {
       ElMessage.warning('每个表单只能有一个流水号')
@@ -312,15 +313,15 @@ function addField(item, beforeKey, paneId, fromCanvas) {
       return
     }
     const field = createTabsField(nextKey(), [nextKey(), nextKey()])
-    insertIntoList(fields.value, field, beforeKey)
+    insertIntoRoot(field, beforeKey, fromPalette)
     activePaneId.value = field.panes[0].id
     selectField(field)
     return
   }
 
   const selectedParent = findParentSubform(fields.value, selectedKey.value)
-  if (selectedParent && !fromCanvas && !beforeKey && !paneId) {
-    addChildField(selectedParent.key, item)
+  if (selectedParent && fromPalette) {
+    addChildField(selectedParent.key, item, undefined, selectedKey.value)
     return
   }
 
@@ -345,7 +346,7 @@ function addField(item, beforeKey, paneId, fromCanvas) {
     }
   }
 
-  insertIntoList(fields.value, field, beforeKey)
+  insertIntoRoot(field, beforeKey, fromPalette)
   selectField(field)
 }
 
@@ -418,7 +419,7 @@ function copySubformField(field) {
   return copied
 }
 
-function addChildField(parentKey, item, beforeChildKey) {
+function addChildField(parentKey, item, beforeChildKey, afterChildKey) {
   const parent = findFieldByKey(fields.value, parentKey)
   if (!parent || parent.type !== 'subform') {
     return
@@ -432,8 +433,9 @@ function addChildField(parentKey, item, beforeChildKey) {
   }
   const field = createFieldFromItem(item, { child: true })
   if (beforeChildKey) {
-    const index = parent.fields.findIndex((entry) => entry.key === beforeChildKey)
-    parent.fields.splice(index < 0 ? parent.fields.length : index, 0, field)
+    insertIntoList(parent.fields, field, beforeChildKey)
+  } else if (afterChildKey) {
+    insertAfterKey(parent.fields, field, afterChildKey)
   } else {
     parent.fields.push(field)
   }

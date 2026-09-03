@@ -37,6 +37,7 @@
       draggable
       destroy-on-close
       @open="onPickerOpen"
+      append-to-body
     >
       <div class="dept-picker">
         <div class="dept-picker-selected">

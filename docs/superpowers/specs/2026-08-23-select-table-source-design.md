@@ -30,7 +30,7 @@
 - 打开表单返回 `fields`；保存设计用独立接口写入。
 - 一份列表接口，返回本应用其他已保存表单及其可选字段（排除当前表单）。
 - 组件库：`select`（下拉单选框）、`select-multiple`（下拉多选框）。
-- 两者数据源仍为 `dictionary` | `table_data`。字典交互与现网下拉相同。
+- 两者数据源仍为 `dictionary` | `table_data`。字典交互与已有下拉单选/多选相同。
 - `table_data` 记录 `sourceFormId` + `sourceFieldKey`。
 - 选择器：`div` 模拟 select，下拉层内搜索表单名 + 树（表单 / 字段标题（类型））。
 - 未配选项来源时，画布标题下提示「请配置选项来源」。

@@ -37,6 +37,7 @@
       draggable
       destroy-on-close
       @open="onPickerOpen"
+      append-to-body
     >
       <div class="member-picker">
         <div class="member-picker-selected">
@@ -96,6 +97,7 @@
               highlight-current
               default-expand-all
               @node-click="onDeptNodeClick"
+              :expand-on-click-node="false"
             />
             <div v-else-if="browseMode === 'role'" class="member-picker-roles">
               <button

@@ -12,7 +12,14 @@
         <span class="data-select-value">
           {{ triggerText || field.placeholder || '请选择' }}
         </span>
-        <el-icon class="data-select-arrow">
+        <el-icon
+          v-if="canClear"
+          class="data-select-clear"
+          @click.stop="clearSelected"
+        >
+          <CircleClose />
+        </el-icon>
+        <el-icon v-else class="data-select-arrow">
           <ArrowDown />
         </el-icon>
       </div>
@@ -92,7 +99,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
-import { ArrowDown, Search } from '@element-plus/icons-vue'
+import { ArrowDown, CircleClose, Search } from '@element-plus/icons-vue'
 import {
   getFormApi,
   getFormRecordApi,
@@ -234,6 +241,23 @@ const triggerText = computed(() => {
   const first = previewRows.value.find((item) => item.text && item.text !== '—')
   return first?.text || (selected.value ? '已选择' : '')
 })
+
+const canClear = computed(() => {
+  if (props.preview || props.disabled) {
+    return false
+  }
+  const id = typeof props.modelValue === 'string' ? props.modelValue.trim() : ''
+  return Boolean(id)
+})
+
+function clearSelected() {
+  if (!canClear.value) {
+    return
+  }
+  selected.value = null
+  loadedKey = ''
+  emit('update:modelValue', undefined)
+}
 
 function formatSystemTime(value) {
   return formatDateTime(value)
@@ -624,10 +648,20 @@ watch(
   color: var(--el-disabled-text-color);
 }
 
-.data-select-arrow {
+.data-select-arrow,
+.data-select-clear {
   flex-shrink: 0;
   margin-left: 8px;
   color: var(--el-text-color-placeholder);
+}
+
+.data-select-clear {
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.data-select-clear:hover {
+  color: var(--el-text-color-secondary);
 }
 
 .data-select-preview {

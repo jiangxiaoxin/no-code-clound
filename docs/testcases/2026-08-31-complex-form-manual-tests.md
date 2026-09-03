@@ -137,8 +137,9 @@
 | T-01 | 点页签条或 pane 空白 | 右侧是标签页属性：pane 列表，**没有**必填 / 占位 / 宽度 | ok |
 | T-02 | 点「基本信息」里的工厂 | 右侧是工厂属性；活动 tab 仍是基本信息 | ok |
 | T-03 | 选中标签页（或内部字段），点调色板「单行文本」 | 新字段进**当前活动 pane**，不进根上 | ok |
-| T-04 | 点画布空白（标签页外面），再点调色板「单行文本」 | 新字段加到整表根上（标签页前或后），不进 pane | ok |
-| T-05 | 测完删掉 T-03/T-04 多出来的字段，保存 | 能删 | ok |
+| T-04 | 点画布空白（标签页外面），再点调色板「单行文本」 | 取消选中后，新字段加到根列表**最下方**，不进 pane | ok |
+| T-04a | 选中 T-04 刚加的根字段，再点调色板「多行文本」 | 新字段紧挨该字段下方（仍在根上），不进 pane、不进子表 | ok |
+| T-05 | 测完删掉 T-03/T-04/T-04a 多出来的字段，保存 | 能删 | ok |
 | T-06 | 属性里把 pane 标题改成空再失焦 | 回退成改前标题或「标签页」，不能空着保存进画布 | ok |
 | T-07 | 点「添加标签页」直到 10 个 | 第 11 次按钮禁用 | ok |
 | T-08 | 只剩 2 个 pane 时点删除 | 删除按钮禁用 | ok |
@@ -205,7 +206,7 @@
 | C-13 | 列表快捷搜索按「工厂」搜 | 能搜到；不会误拿子表列当主表筛选项 | ok |
 | C-14 | 订单明细加一列下拉单选框 `select`，选项来源=其他表数据 `table_data`、无选项过滤。Network 开着，在标签页2里切换该下拉 | 打开时查一次源表即可；只改本列选项不再打 `records/query` | ok |
 | C-15 | 该下拉单选框 `select` 选项过滤绑标签页1的单行文本 `input`「工厂」。只切下拉；再改工厂 | 切下拉不请求。改工厂约 1 秒后请求，选项随过滤变。未打开过标签页2时改工厂，切过去下拉已是过滤后的选项 | ok |
-| C-16 | 订单明细里加图片上传 `image`、文件上传 `file`、成员选择 `member`、部门选择 `dept` 四列，再加选择数据 `data` 列，数据源配件台账，打开「设置填充字段」 | 目标字段下拉里这四列都能选到（只有选择数据 `data` 和自己不在），选项文案为 `订单明细.列标题`；配好映射后在标签页2选一条源记录，四列按源值填上；该子列属性里没有「显示在表单中的字段」。保存后数据管理「订单明细」摘要有这四列的展示值，**没有**选择数据源记录 id | |
+| C-16 | 订单明细里加图片上传 `image`、文件上传 `file`、成员选择 `member`、部门选择 `dept` 四列，再加选择数据 `data` 列，数据源配件台账，打开「设置填充字段」 | 目标字段下拉里这四列都能选到（只有选择数据 `data` 和自己不在），选项文案为 `订单明细.列标题`；配好映射后在标签页2选一条源记录，四列按源值填上；该子列属性里没有「显示在表单中的字段」。选完后「已选择」右侧有清除图标，点一下本格变回「请选择」，四列填充值**还在**。保存后数据管理「订单明细」摘要有这四列的展示值，**没有**选择数据源记录 id | |
 
 C-09 有破坏性。需要的话先复制一份表或测完重建子表。
 
@@ -332,14 +333,14 @@ P-08、P-09 需要人员专项里的「人员源」表。没有该表时跳过�
 
 这些是单元测试，**不能代替**上面的界面操作。跑过结果：
 
-- 前端 `node --test`：`tabsField`、`serialField`、`fillValues`、`subformField`、`tableOptions`、`linkage`、`linkageRuntime`（`tableOptions` 覆盖子表「其他表数据」缓存键）
+- 前端 `node --test`：`tabsField`、`serialField`、`canvasInsert`、`fillValues`、`subformField`、`tableOptions`、`linkage`、`linkageRuntime`（`tableOptions` 覆盖子表「其他表数据」缓存键；`canvasInsert` 覆盖点调色板插到选中主表字段下方）
 - 后端 Jest `src/application/form-record` → **84 通过**
 - 后端 Jest `application.service.spec.ts`（含一表一个流水号 / 标签页字段列表）→ **33 通过**
 
 本地命令：
 
 ```text
-node --test front/src/components/form-design/tabsField.spec.js front/src/components/form-design/serialField.spec.js front/src/components/form-fill/fillValues.spec.js front/src/components/form-fill/subformField.spec.js front/src/components/form-fill/tableOptions.spec.js front/src/components/form-fill/linkageRuntime.spec.js front/src/components/form-design/linkage.spec.js
+node --test front/src/components/form-design/tabsField.spec.js front/src/components/form-design/serialField.spec.js front/src/components/form-design/canvasInsert.spec.js front/src/components/form-fill/fillValues.spec.js front/src/components/form-fill/subformField.spec.js front/src/components/form-fill/tableOptions.spec.js front/src/components/form-fill/linkageRuntime.spec.js front/src/components/form-design/linkage.spec.js
 
 cd server
 npx jest src/application/form-record src/application/application.service.spec.ts --no-coverage
