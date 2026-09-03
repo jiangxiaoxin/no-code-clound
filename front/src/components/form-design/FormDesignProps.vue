@@ -522,12 +522,21 @@
           />
         </el-form-item>
         <el-form-item v-if="field.optionSource === 'table_data'" label="选项过滤">
-          <div
-            class="filter-trigger"
-            :class="{ 'is-placeholder': !hasOptionFilters(field.optionFilters) }"
-            @click="openOptionFilters"
-          >
-            {{ hasOptionFilters(field.optionFilters) ? '已添加过滤条件' : '添加过滤条件' }}
+          <div class="linkage-row">
+            <div
+              class="filter-trigger"
+              :class="{ 'is-placeholder': !hasOptionFilters(field.optionFilters) }"
+              @click="openOptionFilters"
+            >
+              {{ hasOptionFilters(field.optionFilters) ? '已添加过滤条件' : '添加过滤条件' }}
+            </div>
+            <el-icon
+              v-if="hasOptionFilters(field.optionFilters)"
+              class="linkage-clear"
+              @click.stop="confirmClearOptionFilters"
+            >
+              <CircleClose />
+            </el-icon>
           </div>
         </el-form-item>
         <el-form-item v-if="field.optionSource === 'linkage'" label="数据联动">
@@ -1700,6 +1709,20 @@ function openProcess() {
 
 function openOptionFilters() {
   filterVisible.value = true
+}
+
+async function confirmClearOptionFilters() {
+  if (!props.field) return
+  try {
+    await ElMessageBox.confirm('是否要清空已配置的过滤条件？', '清空', {
+      confirmButtonText: '清空',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  delete props.field.optionFilters
 }
 
 function openLinkage() {

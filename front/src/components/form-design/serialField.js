@@ -1,13 +1,14 @@
 import { flattenFields } from './tabsField.js'
+import dayjs from "dayjs"
 
 export const DEFAULT_SERIAL_SEPARATOR = '-'
 
 export const SERIAL_DATETIME_OPTIONS = [
-  { value: 'YYYY', label: '2025' },
-  { value: 'YYYYMM', label: '202508' },
-  { value: 'YYYYMMDD', label: '20250823' },
-  { value: 'YYYYMMDDHHmmss', label: '20250823102035' },
-  { value: 'epochMs', label: '毫秒时间戳' },
+  { value: 'YYYY', label: `年(${dayjs().format('YYYY')})` },
+  { value: 'YYYYMM', label: `年月(${dayjs().format('YYYYMM')})` },
+  { value: 'YYYYMMDD', label: `年月日(${dayjs().format('YYYYMMDD')})` },
+  { value: 'YYYYMMDDHHmmss', label: `年月日时分秒(${dayjs().format('YYYYMMDDHHmmss')})` },
+  { value: 'epochMs', label: `毫秒时间戳(${dayjs().valueOf()})` },
 ]
 
 export const SERIAL_RESET_PERIODS = [
