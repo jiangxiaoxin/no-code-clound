@@ -1240,9 +1240,13 @@ const subformLinkageVisible = ref(false)
 
 const formFields = computed(() => {
   if (props.parentSubform) {
-    return (props.parentSubform.fields || []).filter(
-      (item) => isFillable(item) && item.key !== props.field?.key,
-    )
+    const parentTitle = props.parentSubform.title || '子表单'
+    return (props.parentSubform.fields || [])
+      .filter((item) => isFillable(item) && item.key !== props.field?.key)
+      .map((item) => ({
+        ...item,
+        title: fieldRefLabel(item, { parentTitle }),
+      }))
   }
   return flattenFields(props.fields || []).filter(
     (item) => isFillable(item) && item.key !== props.field?.key,

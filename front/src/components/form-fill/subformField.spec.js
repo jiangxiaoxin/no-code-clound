@@ -9,6 +9,7 @@ import {
   stripEmptySubformRows,
   subformRowsRequiredError,
   uniqueInRowsError,
+  fieldRefLabel,
 } from './subformField.js'
 
 test('rejects nested subform and divider', () => {
@@ -51,6 +52,18 @@ test('required child blocks an otherwise empty row', () => {
     '[订单明细.物料名称]不能为空',
   )
   assert.equal(subformRowsRequiredError(field, []), '')
+})
+
+test('fieldRefLabel prefixes subform title', () => {
+  assert.equal(
+    fieldRefLabel({ title: '物料名称' }, { parentTitle: '明细' }),
+    '明细.物料名称',
+  )
+  assert.equal(fieldRefLabel({ title: '工厂' }), '当前表单.工厂')
+  assert.equal(
+    fieldRefLabel({ key: 'name' }, { parentTitle: '订单明细' }),
+    '订单明细.未命名',
+  )
 })
 
 test('uniqueInRows catches duplicate text and data id', () => {
