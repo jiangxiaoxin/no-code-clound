@@ -3,7 +3,7 @@
     :model-value="modelValue"
     title="数据详情"
     direction="rtl"
-    size="800px"
+    size="1000px"
     destroy-on-close
     @update:model-value="onVisibleChange"
     @closed="resetDetail"

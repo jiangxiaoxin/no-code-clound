@@ -708,7 +708,7 @@
                   :disabled="index === 0"
                   @click.stop="onMoveChild(child, -1)"
                 >
-                  左移
+                  上移
                 </el-button>
                 <el-button
                   link
@@ -716,7 +716,7 @@
                   :disabled="index === (field.fields || []).length - 1"
                   @click.stop="onMoveChild(child, 1)"
                 >
-                  右移
+                  下移
                 </el-button>
                 <!-- <el-button link type="primary" @click.stop="onCopyChild(child)">复制</el-button> -->
                 <el-button link type="danger" @click.stop="onRemoveChild(child)">删除</el-button>
