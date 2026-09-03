@@ -39,6 +39,16 @@
           <template #header>
             <span class="subform-col-title">
               <span v-if="child.required" class="subform-required">*</span>
+              <el-tooltip v-if="hasLinkage(child)" content="设置了数据联动" placement="top">
+                <el-icon class="subform-col-icon">
+                  <Link />
+                </el-icon>
+              </el-tooltip>
+              <el-tooltip v-if="fillTips[child.key]" :content="fillTips[child.key]" placement="top">
+                <el-icon class="subform-col-icon">
+                  <Connection />
+                </el-icon>
+              </el-tooltip>
               <span>{{ child.title }}</span>
             </span>
           </template>
@@ -86,6 +96,8 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Connection, Link } from '@element-plus/icons-vue'
+import { fillInfluencerTips } from '../form-design/dataSelect'
 import { hasLinkage } from '../form-design/linkage'
 import { isSelectType } from '../form-design/fieldTypes'
 import FormFillField from './FormFillField.vue'
@@ -149,6 +161,7 @@ const fillDeptNames = computed(() => ({
 const children = computed(() =>
   Array.isArray(props.field.fields) ? props.field.fields : [],
 )
+const fillTips = computed(() => fillInfluencerTips(children.value))
 
 const locked = computed(
   () =>
@@ -601,6 +614,12 @@ onUnmounted(() => {
 .subform-col-title {
   display: flex;
   align-items: center;
+}
+
+.subform-col-icon {
+  margin-right: 4px;
+  color: var(--el-color-primary);
+  cursor: help;
 }
 
 .subform-required {
