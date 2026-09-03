@@ -14,7 +14,6 @@
       :on-success="onUploadSuccess"
       :on-remove="onRemove"
       :disabled="disabled"
-      class="my-upload"
     >
       <el-button :disabled="disabled" :icon="Upload">上传文件</el-button>
       <template #file="{ file }">
@@ -171,9 +170,4 @@ function onUploadSuccess(result, file) {
   color: var(--el-text-color-secondary);
 }
 
-// .my-upload {
-//   :deep(.el-upload) {
-//     width: 100% !important;
-//   }
-// }
 </style>

@@ -641,4 +641,10 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+:deep(.subform-cell.is-subform-file .el-upload) {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
 </style>

@@ -854,6 +854,12 @@ function onChildDragEnd() {
   font-size: 13px;
   line-height: 32px;
 }
+
+.canvas-subform-cell.is-file :deep(.el-upload) {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
 </style>
 
 <style lang="less">
