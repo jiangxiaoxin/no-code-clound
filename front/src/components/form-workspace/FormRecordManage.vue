@@ -81,6 +81,14 @@ const detailStartEditing = ref(false)
 // 切换表单时作废进行中的请求，避免把上一张表的字段写进来
 const loadSession = ref(0)
 
+watch(detailRecord, (newval, oldval) => {
+  console.log('watch detailRecord======');
+  console.log(newval);
+  console.log(oldval);
+  console.log('===========');
+  
+})
+
 function resetValues() {
   for (const key of Object.keys(values)) {
     delete values[key]
@@ -173,12 +181,16 @@ function openCreate() {
 }
 
 function openDetail(row) {
+  console.log("🚀 ~ FormRecordManage.vue:184 ~ openDetail ~ row:", row)
+
   detailStartEditing.value = false
   detailRecord.value = row
   detailVisible.value = true
 }
 
 function openEdit(row) {
+  console.log("🚀 ~ FormRecordManage.vue:192 ~ openEdit ~ row:", row)
+
   detailStartEditing.value = true
   detailRecord.value = row
   detailVisible.value = true

@@ -58,6 +58,7 @@
       <div class="table-wrap">
         <!-- TODO 要增加统计列 -->
         <el-table
+          ref="tableRef"
           v-loading="listLoading"
           :data="records"
           border
@@ -187,6 +188,7 @@ const props = defineProps({
 const emit = defineEmits(['create', 'edit', 'row-click'])
 
 const listLoading = ref(false)
+const tableRef = ref(null)
 const records = ref([])
 const selectedRecords = ref([])
 const page = ref(1)
@@ -317,6 +319,7 @@ function onEditClick() {
     ElMessage.warning('请选择一条要编辑的数据')
     return
   }
+  console.log("🚀 ~ FormRecordList.vue:321 ~ onEditClick ~ selectedRecords.value[0]:", selectedRecords.value[0])
   emit('edit', selectedRecords.value[0])
 }
 
@@ -358,7 +361,7 @@ async function onDeleteSelected() {
       ids.map((id) => deleteFormRecordApi(props.appId, props.form.id, id)),
     )
     ElMessage.success('已删除')
-    selectedRecords.value = []
+    clearSelectedRecords()
     if (removed && page.value > 1) {
       page.value -= 1
     }
@@ -372,6 +375,7 @@ async function reload({ resetPage = false } = {}) {
   if (resetPage) {
     page.value = 1
   }
+  clearSelectedRecords()
   await loadRecords()
 }
 
@@ -399,11 +403,17 @@ function onQuickSearch(payload) {
   loadRecords()
 }
 
+function clearSelectedRecords() {
+  selectedRecords.value = []
+  tableRef.value?.clearSelection()
+}
+
 function upsertRecord(updated) {
   const index = records.value.findIndex((item) => item.id === updated.id)
   if (index >= 0) {
     records.value[index] = updated
   }
+  clearSelectedRecords()
 }
 
 function formHasDeptField(fields) {
