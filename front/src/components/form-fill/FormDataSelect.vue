@@ -106,6 +106,8 @@ import {
   listDictionaryItemsByCodesApi,
   queryFormRecordsApi,
 } from '../../api/apps'
+import { listOrgDepartmentsApi } from '../../api/org'
+import { flattenDeptNames, isDeptField } from '../form-design/deptField.js'
 import { isSelectType } from '../form-design/fieldTypes'
 import {
   CREATED_AT_KEY,
@@ -162,6 +164,8 @@ const pageSize = ref(PAGE_SIZES[0])
 const keyword = ref('')
 const sourceFields = ref([])
 const dictItemsByCode = ref({})
+const sourceUserNames = ref({})
+const sourceDeptNames = ref({})
 const selected = ref(null)
 const tableRef = ref(null)
 const draftRow = ref(null)
@@ -296,7 +300,33 @@ function formatRecordField(col, row) {
     col.field,
     row?.data?.[col.key],
     dictItemsByCode.value,
+    sourceUserNames.value,
+    sourceDeptNames.value,
   )
+}
+
+function mergeUserNames(extra) {
+  if (!extra || typeof extra !== 'object') {
+    return
+  }
+  sourceUserNames.value = { ...sourceUserNames.value, ...extra }
+}
+
+function sourceHasDeptField(fields) {
+  return (fields || []).some(isDeptField)
+}
+
+async function loadDeptNames(fields) {
+  if (!sourceHasDeptField(fields)) {
+    sourceDeptNames.value = {}
+    return
+  }
+  try {
+    const tree = await listOrgDepartmentsApi()
+    sourceDeptNames.value = flattenDeptNames(tree)
+  } catch {
+    sourceDeptNames.value = {}
+  }
 }
 
 function dictCodesOf(fields) {
@@ -332,6 +362,8 @@ async function loadSource() {
   if (!props.appId || !props.field.sourceFormId) {
     sourceFields.value = []
     dictItemsByCode.value = {}
+    sourceUserNames.value = {}
+    sourceDeptNames.value = {}
     return
   }
   try {
@@ -340,8 +372,10 @@ async function loadSource() {
     sourceFields.value = fields.filter(isFillable)
     if (props.preview) {
       dictItemsByCode.value = {}
+      sourceDeptNames.value = {}
       return
     }
+    await loadDeptNames(sourceFields.value)
     const codes = dictCodesOf(sourceFields.value)
     if (!codes.length) {
       dictItemsByCode.value = {}
@@ -354,6 +388,8 @@ async function loadSource() {
   } catch {
     sourceFields.value = []
     dictItemsByCode.value = {}
+    sourceUserNames.value = {}
+    sourceDeptNames.value = {}
   }
 }
 
@@ -397,6 +433,7 @@ async function loadRecords() {
     )
     records.value = result?.items || []
     total.value = result?.total || 0
+    mergeUserNames(result?.userNames)
   } catch {
     records.value = []
     total.value = 0
@@ -576,6 +613,7 @@ async function loadSelected() {
     if (seq !== selectedSeq) return
     selected.value = row
     loadedKey = key
+    mergeUserNames(row?.userNames)
   } catch {
     if (seq !== selectedSeq) return
     selected.value = null
