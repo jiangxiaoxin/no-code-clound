@@ -39,10 +39,32 @@
           @select-all="onSelectAll">
           <el-table-column type="selection" width="42" />
           <el-table-column type="index" width="55" label="序号" />
-          <el-table-column v-for="col in tableColumns" :key="col.key" :label="col.title" min-width="120"
-            show-overflow-tooltip>
+          <el-table-column v-for="col in tableColumns" :key="col.key" :label="col.title" :min-width="columnMinWidth(col)"
+            :show-overflow-tooltip="showColumnTooltip(col)">
             <template #default="{ row }">
-              {{ formatRecordField(col, row) }}
+              <div v-if="isImageColumn(col)" class="data-select-images">
+                <el-image
+                  v-for="(url, index) in recordImageUrls(col, row)"
+                  :key="url"
+                  class="data-select-thumb"
+                  :src="url"
+                  :preview-src-list="recordImageUrls(col, row)"
+                  :initial-index="index"
+                  fit="cover"
+                  preview-teleported
+                  @click.prevent.stop
+                >
+                  <template #toolbar="toolbar">
+                    <FormImageViewerToolbar
+                      v-bind="toolbar"
+                      :urls="recordImageUrls(col, row)"
+                    />
+                  </template>
+                </el-image>
+              </div>
+              <template v-else>
+                {{ formatRecordField(col, row) }}
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -86,6 +108,8 @@ import {
 } from '../form-workspace/columnPrefs'
 import { cloneDisplayFieldKeys, displayFieldTitle, findDisplaySourceField } from '../form-design/dataSelect'
 import { formatCellValue, isFillable } from './fillValues'
+import { imageUrlsOf } from './imageField.js'
+import FormImageViewerToolbar from './FormImageViewerToolbar.vue'
 import { formatDateTime } from '../../utils/timeValue.js'
 import { buildSourceQuery, mergeFilterQueries } from './tableOptions'
 import { buildQuickSearchQuery } from '../form-workspace/quickSearch'
@@ -213,6 +237,22 @@ const triggerText = computed(() => {
 
 function formatSystemTime(value) {
   return formatDateTime(value)
+}
+
+function isImageColumn(col) {
+  return col?.field?.type === 'image'
+}
+
+function recordImageUrls(col, row) {
+  return imageUrlsOf(row?.data?.[col?.key])
+}
+
+function columnMinWidth(col) {
+  return isImageColumn(col) ? 160 : 120
+}
+
+function showColumnTooltip(col) {
+  return !isImageColumn(col)
 }
 
 function formatRecordField(col, row) {
@@ -619,5 +659,19 @@ watch(
 
 .data-select-table.is-single :deep(th.el-table-column--selection .el-checkbox) {
   display: none;
+}
+
+.data-select-images {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+
+.data-select-thumb {
+  width: 36px;
+  height: 36px;
+  margin-right: 4px;
+  border-radius: 4px;
 }
 </style>
