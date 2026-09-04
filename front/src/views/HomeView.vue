@@ -32,6 +32,7 @@
           v-for="app in visibleApps"
           :key="app.id"
           class="app-card"
+          :class="{ 'is-menu-open': openMenuAppId === app.id }"
           shadow="never"
           @click="openApp(app)"
         >
@@ -41,6 +42,7 @@
             placement="bottom"
             popper-class="app-card-dropdown"
             @command="onAppMenuCommand($event, app)"
+            @visible-change="onAppMenuVisibleChange($event, app)"
           >
             <el-button
               class="app-card-settings"
@@ -156,6 +158,7 @@ const renaming = ref(false)
 const renameFormRef = ref()
 const renameTargetId = ref(0)
 const renameForm = reactive({ name: '' })
+const openMenuAppId = ref(null)
 const nameRules = [
   { required: true, message: '请输入应用名称', trigger: 'blur' },
   { min: 1, max: 32, message: '应用名称最多 32 个字', trigger: 'blur' },
@@ -199,6 +202,10 @@ function onAppMenuCommand(command, app) {
   if (command === 'delete') {
     onDeleteApp(app)
   }
+}
+
+function onAppMenuVisibleChange(visible, app) {
+  openMenuAppId.value = visible ? app.id : null
 }
 
 function openRename(app) {
@@ -341,7 +348,8 @@ onMounted(loadApps)
   transition: background-color 0.15s ease;
 }
 
-.app-card:hover {
+.app-card:hover,
+.app-card.is-menu-open {
   background-color: #f7f8fa;
 }
 
@@ -361,7 +369,8 @@ onMounted(loadApps)
   pointer-events: none;
 }
 
-.app-card:hover .app-card-menu {
+.app-card:hover .app-card-menu,
+.app-card.is-menu-open .app-card-menu {
   opacity: 1;
   pointer-events: auto;
 }
