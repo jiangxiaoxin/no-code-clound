@@ -18,6 +18,7 @@
         :disabled="!editing"
         :updating="true"
         :user-names="record?.userNames || {}"
+        :record-id="record?.id || ''"
       />
       <div v-if="!editing" class="record-audit">
         <div class="record-audit-row">

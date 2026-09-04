@@ -179,6 +179,29 @@ describe('ApplicationService', () => {
     });
   });
 
+  describe('renameApp', () => {
+    it('updates name', async () => {
+      repo.findOne.mockResolvedValue({ ...ownedApp, name: '旧名' });
+      repo.save.mockImplementation(async (row: Application) => row);
+
+      await expect(
+        service.renameApp(1, 8, { name: ' 新名 ' }),
+      ).resolves.toEqual({
+        id: 8,
+        name: '新名',
+        icon: ownedApp.icon,
+      });
+    });
+
+    it('throws 404 when missing or not owner', async () => {
+      repo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.renameApp(1, 8, { name: '新名' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
   describe('deleteApp', () => {
     it('removes mysql rows and mongo collections for the app', async () => {
       repo.findOne.mockResolvedValue(ownedApp);
@@ -877,6 +900,43 @@ describe('ApplicationService', () => {
               fields: [{ key: 'name', title: '名称', type: 'input' }],
             },
           ],
+        },
+      ]);
+    });
+
+    it('include=relate 时返回关联数据字段和它指向的主表', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.find.mockResolvedValue([
+        {
+          id: 30,
+          name: '人员表',
+          applicationId: 8,
+          fields: {
+            fields: [
+              { key: 'name', type: 'input', title: '工人名' },
+              { key: 'r1', type: 'relate', title: '所属工厂', sourceFormId: 12 },
+              { key: 'r2', type: 'relate', title: '没配主表' },
+            ],
+          },
+        },
+      ]);
+
+      await expect(service.listFormFields(1, 8, undefined, 'relate')).resolves.toEqual([
+        {
+          id: 30,
+          name: '人员表',
+          fields: [
+            { key: 'name', title: '工人名', type: 'input' },
+            { key: 'r1', title: '所属工厂', type: 'relate', sourceFormId: 12 },
+          ],
+        },
+      ]);
+
+      await expect(service.listFormFields(1, 8)).resolves.toEqual([
+        {
+          id: 30,
+          name: '人员表',
+          fields: [{ key: 'name', title: '工人名', type: 'input' }],
         },
       ]);
     });

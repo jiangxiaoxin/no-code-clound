@@ -22,6 +22,7 @@ export const IMPORT_SKIP_TYPES = new Set([
   'dept-multiple',
   'data',
   'relate',
+  'relate-subform',
   'serialNumber',
 ]);
 

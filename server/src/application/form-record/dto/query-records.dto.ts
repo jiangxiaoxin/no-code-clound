@@ -38,4 +38,12 @@ export class QueryRecordsDto {
   @Min(1, { message: '分页大小不正确' })
   @Max(100, { message: '分页大小不正确' })
   pageSize?: number;
+
+  @IsOptional()
+  @IsArray()
+  ids?: string[];
+
+  @IsOptional()
+  @IsArray()
+  excludeIds?: string[];
 }

@@ -230,4 +230,12 @@ describe('mergeRecordData', () => {
       ),
     ).toEqual({ name: 'B', sn: '20260831-00001' });
   });
+
+  it('relate-subform 不入库', () => {
+    const fields = [
+      { key: 'name', type: 'input' },
+      { key: 'rs1', type: 'relate-subform' },
+    ];
+    expect(coerceRecordData(fields, { name: 'A', rs1: 'x' })).toEqual({ name: 'A' });
+  });
 });

@@ -35,14 +35,30 @@
           shadow="never"
           @click="openApp(app)"
         >
-          <el-button
-            class="app-card-delete"
-            text
-            type="danger"
-            title="删除"
-            :icon="Delete"
-            @click.stop="onDeleteApp(app)"
-          />
+          <el-dropdown
+            class="app-card-menu"
+            trigger="click"
+            placement="bottom"
+            popper-class="app-card-dropdown"
+            @command="onAppMenuCommand($event, app)"
+          >
+            <el-button
+              class="app-card-settings"
+              text
+              :icon="Setting"
+              @click.stop
+            />
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="rename" :icon="EditPen">
+                  修改名称
+                </el-dropdown-item>
+                <el-dropdown-item command="delete" :icon="Delete">
+                  删除应用
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <div class="app-card-inner">
             <span class="app-icon" :style="{ background: app.icon }">
               {{ appInitial(app.name) }}
@@ -59,6 +75,7 @@
     title="新建应用"
     width="420px"
     align-center
+    draggable
     @closed="resetCreate"
   >
     <el-form
@@ -84,15 +101,47 @@
       </el-button>
     </template>
   </el-dialog>
+
+  <el-dialog
+    v-model="renameVisible"
+    title="修改名称"
+    width="420px"
+    align-center
+    draggable
+    @closed="resetRename"
+  >
+    <el-form
+      ref="renameFormRef"
+      :model="renameForm"
+      :rules="renameRules"
+      label-position="top"
+      @submit.prevent="onRename"
+    >
+      <el-form-item label="应用名称" prop="name">
+        <el-input
+          v-model="renameForm.name"
+          maxlength="32"
+          show-word-limit
+          placeholder="请输入应用名称"
+        />
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="renameVisible = false">取消</el-button>
+      <el-button type="primary" :loading="renaming" @click="onRename">
+        保存
+      </el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Delete, Plus, Search } from '@element-plus/icons-vue'
+import { Delete, EditPen, Plus, Search, Setting } from '@element-plus/icons-vue'
 import AppHeader from '../components/AppHeader.vue'
-import { createAppApi, deleteAppApi, listAppsApi } from '../api/apps'
+import { createAppApi, deleteAppApi, listAppsApi, renameAppApi } from '../api/apps'
 
 const router = useRouter()
 const keyword = ref('')
@@ -102,12 +151,17 @@ const createVisible = ref(false)
 const creating = ref(false)
 const createFormRef = ref()
 const createForm = reactive({ name: '' })
-const createRules = {
-  name: [
-    { required: true, message: '请输入应用名称', trigger: 'blur' },
-    { min: 1, max: 32, message: '应用名称最多 32 个字', trigger: 'blur' },
-  ],
-}
+const renameVisible = ref(false)
+const renaming = ref(false)
+const renameFormRef = ref()
+const renameTargetId = ref(0)
+const renameForm = reactive({ name: '' })
+const nameRules = [
+  { required: true, message: '请输入应用名称', trigger: 'blur' },
+  { min: 1, max: 32, message: '应用名称最多 32 个字', trigger: 'blur' },
+]
+const createRules = { name: nameRules }
+const renameRules = { name: nameRules }
 
 const visibleApps = computed(() => {
   const q = keyword.value.trim().toLowerCase()
@@ -135,6 +189,50 @@ async function loadApps() {
 
 function openApp(app) {
   router.push(`/apps/${app.id}`)
+}
+
+function onAppMenuCommand(command, app) {
+  if (command === 'rename') {
+    openRename(app)
+    return
+  }
+  if (command === 'delete') {
+    onDeleteApp(app)
+  }
+}
+
+function openRename(app) {
+  renameTargetId.value = app.id
+  renameForm.name = app.name
+  renameVisible.value = true
+}
+
+function resetRename() {
+  renameTargetId.value = 0
+  renameForm.name = ''
+  renameFormRef.value?.resetFields()
+}
+
+async function onRename() {
+  await renameFormRef.value.validate()
+  const name = renameForm.name.trim()
+  if (!renameTargetId.value) {
+    return
+  }
+  renaming.value = true
+  try {
+    const updated = await renameAppApi(renameTargetId.value, { name })
+    const index = apps.value.findIndex((item) => item.id === updated.id)
+    if (index >= 0) {
+      apps.value[index] = updated
+    }
+    renameVisible.value = false
+    ElMessage.success('已修改应用名称')
+  } catch {
+    // 错误已由 http 拦截器提示
+  } finally {
+    renaming.value = false
+  }
 }
 
 async function onDeleteApp(app) {
@@ -254,7 +352,7 @@ onMounted(loadApps)
   padding: 20px 18px 16px;
 }
 
-.app-card-delete {
+.app-card-menu {
   position: absolute;
   top: 4px;
   right: 4px;
@@ -263,9 +361,14 @@ onMounted(loadApps)
   pointer-events: none;
 }
 
-.app-card:hover .app-card-delete {
+.app-card:hover .app-card-menu {
   opacity: 1;
   pointer-events: auto;
+}
+
+.app-card-settings {
+  padding: 4px;
+  color: var(--el-text-color-secondary);
 }
 
 .app-card-inner {
@@ -302,5 +405,21 @@ onMounted(loadApps)
   line-height: 1.4;
   color: var(--el-text-color-primary);
   font-weight: bold;
+}
+</style>
+
+<style lang="less">
+.app-card-dropdown {
+  min-width: 140px;
+
+  .el-dropdown-menu {
+    min-width: 140px;
+  }
+
+  .el-dropdown-menu__item {
+    justify-content: flex-start;
+    text-align: left;
+    font-size: 13px;
+  }
 }
 </style>

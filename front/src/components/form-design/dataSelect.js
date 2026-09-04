@@ -1,4 +1,5 @@
 import { flattenFields } from './tabsField.js'
+import { isSelectType } from './fieldTypes'
 import {
   CREATED_AT_KEY,
   CREATED_BY_KEY,
@@ -75,7 +76,7 @@ export function fillInfluencerTips(fields) {
         collect(field.fields)
         continue
       }
-      if (field.type !== 'data') continue
+      if (field.type !== 'data' && field.type !== 'relate') continue
       const name =
         (typeof field.title === 'string' && field.title.trim()) || field.key
       if (!name) continue
@@ -93,4 +94,21 @@ export function fillInfluencerTips(fields) {
     tips[key] = `会受 [ ${names.join('、')} ] 字段影响`
   }
   return tips
+}
+
+export function sourceDictCodes(fields) {
+  const codes = []
+  const seen = new Set()
+  for (const field of fields || []) {
+    const usesDict =
+      (field.type === 'radio' ||
+        field.type === 'checkbox' ||
+        isSelectType(field.type)) &&
+      (field.optionSource || 'dictionary') === 'dictionary' &&
+      field.dictCode
+    if (!usesDict || seen.has(field.dictCode)) continue
+    seen.add(field.dictCode)
+    codes.push(field.dictCode)
+  }
+  return codes
 }

@@ -512,3 +512,45 @@ describe('rewriteDictFilterValues', () => {
     ).toEqual([{ key: 'status', op: 'eq', value: '1' }]);
   });
 });
+
+describe('buildRecordQuery ids / excludeIds', () => {
+  const idA = '64b7f9c2e3a1b2c3d4e5f601';
+  const idB = '64b7f9c2e3a1b2c3d4e5f602';
+
+  it('ids 只保留合法 ObjectId', () => {
+    const built = buildRecordQuery([], { ids: [idA, 'not-an-id'] });
+    const clause = built.filter as { _id: { $in: { toHexString(): string }[] } };
+    expect(clause._id.$in.map((item) => item.toHexString())).toEqual([idA]);
+  });
+
+  it('ids 全非法时查不到数据', () => {
+    const built = buildRecordQuery([], { ids: ['nope'] });
+    const clause = built.filter as { _id: { $in: unknown[] } };
+    expect(clause._id.$in).toEqual([]);
+  });
+
+  it('excludeIds 与其它条件并存', () => {
+    const nameFields = [{ key: 'name', type: 'input' }] as never;
+    const built = buildRecordQuery(nameFields, {
+      filters: [{ key: 'name', op: 'eq', value: 'A' }],
+      excludeIds: [idB],
+    });
+    const parts = built.filter.$and as Record<string, unknown>[];
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toEqual({ 'data.name': 'A' });
+    const nin = (parts[1] as { _id: { $nin: { toHexString(): string }[] } })._id
+      .$nin;
+    expect(nin.map((item) => item.toHexString())).toEqual([idB]);
+  });
+
+  it('excludeIds 全非法时不加条件', () => {
+    const built = buildRecordQuery([], { excludeIds: ['nope'] });
+    expect(built.filter).toEqual({});
+  });
+
+  it('不传时行为不变', () => {
+    const built = buildRecordQuery([], {});
+    expect(built.filter).toEqual({});
+    expect(built.sort).toEqual({ updatedAt: -1 });
+  });
+});

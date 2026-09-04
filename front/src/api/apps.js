@@ -18,6 +18,10 @@ export function deleteAppApi(id) {
   return http.delete(`/apps/${id}`)
 }
 
+export function renameAppApi(id, payload) {
+  return http.patch(`/apps/${id}`, payload)
+}
+
 export function getDirectoryApi(id) {
   return http.get(`/apps/${id}/directory`)
 }

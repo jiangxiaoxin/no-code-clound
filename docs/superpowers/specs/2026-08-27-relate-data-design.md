@@ -1,7 +1,7 @@
 # 关联数据设计
 
 日期：2026-08-27  
-状态：待确认  
+状态：已并入 `docs/superpowers/specs/2026-09-04-relate-data-and-relate-subform-design.md`（关联数据 + 关联子表单），本文保留作历史  
 参考：简道云 [关联数据](https://hc.jiandaoyun.com/doc/18113)、[字段使用方式](https://hc.jiandaoyun.com/doc/18607)、[关联数据与选择数据的区别](https://hc.jiandaoyun.com/doc/18699)  
 范围：主表字段 `type: 'relate'` 的设计配置与填报。存主表记录 id，按配置字段实时显示。不包含关联子表单、关联标签页、跨应用、聚合表。
 

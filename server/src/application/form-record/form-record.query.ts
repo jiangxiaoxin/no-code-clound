@@ -1,7 +1,20 @@
 import { BadRequestException } from '@nestjs/common';
+import { ObjectId } from 'mongodb';
 import { flattenFields } from './flatten-fields';
 import { FILTERABLE_TYPES } from './form-record.indexes';
 import { FormField } from './form-record.types';
+
+const OBJECT_ID_RE = /^[a-fA-F0-9]{24}$/;
+
+function toObjectIds(list: unknown): ObjectId[] {
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter(
+      (item): item is string =>
+        typeof item === 'string' && OBJECT_ID_RE.test(item),
+    )
+    .map((item) => new ObjectId(item));
+}
 
 export type DatePrecision =
   | 'year'
@@ -31,6 +44,10 @@ export type RecordQueryBody = {
   sort?: RecordSort | RecordSort[];
   page?: number;
   pageSize?: number;
+  /** 只取这些数据（关联数据列表批量补显示字段用）；非法 id 丢弃 */
+  ids?: string[];
+  /** 排除这些数据（关联本表时排除正在编辑的自己） */
+  excludeIds?: string[];
 };
 
 const STRING_CONTAINS_TYPES = new Set([
@@ -562,6 +579,13 @@ export function buildRecordQuery(
       group.match,
     );
     if (Object.keys(next).length) parts.push(next);
+  }
+  if (body.ids !== undefined) {
+    parts.push({ _id: { $in: toObjectIds(body.ids) } });
+  }
+  const excluded = toObjectIds(body.excludeIds);
+  if (excluded.length) {
+    parts.push({ _id: { $nin: excluded } });
   }
   const filter =
     parts.length <= 1 ? (parts[0] ?? {}) : { $and: parts };

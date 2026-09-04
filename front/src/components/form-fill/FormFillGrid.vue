@@ -25,6 +25,7 @@
                 :dict-items-by-code="dictItemsByCode"
                 :user-names="fillUserNames"
                 :dept-names="fillDeptNames"
+                :record-id="recordId"
                 @fill="onFill"
               />
             </div>
@@ -45,6 +46,7 @@
         :dict-items-by-code="dictItemsByCode"
         :user-names="fillUserNames"
         :dept-names="fillDeptNames"
+        :record-id="recordId"
         @fill="onFill"
       />
     </template>
@@ -88,6 +90,7 @@ const props = defineProps({
   updating: { type: Boolean, default: false },
   userNames: { type: Object, default: () => ({}) },
   deptNames: { type: Object, default: () => ({}) },
+  recordId: { type: String, default: '' },
 })
 
 const linkageUserNames = ref({})

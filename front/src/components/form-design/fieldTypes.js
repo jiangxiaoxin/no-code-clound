@@ -46,9 +46,9 @@ export const fieldTypes = [
   { type: 'dept-multiple', label: '部门多选', icon: OfficeBuilding, component: 'DeptSelect', placeholder: '请选择' },
   { type: 'subform', label: '子表单', icon: Tickets, component: 'SubForm', placeholder: '' },
   { type: 'tabs', label: '标签页', icon: Document, component: 'Tabs', placeholder: '' },
-  // -----------以下未完成------
   { type: 'relate', label: '关联数据', icon: Link, component: 'RelateData', placeholder: '请选择' },
   { type: 'relate-subform', label: '关联子表单', icon: Link, component: 'RelateSubForm', placeholder: '请选择' },
+  // -----------以下未完成------
   
   
 ]

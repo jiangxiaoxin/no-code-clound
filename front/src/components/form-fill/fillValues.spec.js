@@ -399,3 +399,43 @@ test('dept single persists id; multiple persists unique ids; required', () => {
     '总部、研发',
   )
 })
+
+test('relate 存 id、回显 id、进列表列、必填生效', () => {
+  const field = { key: 'r1', type: 'relate', sourceFormId: 12, required: true }
+  assert.equal(isFillable(field), false)
+  assert.equal(isListColumn(field), true)
+  assert.equal(isInlineEditable(field), false)
+
+  const cloned = cloneRecordValues([field], { r1: '64b7f9c2e3a1b2c3d4e5f601' })
+  assert.equal(cloned.r1, '64b7f9c2e3a1b2c3d4e5f601')
+
+  const payload = buildRecordData([field], { r1: '64b7f9c2e3a1b2c3d4e5f601' })
+  assert.equal(payload.r1, '64b7f9c2e3a1b2c3d4e5f601')
+
+  assert.equal(
+    firstRequiredError([field], { r1: '' })?.key,
+    'r1',
+  )
+  assert.equal(firstRequiredError([field], { r1: '64b7f9c2e3a1b2c3d4e5f601' }), null)
+})
+
+test('选择数据设了必填、没选时也要拦下来', () => {
+  const field = { key: 'd1', type: 'data', sourceFormId: 12, required: true, title: '物料' }
+  assert.equal(firstRequiredError([field], { d1: '' })?.key, 'd1')
+  assert.equal(
+    firstRequiredError([field], { d1: '' })?.message,
+    '请填写「物料」',
+  )
+  assert.equal(firstRequiredError([field], { d1: '64b7f9c2e3a1b2c3d4e5f601' }), null)
+  assert.equal(firstRequiredError([{ ...field, required: false }], { d1: '' }), null)
+})
+
+test('relate-subform 不填报、不入库、不进列表', () => {
+  const field = { key: 'rs1', type: 'relate-subform', childFormId: 30, childRelateKey: 'r1' }
+  assert.equal(isFillable(field), false)
+  assert.equal(isListColumn(field), false)
+  assert.equal(isInlineEditable(field), false)
+  assert.deepEqual(emptyRecordValues([field]), {})
+  assert.deepEqual(buildRecordData([field], { rs1: 'x' }), {})
+  assert.equal(firstRequiredError([{ ...field, required: true }], {}), null)
+})

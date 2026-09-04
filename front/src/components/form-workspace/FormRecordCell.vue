@@ -180,6 +180,7 @@ import { addressHasDetail } from '../form-fill/addressField.js'
 import { buildSourceQuery, recordsToSelectItems } from '../form-fill/tableOptions'
 import FormAddressSelect from '../form-fill/FormAddressSelect.vue'
 import FormImageViewerToolbar from '../form-fill/FormImageViewerToolbar.vue'
+import { relateTitleKey } from './relateTitles'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -190,6 +191,7 @@ const props = defineProps({
   dictItemsByCode: { type: Object, default: () => ({}) },
   userNames: { type: Object, default: () => ({}) },
   deptNames: { type: Object, default: () => ({}) },
+  relateTitles: { type: Object, default: () => ({}) },
   editing: { type: Boolean, default: false },
 })
 
@@ -216,15 +218,23 @@ const usesSelectEditor = computed(() => {
   )
 })
 
-const display = computed(() =>
-  formatCellValue(
-    props.field,
-    props.row.data?.[props.field?.key],
+const display = computed(() => {
+  const field = props.field
+  if (field?.type === 'relate') {
+    const id = props.row.data?.[field.key]
+    if (typeof id !== 'string' || !id) return ''
+    return (
+      props.relateTitles[relateTitleKey(field.sourceFormId, id)] || '已删除'
+    )
+  }
+  return formatCellValue(
+    field,
+    props.row.data?.[field.key],
     props.dictItemsByCode,
     props.userNames,
     props.deptNames,
-  ),
-)
+  )
+})
 
 const imageUrls = computed(() => imageUrlsOf(props.row.data?.[props.field?.key]))
 

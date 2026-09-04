@@ -138,6 +138,15 @@ export class ApplicationController {
     return this.applicationService.getOne(req.user.id, id);
   }
 
+  @Patch(':id')
+  renameApp(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: NameDto,
+  ) {
+    return this.applicationService.renameApp(req.user.id, id, dto);
+  }
+
   @Delete(':id')
   deleteApp(
     @Req() req: { user: { id: number } },

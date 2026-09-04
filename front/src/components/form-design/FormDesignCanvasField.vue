@@ -2,7 +2,7 @@
   <div
     class="canvas-field"
     :class="[
-      widthClass[field.width] || 'is-w-full',
+      layoutWidthClass,
       {
         'is-selected': selected,
         'is-child-selected': childSelected,
@@ -11,6 +11,7 @@
         'is-image': field.type === 'image',
         'is-file': field.type === 'file',
         'is-tabs': field.type === 'tabs',
+        'is-subform': field.type === 'subform' || field.type === 'relate-subform',
         'is-embedded': embedded,
       },
     ]"
@@ -150,12 +151,49 @@
       :field="field"
       preview
     />
-    <el-select
+    <div v-else-if="field.type === 'relate' && !field.sourceFormId" class="canvas-field-hint">
+      请选择主表
+    </div>
+    <FormDataSelect
       v-else-if="field.type === 'relate'"
-      disabled
       class="canvas-item"
-      :placeholder="field.placeholder"
+      :app-id="appId"
+      :field="field"
+      mode="relate"
+      preview
+      :compact="embedded"
     />
+    <div v-else-if="field.type === 'relate-subform'" class="canvas-subform">
+      <div class="canvas-subform-table">
+        <div class="canvas-subform-head">
+          <div
+            v-for="col in previewColumns"
+            :key="col.key"
+            class="canvas-subform-col"
+            :class="relatePreviewColClass(col.key)"
+          >
+            <span class="canvas-subform-col-title">{{ col.title }}</span>
+          </div>
+        </div>
+        <div class="canvas-subform-body">
+          <div
+            v-if="!previewColumns.length"
+            class="canvas-subform-cell is-hint"
+          >
+            保存数据后，在数据详情里查看关联数据
+          </div>
+          <div
+            v-for="col in previewColumns"
+            :key="`${col.key}-preview`"
+            class="canvas-subform-cell"
+            :class="relatePreviewColClass(col.key)"
+          />
+        </div>
+      </div>
+      <div v-if="previewColumns.length" class="relate-subform-preview-hint">
+        保存数据后，在数据详情里查看关联数据
+      </div>
+    </div>
     <FormDataSelect
       v-else-if="field.type === 'data'"
       class="canvas-item"
@@ -337,15 +375,17 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { CopyDocument, Connection, Delete, InfoFilled, Link, Plus } from '@element-plus/icons-vue'
+import { getFormApi } from '../../api/apps'
 import { fieldTypes, widthClass } from './fieldTypes'
+import { relateSubformColumnTitles } from './relateSubform.js'
 import {
   hasLinkage,
   hasSubformLinkage,
   needsOptionSourceHint as fieldNeedsOptionSourceHint,
 } from './linkage'
-import { isTabsField } from './tabsField.js'
+import { flattenFields, isTabsField } from './tabsField.js'
 import { SUBFORM_CHILD_TYPES } from '../form-fill/subformField.js'
 import FormDataSelect from '../form-fill/FormDataSelect.vue'
 import FormFileUpload from '../form-fill/FormFileUpload.vue'
@@ -389,6 +429,13 @@ const emit = defineEmits([
 const innerDragKey = ref('')
 const innerDragOverKey = ref('')
 
+const layoutWidthClass = computed(() => {
+  if (props.field.type === 'subform' || props.field.type === 'relate-subform' || props.field.type === 'tabs') {
+    return 'is-w-full'
+  }
+  return widthClass[props.field.width] || 'is-w-full'
+})
+
 const childFields = computed(() =>
   Array.isArray(props.field.fields) ? props.field.fields : [],
 )
@@ -409,6 +456,44 @@ const needsOptionSourceHint = computed(() =>
 
 const linked = computed(
   () => hasLinkage(props.field) || hasSubformLinkage(props.field),
+)
+
+const relateChildFields = ref([])
+
+const previewColumns = computed(() =>
+  relateSubformColumnTitles(props.field.columnKeys, relateChildFields.value),
+)
+
+function relatePreviewColClass(key) {
+  const field = relateChildFields.value.find((item) => item.key === key)
+  return {
+    'is-image': field?.type === 'image',
+    'is-file': field?.type === 'file',
+  }
+}
+
+async function loadRelateChildFields() {
+  if (props.field.type !== 'relate-subform') {
+    relateChildFields.value = []
+    return
+  }
+  const formId = Number(props.field.childFormId)
+  if (!props.appId || !Number.isInteger(formId) || formId <= 0) {
+    relateChildFields.value = []
+    return
+  }
+  try {
+    const detail = await getFormApi(props.appId, formId)
+    relateChildFields.value = flattenFields(detail?.fields || [])
+  } catch {
+    relateChildFields.value = []
+  }
+}
+
+watch(
+  () => [props.appId, props.field.type, props.field.childFormId],
+  loadRelateChildFields,
+  { immediate: true },
 )
 
 const currentPane = computed(() => {
@@ -651,6 +736,12 @@ function onChildDragEnd() {
   line-height: 32px;
 }
 
+.relate-subform-preview-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--el-text-color-placeholder);
+}
+
 :deep(.canvas-item) {
   width: 100%;
   max-width: 354px;
@@ -779,6 +870,10 @@ function onChildDragEnd() {
   line-height: 34px;
 }
 
+.canvas-subform-cell:empty {
+  min-height: 50px;
+}
+
 .canvas-subform-plus {
   color: var(--el-color-primary);
   cursor: pointer;
@@ -809,7 +904,8 @@ function onChildDragEnd() {
   max-width: 100%;
 }
 
-.canvas-field.is-tabs {
+.canvas-field.is-tabs,
+.canvas-field.is-subform {
   max-width: none;
 }
 

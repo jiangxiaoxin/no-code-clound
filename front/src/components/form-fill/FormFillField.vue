@@ -158,11 +158,19 @@
       :dept-names="deptNames"
       @update:model-value="onUpdateModelValue"
     />
-    <el-select
+    <FormDataSelect
       v-else-if="field.type === 'relate'"
-      disabled
       class="fill-full"
-      :placeholder="field.placeholder"
+      :app-id="appId"
+      :field="field"
+      mode="relate"
+      :disabled="isDisabled"
+      :model-value="modelValue"
+      :record-values="recordValues"
+      :form-fields="formFields"
+      :exclude-record-id="recordId"
+      @update:model-value="onUpdateModelValue"
+      @fill="onFill"
     />
     <FormDataSelect
       v-else-if="field.type === 'data'"
@@ -238,6 +246,13 @@
       :dept-names="deptNames"
       @update:model-value="onUpdateModelValue"
     />
+    <FormRelateSubform
+      v-else-if="field.type === 'relate-subform'"
+      class="fill-full"
+      :field="field"
+      :app-id="appId"
+      :record-id="recordId"
+    />
   </div>
 </template>
 
@@ -255,6 +270,7 @@ import FormImageUpload from './FormImageUpload.vue'
 import FormFileUpload from './FormFileUpload.vue'
 import FormAddressSelect from './FormAddressSelect.vue'
 import FormSubform from './FormSubform.vue'
+import FormRelateSubform from './FormRelateSubform.vue'
 import FormMemberSelect from './FormMemberSelect.vue'
 import FormDeptSelect from './FormDeptSelect.vue'
 import CurrentUserName from './CurrentUserName.vue'
@@ -276,6 +292,7 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
   userNames: { type: Object, default: () => ({}) },
   deptNames: { type: Object, default: () => ({}) },
+  recordId: { type: String, default: '' },
 })
 
 const emit = defineEmits(['update:modelValue', 'fill', 'fill-rows'])
@@ -338,6 +355,9 @@ const needsOptionSourceHint = computed(() =>
 const fieldClass = computed(() => {
   if (props.plain) {
     return ['is-plain']
+  }
+  if (props.field.type === 'relate-subform') {
+    return ['is-w-full', 'is-subform']
   }
   const width = widthClass[props.field.width] || 'is-w-full'
   if (props.field.type === 'image') return [width, 'is-image']

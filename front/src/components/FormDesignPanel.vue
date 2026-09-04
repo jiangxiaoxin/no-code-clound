@@ -52,6 +52,13 @@
       <el-button type="primary" @click="copyPreviewJson">复制</el-button>
     </template>
   </el-dialog>
+  <RelateSubformPickerDialog
+    v-model="relateSubformVisible"
+    :app-id="appId"
+    :form-id="formId"
+    @confirm="onRelateSubformConfirm"
+    @cancel="onRelateSubformCancel"
+  />
 </template>
 
 <script setup>
@@ -102,6 +109,11 @@ import {
 } from './form-fill/fileField'
 import { DEFAULT_ADDRESS_FORMAT } from './form-fill/addressField'
 import { insertAfterKey, insertIntoList } from './form-design/canvasInsert.js'
+import RelateSubformPickerDialog from './form-design/RelateSubformPickerDialog.vue'
+import {
+  defaultRelateSubformColumns,
+  hasRelateSubformField,
+} from './form-design/relateSubform.js'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -114,6 +126,8 @@ const emit = defineEmits(['saved'])
 
 const propTab = ref('field')
 const previewVisible = ref(false)
+const relateSubformVisible = ref(false)
+let pendingRelateSubform = null
 const columns = ref(1)
 const fields = ref([])
 const selectedKey = ref('')
@@ -231,7 +245,7 @@ function createFieldFromItem(item, { child = false } = {}) {
     title: item.label,
     placeholder: isSubform ? '' : item.placeholder || '',
     width:
-      isSubform || item.type === 'divider' || child
+      isSubform || item.type === 'relate-subform' || item.type === 'divider' || child
         ? '1'
         : defaultWidthByColumns(columns.value),
     required: false,
@@ -299,6 +313,22 @@ function insertIntoRoot(field, beforeKey, fromPalette) {
   insertIntoList(fields.value, field, beforeKey)
 }
 
+function placeField(field, { beforeKey, paneId, fromCanvas, fromPalette }) {
+  if (!(fromCanvas && !paneId)) {
+    const targetPaneId = resolveTargetPaneId(paneId)
+    const pane = findPane(targetPaneId)
+    if (pane) {
+      if (!pane.fields) pane.fields = []
+      insertIntoList(pane.fields, field, beforeKey)
+      activePaneId.value = pane.id
+      selectField(field)
+      return
+    }
+  }
+  insertIntoRoot(field, beforeKey, fromPalette)
+  selectField(field)
+}
+
 function addField(item, beforeKey, paneId, fromCanvas) {
   const fromPalette = !fromCanvas && !beforeKey && !paneId
   if (item.type === 'serialNumber') {
@@ -319,6 +349,12 @@ function addField(item, beforeKey, paneId, fromCanvas) {
     return
   }
 
+  if (item.type === 'relate-subform') {
+    pendingRelateSubform = { item, beforeKey, paneId, fromCanvas, fromPalette }
+    relateSubformVisible.value = true
+    return
+  }
+
   const selectedParent = findParentSubform(fields.value, selectedKey.value)
   if (selectedParent && fromPalette) {
     addChildField(selectedParent.key, item, undefined, selectedKey.value)
@@ -334,20 +370,31 @@ function addField(item, beforeKey, paneId, fromCanvas) {
     field.serialRule = serial.serialRule
   }
 
-  if (!(fromCanvas && !paneId)) {
-    const targetPaneId = resolveTargetPaneId(paneId)
-    const pane = findPane(targetPaneId)
-    if (pane) {
-      if (!pane.fields) pane.fields = []
-      insertIntoList(pane.fields, field, beforeKey)
-      activePaneId.value = pane.id
-      selectField(field)
-      return
-    }
-  }
+  placeField(field, { beforeKey, paneId, fromCanvas, fromPalette })
+}
 
-  insertIntoRoot(field, beforeKey, fromPalette)
-  selectField(field)
+function onRelateSubformConfirm(option) {
+  const pending = pendingRelateSubform
+  pendingRelateSubform = null
+  if (!pending || !option) {
+    return
+  }
+  if (hasRelateSubformField(fields.value, option.formId, option.relateKey)) {
+    ElMessage.warning('已添加该关联表单')
+    return
+  }
+  const field = createFieldFromItem(pending.item)
+  field.title = option.formName
+  field.width = '1'
+  field.placeholder = ''
+  field.childFormId = option.formId
+  field.childRelateKey = option.relateKey
+  field.columnKeys = defaultRelateSubformColumns(option.fields)
+  placeField(field, pending)
+}
+
+function onRelateSubformCancel() {
+  pendingRelateSubform = null
 }
 
 function remapCopiedKeys(field, keyMap) {
@@ -554,6 +601,9 @@ function ensureOptionSource(field) {
     if (field.frozenCols == null) field.frozenCols = 0
     if (!field.optionSource) field.optionSource = 'custom'
   }
+  if (field.type === 'relate-subform') {
+    field.width = '1'
+  }
 }
 
 function selectField(field) {
@@ -691,6 +741,11 @@ watch(
   () => [props.appId, props.formId],
   () => {
     fields.value = cloneFields(props.initialFields)
+    walkFormFields(fields.value, (field) => {
+      if (field.type === 'relate-subform' || field.type === 'subform') {
+        field.width = '1'
+      }
+    })
     columns.value =
       props.initialColumns === 2 ||
       props.initialColumns === 3 ||

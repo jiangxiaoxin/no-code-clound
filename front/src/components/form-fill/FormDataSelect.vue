@@ -1,7 +1,7 @@
 <template>
   <div class="data-select-root">
     <div v-if="!field.sourceFormId" class="data-select-hint">
-      请配置数据源
+      {{ emptyHint }}
     </div>
     <template v-else>
       <div class="data-select-trigger" :class="{
@@ -28,7 +28,7 @@
           {{ item.title }}：{{ item.text || '—' }}
         </div>
       </div>
-      <el-dialog v-if="!preview" v-model="pickerVisible" title="选择数据" width="800px" align-center draggable
+      <el-dialog v-if="!preview" v-model="pickerVisible" :title="pickerTitle" width="800px" align-center draggable
         destroy-on-close @open="onPickerOpen" :append-to-body="true">
         <div class="data-select-toolbar">
           <el-input v-model="keyword" clearable placeholder="快捷搜索" @clear="onSearchNow" @keyup.enter="onSearchNow"
@@ -93,12 +93,23 @@
 
         </template>
       </el-dialog>
+      <FormRecordDetailDrawer
+        v-if="sourceDetailVisible"
+        v-model="sourceDetailVisible"
+        :record="selected"
+        :fields="sourceFields"
+        :dict-items-by-code="dictItemsByCode"
+        :app-id="appId"
+        :form-id="field.sourceFormId"
+        :can-edit="false"
+      />
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { ArrowDown, CircleClose, Search } from '@element-plus/icons-vue'
 import {
   getFormApi,
@@ -108,14 +119,14 @@ import {
 } from '../../api/apps'
 import { listOrgDepartmentsApi } from '../../api/org'
 import { flattenDeptNames, isDeptField } from '../form-design/deptField.js'
-import { isSelectType } from '../form-design/fieldTypes'
 import {
   CREATED_AT_KEY,
   CREATED_BY_KEY,
   UPDATED_AT_KEY,
   UPDATED_BY_KEY,
 } from '../form-workspace/columnPrefs'
-import { cloneDisplayFieldKeys, displayFieldTitle, findDisplaySourceField } from '../form-design/dataSelect'
+import { cloneDisplayFieldKeys, displayFieldTitle, findDisplaySourceField, sourceDictCodes } from '../form-design/dataSelect'
+import { flattenFields } from '../form-design/tabsField.js'
 import { formatCellValue, isFillable } from './fillValues'
 import { imageUrlsOf } from './imageField.js'
 import FormImageViewerToolbar from './FormImageViewerToolbar.vue'
@@ -134,7 +145,13 @@ const props = defineProps({
   formFields: { type: Array, default: () => [] },
   multiple: { type: Boolean, default: false },
   compact: { type: Boolean, default: false },
+  mode: { type: String, default: 'data' }, // 'data'-选择数据 'relate'-关联数据
+  excludeRecordId: { type: String, default: '' },
 })
+
+const FormRecordDetailDrawer = defineAsyncComponent(
+  () => import('../form-workspace/FormRecordDetailDrawer.vue'),
+)
 
 /**
  * 选择数据可以用在主表和子表里
@@ -156,7 +173,13 @@ onMounted(() => {
  */
 
 const pickerVisible = ref(false)
+const sourceDetailVisible = ref(false)
+const missing = ref(false)
 const listLoading = ref(false)
+
+const isRelate = computed(() => props.mode === 'relate')
+const pickerTitle = computed(() => (isRelate.value ? '选择关联数据' : '选择数据'))
+const emptyHint = computed(() => (isRelate.value ? '请选择主表' : '请配置数据源'))
 const records = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -238,9 +261,23 @@ const previewRows = computed(() => {
   })
 })
 
+const relateTitleText = computed(() => {
+  const id = typeof props.modelValue === 'string' ? props.modelValue.trim() : ''
+  if (!id) return ''
+  if (missing.value) return '已删除'
+  if (!selected.value) return ''
+  const key = props.field.titleKey
+  const col = key ? findDisplaySourceField(sourceFields.value, key) : null
+  if (!col) return id
+  return formatRecordField({ key: col.key, field: col }, selected.value) || id
+})
+
 const triggerText = computed(() => {
   if (props.preview) {
     return ''
+  }
+  if (isRelate.value) {
+    return relateTitleText.value
   }
   const first = previewRows.value.find((item) => item.text && item.text !== '—')
   return first?.text || (selected.value ? '已选择' : '')
@@ -260,6 +297,7 @@ function clearSelected() {
   }
   selected.value = null
   loadedKey = ''
+  missing.value = false
   emit('update:modelValue', undefined)
 }
 
@@ -329,33 +367,37 @@ async function loadDeptNames(fields) {
   }
 }
 
-function dictCodesOf(fields) {
-  const codes = []
-  const seen = new Set()
-  for (const field of fields) {
-    const usesDict =
-      (field.type === 'radio' ||
-        field.type === 'checkbox' ||
-        isSelectType(field.type)) &&
-      (field.optionSource || 'dictionary') === 'dictionary' &&
-      field.dictCode
-    if (!usesDict || seen.has(field.dictCode)) continue
-    seen.add(field.dictCode)
-    codes.push(field.dictCode)
-  }
-  return codes
-}
-
 function cloneCopiedValue(value) {
   if (Array.isArray(value)) return [...value]
   return value == null ? undefined : value
 }
 
 function openPicker() {
-  if (props.preview || props.disabled || !props.field.sourceFormId) {
+  if (props.preview) {
+    return
+  }
+  if (props.disabled) {
+    if (isRelate.value) {
+      openSourceDetail()
+    }
+    return
+  }
+  if (!props.field.sourceFormId) {
     return
   }
   pickerVisible.value = true
+}
+
+function openSourceDetail() {
+  const id = typeof props.modelValue === 'string' ? props.modelValue.trim() : ''
+  if (!id) {
+    return
+  }
+  if (missing.value || !selected.value) {
+    ElMessage.warning('源数据已删除或无法查看')
+    return
+  }
+  sourceDetailVisible.value = true
 }
 
 async function loadSource() {
@@ -368,7 +410,7 @@ async function loadSource() {
   }
   try {
     const detail = await getFormApi(props.appId, props.field.sourceFormId)
-    const fields = Array.isArray(detail?.fields) ? detail.fields : []
+    const fields = flattenFields(Array.isArray(detail?.fields) ? detail.fields : [])
     sourceFields.value = fields.filter(isFillable)
     if (props.preview) {
       dictItemsByCode.value = {}
@@ -376,7 +418,7 @@ async function loadSource() {
       return
     }
     await loadDeptNames(sourceFields.value)
-    const codes = dictCodesOf(sourceFields.value)
+    const codes = sourceDictCodes(sourceFields.value)
     if (!codes.length) {
       dictItemsByCode.value = {}
       return
@@ -428,6 +470,8 @@ async function loadRecords() {
       {
         page: page.value,
         pageSize: pageSize.value,
+        // 关联本表时排除正在编辑的这条；关联他表时这个 id 不在源表里，排除不到任何数据
+        ...(props.excludeRecordId ? { excludeIds: [props.excludeRecordId] } : {}),
         ...mergeFilterQueries(optionQuery, searchQuery),
       },
     )
@@ -584,6 +628,7 @@ function confirmPick() {
 
 async function loadSelected() {
   const seq = ++selectedSeq
+  missing.value = false
   if (props.preview) {
     selected.value = null
     loadedKey = ''
@@ -613,11 +658,13 @@ async function loadSelected() {
     if (seq !== selectedSeq) return
     selected.value = row
     loadedKey = key
+    missing.value = false
     mergeUserNames(row?.userNames)
   } catch {
     if (seq !== selectedSeq) return
     selected.value = null
     loadedKey = ''
+    missing.value = true
   }
 }
 

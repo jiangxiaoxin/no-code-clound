@@ -112,6 +112,7 @@
                 :dict-items-by-code="dictItemsByCode"
                 :user-names="userNames"
                 :dept-names="deptNames"
+                :relate-titles="relateTitles"
                 :editing="editingCell === cellKey(row.id, col.key)"
                 @start="editingCell = cellKey(row.id, col.key)"
                 @close="onCellClose(row.id, col.key)"
@@ -154,6 +155,8 @@ import { flattenDeptNames, isDeptField } from '../form-design/deptField.js'
 import { walkFormFields } from '../form-fill/subformField.js'
 import { flattenFields } from '../form-design/tabsField.js'
 import { isFillable, isListColumn } from '../form-fill/fillValues.js'
+import { relateColumnFields } from '../form-design/relateField.js'
+import { loadRelateTitles } from './relateTitles'
 import { formatDateTime } from '../../utils/timeValue.js'
 import FormRecordCell from './FormRecordCell.vue'
 import FormRecordColumnSetup from './FormRecordColumnSetup.vue'
@@ -198,6 +201,8 @@ const editingCell = ref('')
 const importVisible = ref(false)
 const userNames = ref({})
 const deptNames = ref({})
+const relateTitles = ref({})
+const relateFields = computed(() => relateColumnFields(props.fields))
 // 切换表单时作废进行中的请求，避免把上一张表的记录写进来
 const loadSession = ref(0)
 const actions = computed(() => normalizeRecordActions(props.recordActions))
@@ -288,10 +293,16 @@ async function loadRecords() {
     records.value = result?.items || []
     total.value = result?.total || 0
     userNames.value = result?.userNames || {}
+    const titles = relateFields.value.length
+      ? await loadRelateTitles(props.appId, relateFields.value, records.value)
+      : {}
+    if (session !== loadSession.value) return
+    relateTitles.value = titles
   } catch {
     if (session !== loadSession.value) return
     records.value = []
     total.value = 0
+    relateTitles.value = {}
   } finally {
     if (session === loadSession.value) {
       listLoading.value = false

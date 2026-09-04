@@ -11,7 +11,7 @@
 
 本专项的姓名、手机走的是「取值来源 = 数据联动」；城市走的是「选项来源 = 数据联动」。
 
-对照规格：`docs/superpowers/specs/2026-08-27-data-linkage-design.md`。调色板中文名与 `type` 见 [README.md](./README.md)。
+对照规格：`docs/superpowers/specs/2026-08-27-data-linkage-design.md`。配置与填报说明见 `docs/guides/2026-09-04-data-linkage-usage.md`。调色板中文名与 `type` 见 [README.md](./README.md)。
 
 ---
 

@@ -32,6 +32,7 @@ const SKIP_TYPES = new Set([
   'subform',
   'data',
   'relate',
+  'relate-subform',
   'tabs',
   'serialNumber',
 ])
@@ -44,12 +45,18 @@ export function isListColumn(field) {
   return (
     isFillable(field) ||
     field?.type === 'subform' ||
+    field?.type === 'relate' ||
     field?.type === 'serialNumber'
   )
 }
 
 function persistsValue(field) {
-  return isFillable(field) || field.type === 'data' || field.type === 'subform'
+  return (
+    isFillable(field) ||
+    field.type === 'data' ||
+    field.type === 'relate' ||
+    field.type === 'subform'
+  )
 }
 
 export function emptyValue(field) {
@@ -102,7 +109,7 @@ export function cloneRecordValues(fields, data) {
       )
       continue
     }
-    if (field.type === 'data') {
+    if (field.type === 'data' || field.type === 'relate') {
       const value = data?.[field.key]
       next[field.key] =
         typeof value === 'string' && value ? value : undefined
@@ -259,6 +266,17 @@ export function firstRequiredError(fields, values) {
       )
       if (unique) {
         return { message: unique, key: field.key }
+      }
+      continue
+    }
+    // 关联数据、选择数据存的是源数据 id，不走普通填报校验，必填要单独判
+    if (field.type === 'relate' || field.type === 'data') {
+      const id = values[field.key]
+      if (field.required && (typeof id !== 'string' || !id)) {
+        return {
+          message: `请填写「${field.title || '未命名'}」`,
+          key: field.key,
+        }
       }
       continue
     }

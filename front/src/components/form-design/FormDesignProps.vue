@@ -32,14 +32,14 @@
       </el-form-item>
       <template v-if="!isCurrentDisplayField">
       <template v-if="field.type !== 'divider'">
-      <el-form-item v-if="field.type !== 'divider' && field.type !== 'image' && field.type !== 'file' && field.type !== 'subform'" label="占位文字">
+      <el-form-item v-if="field.type !== 'divider' && field.type !== 'image' && field.type !== 'file' && field.type !== 'subform' && field.type !== 'relate-subform'" label="占位文字">
         <el-input v-model="field.placeholder" maxlength="64" />
       </el-form-item>
       <el-form-item label="字段说明">
         <el-input v-model="field.description" type="textarea" :rows="3" maxlength="200" show-word-limit
           placeholder="填写后，标题右侧会显示说明" />
       </el-form-item>
-      <el-form-item v-if="!isSerialField" label="校验设置">
+      <el-form-item v-if="!isSerialField && !isRelateSubform" label="校验设置">
         <div style="width: 100%;">
           <div class="required-row">
             <span>必填</span>
@@ -599,6 +599,89 @@
           </div>
         </el-form-item>
       </template>
+      <template v-else-if="field.type === 'relate'">
+        <el-form-item label="数据源">
+          <FormSourcePicker
+            :app-id="appId"
+            :form-id="formId"
+            :source-form-id="field.sourceFormId"
+            include-current
+            @select="onRelateSourceSelect"
+          />
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId" label="显示字段">
+          <el-select
+            :model-value="field.titleKey || ''"
+            class="relate-title-select"
+            placeholder="请选择显示字段"
+            @change="onRelateTitleKeyChange"
+          >
+            <el-option
+              v-for="item in relateTitleOptions"
+              :key="item.key"
+              :label="item.title || item.key"
+              :value="item.key"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId && !field.titleKey" label=" ">
+          <span class="relate-title-hint">选了显示字段，收起时和数据管理列表才有文字</span>
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId" label="显示在表单中的字段">
+          <div
+            class="filter-trigger"
+            :class="{ 'is-placeholder': !hasDisplayFields }"
+            @click="openDisplayFields"
+          >
+            {{ displayFieldsTriggerText }}
+          </div>
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId" label="填充到表单中的字段">
+          <div
+            class="filter-trigger"
+            :class="{ 'is-placeholder': !hasFillMappings(field.fillMappings) }"
+            @click="openFillMapping"
+          >
+            {{
+              hasFillMappings(field.fillMappings)
+                ? `已添加 ${field.fillMappings.length} 条填充规则`
+                : '设置填充字段'
+            }}
+          </div>
+        </el-form-item>
+        <el-form-item v-if="field.sourceFormId" label="选择过程设置">
+          <div
+            class="filter-trigger"
+            :class="{ 'is-placeholder': !hasProcessSetup }"
+            @click="openProcess"
+          >
+            {{ processTriggerText }}
+          </div>
+        </el-form-item>
+      </template>
+      <template v-else-if="field.type === 'relate-subform'">
+        <el-form-item label="关联表单">
+          <span class="relate-subform-label">{{ relateSubformLabel }}</span>
+        </el-form-item>
+        <el-form-item label="显示的列">
+          <el-select
+            :model-value="field.columnKeys || []"
+            class="relate-subform-select"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="请选择要显示的列"
+            @change="onRelateSubformColumnsChange"
+          >
+            <el-option
+              v-for="item in relateSubformColumnOptions"
+              :key="item.key"
+              :label="item.title || item.key"
+              :value="item.key"
+            />
+          </el-select>
+        </el-form-item>
+      </template>
       <DataSelectDisplayFieldsDialog
         v-model="displayVisible"
         :display-field-keys="field?.displayFieldKeys"
@@ -890,7 +973,7 @@
           </template>
         </el-dialog>
       </template>
-      <el-form-item v-if="field.type !== 'divider' && field.type !== 'subform' && !parentSubform" label="字段宽度">
+      <el-form-item v-if="field.type !== 'divider' && field.type !== 'subform' && field.type !== 'relate-subform' && !parentSubform" label="字段宽度">
         <el-radio-group class="width-options" :model-value="field.width" @change="onWidthChange">
           <el-radio-button value="1/4">1/4</el-radio-button>
           <el-radio-button value="1/3">1/3</el-radio-button>
@@ -950,7 +1033,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { CircleClose, Close, Delete, Plus, Rank } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatOptions, formColumnOptions, fieldTypes, fieldTypeLabel, isSelectType } from './fieldTypes'
 import {
   MIN_TAB_PANES,
@@ -982,7 +1065,10 @@ import {
   findDisplaySourceField,
   hasDisplayFieldKeys,
   hasFillMappings,
+  withSystemDisplayFields,
 } from './dataSelect'
+import { hasSelfRelateField, isRelateField } from './relateField.js'
+import { isRelateSubformField } from './relateSubform.js'
 import { isFillable } from '../form-fill/fillValues'
 import { SUBFORM_CHILD_TYPES, fieldRefLabel } from '../form-fill/subformField.js'
 import {
@@ -1383,6 +1469,47 @@ const isCurrentDisplayField = computed(
 )
 
 const isSerialField = computed(() => props.field?.type === 'serialNumber')
+const isRelateSubform = computed(() => isRelateSubformField(props.field))
+const relateSubformForms = ref([])
+
+const relateSubformLabel = computed(() => {
+  const field = props.field
+  if (!relateSubformForms.value.length) return ''
+  const form = relateSubformForms.value.find(
+    (item) => Number(item.id) === Number(field?.childFormId),
+  )
+  if (!form) return '关联表单已删除'
+  const relate = (form.fields || []).find(
+    (item) => item.key === field.childRelateKey,
+  )
+  if (!relate) return `${form.name} · 关联字段已删除`
+  return `${form.name} · ${relate.title || relate.key}`
+})
+
+const relateSubformColumnOptions = computed(() => {
+  const form = relateSubformForms.value.find(
+    (item) => Number(item.id) === Number(props.field?.childFormId),
+  )
+  return (form?.fields || []).filter((item) => item.type !== 'relate')
+})
+
+async function loadRelateSubformForms() {
+  if (!props.appId || !isRelateSubform.value) {
+    relateSubformForms.value = []
+    return
+  }
+  try {
+    relateSubformForms.value =
+      (await listFormFieldsApi(props.appId, { include: 'relate' })) || []
+  } catch {
+    relateSubformForms.value = []
+  }
+}
+
+function onRelateSubformColumnsChange(value) {
+  if (!props.field) return
+  props.field.columnKeys = Array.isArray(value) ? [...value] : []
+}
 
 const isMemberFieldType = computed(() => isMemberField(props.field))
 const isDeptFieldType = computed(() => isDeptField(props.field))
@@ -1665,6 +1792,10 @@ const serialSegDialogTitle = computed(
   () => SERIAL_SEG_DIALOG_TITLES[activeSerialSeg.value?.kind] || '规则段',
 )
 
+const relateTitleOptions = computed(() =>
+  withSystemDisplayFields(sourceFields.value.filter(isFillable)),
+)
+
 const hasDisplayFields = computed(() =>
   hasDisplayFieldKeys(props.field?.displayFieldKeys),
 )
@@ -1823,6 +1954,36 @@ function onSourceFormSelect({ formId }) {
   props.field.sourceFormId = formId
 }
 
+function onRelateSourceSelect({ formId }) {
+  if (!props.field) {
+    return
+  }
+  if (
+    Number(formId) === Number(props.formId) &&
+    hasSelfRelateField(props.fields, props.formId, props.field.key)
+  ) {
+    ElMessage.warning('已有关联本表字段')
+    return
+  }
+  if (props.field.sourceFormId !== formId) {
+    props.field.titleKey = ''
+    props.field.displayFieldKeys = []
+    props.field.fillMappings = []
+    props.field.pickerColumnKeys = []
+    delete props.field.displayFieldLabels
+    delete props.field.optionFilters
+  }
+  props.field.sourceFormId = formId
+  loadSourceFields()
+}
+
+function onRelateTitleKeyChange(value) {
+  if (!props.field) {
+    return
+  }
+  props.field.titleKey = value || ''
+}
+
 function onDisplayConfirm(next) {
   if (!props.field) {
     return
@@ -1864,16 +2025,20 @@ function onProcessConfirm({ pickerColumnKeys, optionFilters }) {
 }
 
 async function loadSourceFields() {
-  if (!props.appId || !props.field?.sourceFormId) {
+  const field = props.field
+  if (!props.appId || !field?.sourceFormId) {
     sourceFields.value = []
     return
   }
+  if (isRelateField(field) && Number(field.sourceFormId) === Number(props.formId)) {
+    sourceFields.value = flattenFields(props.fields).filter(isFillable)
+    return
+  }
   try {
-    const forms =
-      (await listFormFieldsApi(props.appId, { excludeFormId: props.formId })) ||
-      []
+    const params = isRelateField(field) ? {} : { excludeFormId: props.formId }
+    const forms = (await listFormFieldsApi(props.appId, params)) || []
     const form = forms.find(
-      (item) => Number(item.id) === Number(props.field.sourceFormId),
+      (item) => Number(item.id) === Number(field.sourceFormId),
     )
     sourceFields.value = form?.fields || []
   } catch {
@@ -1910,6 +2075,13 @@ watch(
   { immediate: true },
 )
 watch(
+  () => [props.appId, props.field?.key, props.field?.type],
+  () => {
+    loadRelateSubformForms()
+  },
+  { immediate: true },
+)
+watch(
   () => props.field?.key,
   () => {
     filterVisible.value = false
@@ -1924,6 +2096,26 @@ watch(
 </script>
 
 <style scoped lang="less">
+.relate-title-select {
+  width: 100%;
+}
+
+.relate-title-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.relate-subform-select {
+  width: 100%;
+}
+
+.relate-subform-label {
+  color: var(--el-text-color-regular);
+  font-size: 13px;
+  line-height: 32px;
+}
+
 .props {
   padding: 16px;
   background: var(--el-bg-color);

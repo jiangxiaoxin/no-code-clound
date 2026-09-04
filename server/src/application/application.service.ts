@@ -59,6 +59,8 @@ export type OptionField = {
   type: string;
   dictCode?: string;
   optionSource?: string;
+  /** 关联数据指向的主表，仅 include=relate 时返回 */
+  sourceFormId?: number;
   fields?: OptionField[];
 };
 
@@ -117,6 +119,17 @@ export class ApplicationService {
   ): Promise<{ id: number; name: string; icon: string }> {
     const app = await this.requireOwnedApp(ownerId, id);
     return this.toAppItem(app);
+  }
+
+  async renameApp(
+    ownerId: number,
+    id: number,
+    dto: NameDto,
+  ): Promise<{ id: number; name: string; icon: string }> {
+    const app = await this.requireOwnedApp(ownerId, id);
+    app.name = this.requireName(dto.name);
+    const saved = await this.appRepo.save(app);
+    return this.toAppItem(saved);
   }
 
   async deleteApp(ownerId: number, id: number): Promise<void> {
@@ -192,6 +205,7 @@ export class ApplicationService {
         ? excludeFormId
         : undefined;
     const includeSubform = include === 'subform';
+    const includeRelate = include === 'relate';
 
     const result: { id: number; name: string; fields: OptionField[] }[] = [];
     for (const form of forms) {
@@ -201,6 +215,7 @@ export class ApplicationService {
       const fields = this.toOptionFields(
         flattenFields(parseFormSchema(form.fields).fields),
         includeSubform,
+        includeRelate,
       );
       if (!fields.length) {
         continue;
@@ -426,6 +441,7 @@ export class ApplicationService {
   private toOptionFields(
     raw: Record<string, unknown>[] | null,
     includeSubform = false,
+    includeRelate = false,
   ): OptionField[] {
     if (!Array.isArray(raw)) {
       return [];
@@ -450,7 +466,24 @@ export class ApplicationService {
               ? (item.fields as Record<string, unknown>[])
               : [],
             false,
+            false,
           ),
+        });
+        continue;
+      }
+      if (type === 'relate') {
+        if (!includeRelate) {
+          continue;
+        }
+        const sourceFormId = Number(item.sourceFormId);
+        if (!Number.isInteger(sourceFormId) || sourceFormId <= 0) {
+          continue;
+        }
+        fields.push({
+          key,
+          title: typeof item.title === 'string' ? item.title : '',
+          type,
+          sourceFormId,
         });
         continue;
       }

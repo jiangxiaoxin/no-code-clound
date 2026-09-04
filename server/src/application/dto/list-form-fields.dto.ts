@@ -12,6 +12,6 @@ export class ListFormFieldsDto {
   excludeFormId?: number;
 
   @IsOptional()
-  @IsIn(['subform'])
+  @IsIn(['subform', 'relate'])
   include?: string;
 }

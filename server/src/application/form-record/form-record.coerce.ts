@@ -113,6 +113,7 @@ function coerceFieldValue(field: FormField, value: unknown): unknown {
   switch (field.type) {
     case 'divider':
     case 'tabs':
+    case 'relate-subform':
     case 'currentUser':
     case 'currentUserDept':
     case 'serialNumber':
