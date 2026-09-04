@@ -390,6 +390,7 @@ function onRelateSubformConfirm(option) {
   field.childFormId = option.formId
   field.childRelateKey = option.relateKey
   field.columnKeys = defaultRelateSubformColumns(option.fields)
+  field.canViewDetail = false
   placeField(field, pending)
 }
 
@@ -603,6 +604,7 @@ function ensureOptionSource(field) {
   }
   if (field.type === 'relate-subform') {
     field.width = '1'
+    if (field.canViewDetail == null) field.canViewDetail = false
   }
 }
 
@@ -744,6 +746,9 @@ watch(
     walkFormFields(fields.value, (field) => {
       if (field.type === 'relate-subform' || field.type === 'subform') {
         field.width = '1'
+      }
+      if (field.type === 'relate-subform' && field.canViewDetail == null) {
+        field.canViewDetail = false
       }
     })
     columns.value =

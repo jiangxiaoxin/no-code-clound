@@ -6,8 +6,10 @@ import {
   isRelateSubformField,
   relateSubformOptions,
   relateSubformColumnTitles,
+  relateSubformCanViewDetail,
   relateSubformQuery,
   relateSubformReady,
+  RELATE_SUBFORM_TITLE_TIP,
 } from './relateSubform.js'
 
 const forms = [
@@ -32,6 +34,10 @@ const forms = [
 test('isRelateSubformField 只认 relate-subform', () => {
   assert.equal(isRelateSubformField({ type: 'relate-subform' }), true)
   assert.equal(isRelateSubformField({ type: 'relate' }), false)
+})
+
+test('标题提示文案固定', () => {
+  assert.match(RELATE_SUBFORM_TITLE_TIP, /关联子表单/)
 })
 
 test('候选项按「表单 + 关联字段」拆开，只留指向当前表单的', () => {
@@ -95,6 +101,12 @@ test('配好关联表单才算就绪', () => {
   assert.equal(relateSubformReady({ childFormId: 30, childRelateKey: 'r1' }), true)
   assert.equal(relateSubformReady({ childFormId: 30 }), false)
   assert.equal(relateSubformReady({}), false)
+})
+
+test('是否可查看详情默认关闭，只有显式 true 才开启', () => {
+  assert.equal(relateSubformCanViewDetail({}), false)
+  assert.equal(relateSubformCanViewDetail({ canViewDetail: false }), false)
+  assert.equal(relateSubformCanViewDetail({ canViewDetail: true }), true)
 })
 
 test('查询体按关联字段等于当前数据 id，每页条数用查看时传入的值', () => {

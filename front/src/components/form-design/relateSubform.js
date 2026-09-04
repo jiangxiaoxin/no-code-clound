@@ -7,6 +7,9 @@ export function isRelateSubformField(field) {
   return field?.type === 'relate-subform'
 }
 
+export const RELATE_SUBFORM_TITLE_TIP =
+  '关联子表单，详情里只读查看关联本表的数据'
+
 export function relateSubformOptions(forms, currentFormId) {
   const options = []
   for (const form of forms || []) {
@@ -62,6 +65,10 @@ export function relateSubformColumnTitles(columnKeys, childFields) {
 
 export function relateSubformReady(field) {
   return Boolean(Number(field?.childFormId) > 0 && field?.childRelateKey)
+}
+
+export function relateSubformCanViewDetail(field) {
+  return field?.canViewDetail === true
 }
 
 export function relateSubformQuery(field, recordId, page, pageSize) {

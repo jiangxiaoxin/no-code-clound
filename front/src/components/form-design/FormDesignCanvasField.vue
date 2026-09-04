@@ -43,6 +43,11 @@
           <Connection />
         </el-icon>
       </el-tooltip>
+      <el-tooltip v-if="isRelateSubform" :content="relateSubformTitleTip" placement="top">
+        <el-icon class="canvas-field-fill" @click.stop>
+          <Link />
+        </el-icon>
+      </el-tooltip>
       <span class="canvas-field-title-text">{{ field.title }}</span>
       <el-tooltip
         v-if="field.description?.trim()"
@@ -379,7 +384,7 @@ import { computed, ref, watch } from 'vue'
 import { CopyDocument, Connection, Delete, InfoFilled, Link, Plus } from '@element-plus/icons-vue'
 import { getFormApi } from '../../api/apps'
 import { fieldTypes, widthClass } from './fieldTypes'
-import { relateSubformColumnTitles } from './relateSubform.js'
+import { relateSubformColumnTitles, isRelateSubformField, RELATE_SUBFORM_TITLE_TIP } from './relateSubform.js'
 import {
   hasLinkage,
   hasSubformLinkage,
@@ -457,6 +462,9 @@ const needsOptionSourceHint = computed(() =>
 const linked = computed(
   () => hasLinkage(props.field) || hasSubformLinkage(props.field),
 )
+
+const isRelateSubform = computed(() => isRelateSubformField(props.field))
+const relateSubformTitleTip = RELATE_SUBFORM_TITLE_TIP
 
 const relateChildFields = ref([])
 

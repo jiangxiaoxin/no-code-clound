@@ -155,6 +155,7 @@ watch(
       applyValues(props.record.data)
     }
   },
+  { immediate: true },
 )
 </script>
 

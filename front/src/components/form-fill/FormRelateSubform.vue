@@ -12,6 +12,7 @@
         border
         stripe
         size="small"
+        :class="{ 'is-row-clickable': canViewDetail }"
         @row-click="onRowClick"
       >
         <el-table-column type="index" width="55" label="序号" />
@@ -45,10 +46,10 @@
         />
       </div>
       <FormRecordDetailDrawer
-        v-if="detailVisible"
+        v-if="canViewDetail"
         v-model="detailVisible"
         :record="detailRecord"
-        :fields="childFields"
+        :fields="childFormSchema"
         :dict-items-by-code="dictItemsByCode"
         :app-id="appId"
         :form-id="field.childFormId"
@@ -60,8 +61,10 @@
 
 <script setup>
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   getFormApi,
+  getFormRecordApi,
   listDictionaryItemsByCodesApi,
   queryFormRecordsApi,
 } from '../../api/apps'
@@ -69,6 +72,7 @@ import { listOrgDepartmentsApi } from '../../api/org'
 import { flattenDeptNames, isDeptField } from '../form-design/deptField.js'
 import { sourceDictCodes } from '../form-design/dataSelect'
 import {
+  relateSubformCanViewDetail,
   relateSubformColumnTitles,
   relateSubformQuery,
   relateSubformReady,
@@ -92,6 +96,7 @@ const loadError = ref(false)
 const rows = ref([])
 const total = ref(0)
 const page = ref(1)
+const childFormSchema = ref([])
 const childFields = ref([])
 const dictItemsByCode = ref({})
 const userNames = ref({})
@@ -101,6 +106,7 @@ const detailRecord = ref(null)
 let loadedFormId = 0
 
 const ready = computed(() => relateSubformReady(props.field))
+const canViewDetail = computed(() => relateSubformCanViewDetail(props.field))
 const pageSize = ref(PAGE_SIZES[0])
 const configuredColumnKeys = computed(() =>
   Array.isArray(props.field.columnKeys)
@@ -133,9 +139,11 @@ async function loadChildForm() {
   if (loadedFormId === formId && childFields.value.length) return
   try {
     const detail = await getFormApi(props.appId, formId)
-    childFields.value = flattenFields(detail?.fields || []).filter(isFillable)
+    childFormSchema.value = detail?.fields || []
+    childFields.value = flattenFields(childFormSchema.value).filter(isFillable)
     loadedFormId = formId
   } catch {
+    childFormSchema.value = []
     childFields.value = []
     loadedFormId = 0
     return
@@ -202,10 +210,19 @@ function onPageSizeChange(next) {
   loadRows()
 }
 
-function onRowClick(row) {
-  if (!row?.id) return
-  detailRecord.value = row
-  detailVisible.value = true
+async function onRowClick(row) {
+  if (!canViewDetail.value || !row?.id) return
+  try {
+    const record = await getFormRecordApi(
+      props.appId,
+      Number(props.field.childFormId),
+      row.id,
+    )
+    detailRecord.value = record
+    detailVisible.value = true
+  } catch {
+    ElMessage.error('加载详情失败')
+  }
 }
 
 watch(
@@ -236,5 +253,9 @@ watch(
   align-items: center;
   justify-content: flex-end;
   padding-top: 8px;
+}
+
+:deep(.is-row-clickable .el-table__body tr) {
+  cursor: pointer;
 }
 </style>

@@ -1,5 +1,5 @@
 <template>
-  <div class="fill-field" :class="fieldClass">
+  <div v-if="shouldRender" class="fill-field" :class="fieldClass">
     <span
       v-if="field.type !== 'divider' && !plain"
       class="fill-field-title"
@@ -14,6 +14,11 @@
       <el-tooltip v-if="fillTip" :content="fillTip" placement="top">
         <el-icon class="fill-field-fill">
           <Connection />
+        </el-icon>
+      </el-tooltip>
+      <el-tooltip v-if="isRelateSubform" :content="relateSubformTitleTip" placement="top">
+        <el-icon class="fill-field-fill">
+          <Link />
         </el-icon>
       </el-tooltip>
       <span class="fill-field-title-text">{{ field.title }}</span>
@@ -265,6 +270,10 @@ import {
   hasSubformLinkage,
   needsOptionSourceHint as fieldNeedsOptionSourceHint,
 } from '../form-design/linkage'
+import {
+  isRelateSubformField,
+  RELATE_SUBFORM_TITLE_TIP,
+} from '../form-design/relateSubform.js'
 import FormDataSelect from './FormDataSelect.vue'
 import FormImageUpload from './FormImageUpload.vue'
 import FormFileUpload from './FormFileUpload.vue'
@@ -318,6 +327,9 @@ const linked = computed(
   () => hasLinkage(props.field) || hasSubformLinkage(props.field),
 )
 
+const isRelateSubform = computed(() => isRelateSubformField(props.field))
+const relateSubformTitleTip = RELATE_SUBFORM_TITLE_TIP
+
 const isDisabled = computed(
   () =>
     props.disabled ||
@@ -351,6 +363,13 @@ function onFillRows(items) {
 const needsOptionSourceHint = computed(() =>
   fieldNeedsOptionSourceHint(props.field),
 )
+
+const shouldRender = computed(() => {
+  if (props.field.type === 'relate-subform' && !props.recordId) {
+    return false
+  }
+  return true
+})
 
 const fieldClass = computed(() => {
   if (props.plain) {

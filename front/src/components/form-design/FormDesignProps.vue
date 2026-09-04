@@ -681,6 +681,9 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="是否可查看详情">
+          <el-switch v-model="field.canViewDetail" />
+        </el-form-item>
       </template>
       <DataSelectDisplayFieldsDialog
         v-model="displayVisible"
