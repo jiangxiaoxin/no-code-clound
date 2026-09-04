@@ -97,7 +97,8 @@ const rows = ref([])
 const total = ref(0)
 const page = ref(1)
 const childFormSchema = ref([])
-const childFields = ref([])
+const childFields = ref(null)
+const childFormName = ref('')
 const dictItemsByCode = ref({})
 const userNames = ref({})
 const deptNames = ref({})
@@ -115,8 +116,13 @@ const configuredColumnKeys = computed(() =>
 )
 
 const columns = computed(() => {
+  if (!Array.isArray(childFields.value)) return []
   const fieldByKey = new Map(childFields.value.map((item) => [item.key, item]))
-  return relateSubformColumnTitles(props.field.columnKeys, childFields.value)
+  return relateSubformColumnTitles(
+    props.field.columnKeys,
+    childFields.value,
+    childFormName.value,
+  )
     .map((col) => {
       const field = fieldByKey.get(col.key)
       return field ? { ...col, field } : null
@@ -136,15 +142,17 @@ function formatColumn(col, row) {
 
 async function loadChildForm() {
   const formId = Number(props.field.childFormId)
-  if (loadedFormId === formId && childFields.value.length) return
+  if (loadedFormId === formId && Array.isArray(childFields.value)) return
   try {
     const detail = await getFormApi(props.appId, formId)
     childFormSchema.value = detail?.fields || []
     childFields.value = flattenFields(childFormSchema.value).filter(isFillable)
+    childFormName.value = detail?.name || ''
     loadedFormId = formId
   } catch {
     childFormSchema.value = []
-    childFields.value = []
+    childFields.value = null
+    childFormName.value = ''
     loadedFormId = 0
     return
   }

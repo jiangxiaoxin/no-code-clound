@@ -83,18 +83,28 @@ test('默认取前 5 个可展示字段当列', () => {
   assert.deepEqual(defaultRelateSubformColumns([]), [])
 })
 
-test('画布表头用字段标题，找不到时才退回 key', () => {
-  assert.deepEqual(
-    relateSubformColumnTitles(['name', 'no', 'missing'], forms[0].fields),
-    [
-      { key: 'name', title: '工人名' },
-      { key: 'no', title: '工人编号' },
-      { key: 'missing', title: 'missing' },
-    ],
-  )
-  assert.deepEqual(relateSubformColumnTitles(['name'], []), [
-    { key: 'name', title: 'name' },
-  ])
+test('画布表头用字段标题，匹配不到的列隐藏并打日志', () => {
+  const logs = []
+  const orig = console.log
+  console.log = (msg) => logs.push(msg)
+  try {
+    assert.deepEqual(
+      relateSubformColumnTitles(['name', 'no', 'missing'], forms[0].fields, '人员表'),
+      [
+        { key: 'name', title: '工人名' },
+        { key: 'no', title: '工人编号' },
+      ],
+    )
+    assert.deepEqual(logs, ['[人员表的missing字段无法匹配列名，因此被隐藏]'])
+    logs.length = 0
+    assert.deepEqual(relateSubformColumnTitles(['name'], [], '人员表'), [])
+    assert.deepEqual(logs, ['[人员表的name字段无法匹配列名，因此被隐藏]'])
+    logs.length = 0
+    assert.deepEqual(relateSubformColumnTitles(['name'], null, '人员表'), [])
+    assert.deepEqual(logs, [])
+  } finally {
+    console.log = orig
+  }
 })
 
 test('配好关联表单才算就绪', () => {

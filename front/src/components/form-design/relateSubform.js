@@ -48,19 +48,27 @@ export function defaultRelateSubformColumns(childFields) {
     .map((field) => field.key)
 }
 
-export function relateSubformColumnTitles(columnKeys, childFields) {
+export function relateSubformColumnTitles(columnKeys, childFields, formName = '') {
+  if (!Array.isArray(childFields)) return []
   const titleByKey = new Map()
-  for (const item of childFields || []) {
+  for (const item of childFields) {
     if (!item?.key) continue
     const title = typeof item.title === 'string' ? item.title.trim() : ''
     titleByKey.set(item.key, title || item.key)
   }
-  return (Array.isArray(columnKeys) ? columnKeys : [])
-    .filter((key) => typeof key === 'string' && key)
-    .map((key) => ({
-      key,
-      title: titleByKey.get(key) || key,
-    }))
+  const tableName = typeof formName === 'string' ? formName.trim() : ''
+  const columns = []
+  for (const key of Array.isArray(columnKeys) ? columnKeys : []) {
+    if (typeof key !== 'string' || !key) continue
+    const title = titleByKey.get(key)
+    if (!title) {
+      const table = tableName || '关联表'
+      console.log(`[${table}的${key}字段无法匹配列名，因此被隐藏]`)
+      continue
+    }
+    columns.push({ key, title })
+  }
+  return columns
 }
 
 export function relateSubformReady(field) {

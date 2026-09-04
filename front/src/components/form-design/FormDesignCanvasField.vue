@@ -466,14 +466,19 @@ const linked = computed(
 const isRelateSubform = computed(() => isRelateSubformField(props.field))
 const relateSubformTitleTip = RELATE_SUBFORM_TITLE_TIP
 
-const relateChildFields = ref([])
+const relateChildFields = ref(null)
+const relateChildFormName = ref('')
 
 const previewColumns = computed(() =>
-  relateSubformColumnTitles(props.field.columnKeys, relateChildFields.value),
+  relateSubformColumnTitles(
+    props.field.columnKeys,
+    relateChildFields.value,
+    relateChildFormName.value,
+  ),
 )
 
 function relatePreviewColClass(key) {
-  const field = relateChildFields.value.find((item) => item.key === key)
+  const field = (relateChildFields.value || []).find((item) => item.key === key)
   return {
     'is-image': field?.type === 'image',
     'is-file': field?.type === 'file',
@@ -482,19 +487,23 @@ function relatePreviewColClass(key) {
 
 async function loadRelateChildFields() {
   if (props.field.type !== 'relate-subform') {
-    relateChildFields.value = []
+    relateChildFields.value = null
+    relateChildFormName.value = ''
     return
   }
   const formId = Number(props.field.childFormId)
   if (!props.appId || !Number.isInteger(formId) || formId <= 0) {
-    relateChildFields.value = []
+    relateChildFields.value = null
+    relateChildFormName.value = ''
     return
   }
   try {
     const detail = await getFormApi(props.appId, formId)
     relateChildFields.value = flattenFields(detail?.fields || [])
+    relateChildFormName.value = detail?.name || ''
   } catch {
-    relateChildFields.value = []
+    relateChildFields.value = null
+    relateChildFormName.value = ''
   }
 }
 
