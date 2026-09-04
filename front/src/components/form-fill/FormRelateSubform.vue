@@ -72,6 +72,7 @@ import { listOrgDepartmentsApi } from '../../api/org'
 import { flattenDeptNames, isDeptField } from '../form-design/deptField.js'
 import { sourceDictCodes } from '../form-design/dataSelect'
 import {
+  RELATE_SUBFORM_SYSTEM_FIELDS,
   relateSubformCanViewDetail,
   relateSubformColumnTitles,
   relateSubformQuery,
@@ -79,7 +80,14 @@ import {
 } from '../form-design/relateSubform.js'
 import { flattenFields } from '../form-design/tabsField.js'
 import { PAGE_SIZES } from '../../utils/pagination.js'
+import { formatDateTime } from '../../utils/timeValue.js'
 import { formatCellValue, isFillable } from './fillValues.js'
+import {
+  CREATED_AT_KEY,
+  CREATED_BY_KEY,
+  UPDATED_AT_KEY,
+  UPDATED_BY_KEY,
+} from '../form-workspace/columnPrefs'
 
 const FormRecordDetailDrawer = defineAsyncComponent(
   () => import('../form-workspace/FormRecordDetailDrawer.vue'),
@@ -117,7 +125,9 @@ const configuredColumnKeys = computed(() =>
 
 const columns = computed(() => {
   if (!Array.isArray(childFields.value)) return []
-  const fieldByKey = new Map(childFields.value.map((item) => [item.key, item]))
+  const fieldByKey = new Map(
+    [...childFields.value, ...RELATE_SUBFORM_SYSTEM_FIELDS].map((item) => [item.key, item]),
+  )
   return relateSubformColumnTitles(
     props.field.columnKeys,
     childFields.value,
@@ -131,6 +141,10 @@ const columns = computed(() => {
 })
 
 function formatColumn(col, row) {
+  if (col.key === CREATED_BY_KEY) return row?.createdByName || ''
+  if (col.key === UPDATED_BY_KEY) return row?.updatedByName || ''
+  if (col.key === CREATED_AT_KEY) return formatDateTime(row?.createdAt)
+  if (col.key === UPDATED_AT_KEY) return formatDateTime(row?.updatedAt)
   return formatCellValue(
     col.field,
     row?.data?.[col.key],

@@ -4,6 +4,7 @@ import {
   defaultRelateSubformColumns,
   hasRelateSubformField,
   isRelateSubformField,
+  relateSubformDisplayColumnOptions,
   relateSubformOptions,
   relateSubformColumnTitles,
   relateSubformCanViewDetail,
@@ -81,6 +82,35 @@ test('默认取前 5 个可展示字段当列', () => {
     'f4',
   ])
   assert.deepEqual(defaultRelateSubformColumns([]), [])
+})
+
+test('显示的列选项末尾带创建人、创建时间、更新人、更新时间', () => {
+  const options = relateSubformDisplayColumnOptions(forms[0].fields)
+  assert.deepEqual(
+    options.map((item) => item.title),
+    ['工人名', '工人编号', '创建人', '创建时间', '更新人', '更新时间'],
+  )
+  assert.deepEqual(
+    options.slice(-4).map((item) => item.key),
+    ['__createdBy', '__createdAt', '__updatedBy', '__updatedAt'],
+  )
+})
+
+test('系统列能匹配标题，不会被当成已删字段隐藏', () => {
+  assert.deepEqual(
+    relateSubformColumnTitles(
+      ['name', '__createdBy', '__createdAt', '__updatedBy', '__updatedAt'],
+      forms[0].fields,
+      '人员表',
+    ),
+    [
+      { key: 'name', title: '工人名' },
+      { key: '__createdBy', title: '创建人' },
+      { key: '__createdAt', title: '创建时间' },
+      { key: '__updatedBy', title: '更新人' },
+      { key: '__updatedAt', title: '更新时间' },
+    ],
+  )
 })
 
 test('画布表头用字段标题，匹配不到的列隐藏并打日志', () => {

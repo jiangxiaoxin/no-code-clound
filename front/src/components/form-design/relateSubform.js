@@ -3,6 +3,13 @@ import { flattenFields } from './tabsField.js'
 
 const DEFAULT_COLUMN_COUNT = 5
 
+export const RELATE_SUBFORM_SYSTEM_FIELDS = [
+  { key: '__createdBy', title: '创建人' },
+  { key: '__createdAt', title: '创建时间' },
+  { key: '__updatedBy', title: '更新人' },
+  { key: '__updatedAt', title: '更新时间' },
+]
+
 export function isRelateSubformField(field) {
   return field?.type === 'relate-subform'
 }
@@ -48,10 +55,17 @@ export function defaultRelateSubformColumns(childFields) {
     .map((field) => field.key)
 }
 
+export function relateSubformDisplayColumnOptions(childFields) {
+  return [
+    ...(childFields || []).filter((item) => item.type !== 'relate'),
+    ...RELATE_SUBFORM_SYSTEM_FIELDS,
+  ]
+}
+
 export function relateSubformColumnTitles(columnKeys, childFields, formName = '') {
   if (!Array.isArray(childFields)) return []
   const titleByKey = new Map()
-  for (const item of childFields) {
+  for (const item of [...childFields, ...RELATE_SUBFORM_SYSTEM_FIELDS]) {
     if (!item?.key) continue
     const title = typeof item.title === 'string' ? item.title.trim() : ''
     titleByKey.set(item.key, title || item.key)

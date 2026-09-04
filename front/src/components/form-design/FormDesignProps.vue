@@ -1071,7 +1071,7 @@ import {
   withSystemDisplayFields,
 } from './dataSelect'
 import { hasSelfRelateField, isRelateField } from './relateField.js'
-import { isRelateSubformField } from './relateSubform.js'
+import { isRelateSubformField, relateSubformDisplayColumnOptions } from './relateSubform.js'
 import { isFillable } from '../form-fill/fillValues'
 import { SUBFORM_CHILD_TYPES, fieldRefLabel } from '../form-fill/subformField.js'
 import {
@@ -1493,7 +1493,7 @@ const relateSubformColumnOptions = computed(() => {
   const form = relateSubformForms.value.find(
     (item) => Number(item.id) === Number(props.field?.childFormId),
   )
-  return (form?.fields || []).filter((item) => item.type !== 'relate')
+  return relateSubformDisplayColumnOptions(form?.fields)
 })
 
 async function loadRelateSubformForms() {
