@@ -20,6 +20,9 @@
                 <el-radio-button value="create-first">添加数据 → 数据管理</el-radio-button>
                 <el-radio-button value="list-first">数据管理 → 添加数据</el-radio-button>
               </el-radio-group>
+              <p class="publish-desc publish-desc-inline">
+                本配置存在本机浏览器缓存，只在当前电脑、当前浏览器生效。换电脑或清除缓存后，恢复为「添加数据 → 数据管理」。
+              </p>
             </el-form-item>
           </el-form>
           <div class="publish-actions">
@@ -53,6 +56,13 @@ import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getFormConfigApi, saveFormConfigApi } from '../api/apps'
 import { normalizeRecordActions } from '../utils/recordActions'
+import { useUserStore } from '../stores/user'
+import {
+  readWorkspaceTabOrder,
+  workspaceTabOrderFromMode,
+  workspaceTabOrderToMode,
+  writeWorkspaceTabOrder,
+} from './form-workspace/workspaceTabOrder.js'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -60,14 +70,11 @@ const props = defineProps({
   form: { type: Object, default: null },
 })
 
+const userStore = useUserStore()
 const tabOrder = ref('create-first')
 const actions = reactive(normalizeRecordActions())
 const saving = ref(false)
 const activeSetting = ref('workspace')
-
-function readTabOrder(value) {
-  return Array.isArray(value) && value[0] === 'list' ? 'list-first' : 'create-first'
-}
 
 function applyActions(raw) {
   const next = normalizeRecordActions(raw)
@@ -80,29 +87,44 @@ function onSettingSelect(index) {
   activeSetting.value = index
 }
 
+function loadTabOrder() {
+  tabOrder.value = workspaceTabOrderToMode(
+    readWorkspaceTabOrder(userStore.user?.id, props.appId, props.formId),
+  )
+}
+
 async function loadConfig() {
   if (!props.appId || !props.formId) return
+  loadTabOrder()
   try {
     const config = await getFormConfigApi(props.appId, props.formId)
-    tabOrder.value = readTabOrder(config?.workspaceTabOrder)
     applyActions(config?.recordActions)
   } catch {
-    tabOrder.value = 'create-first'
     applyActions()
   }
 }
 
-watch(() => [props.appId, props.formId], loadConfig, { immediate: true })
+watch(
+  () => [props.appId, props.formId, userStore.user?.id],
+  loadConfig,
+  { immediate: true },
+)
 
 async function save() {
   if (!props.form?.id) return
+  if (activeSetting.value === 'workspace') {
+    writeWorkspaceTabOrder(
+      userStore.user?.id,
+      props.appId,
+      props.formId,
+      workspaceTabOrderFromMode(tabOrder.value),
+    )
+    ElMessage.success('已保存在本机')
+    return
+  }
   saving.value = true
   try {
-    const workspaceTabOrder = tabOrder.value === 'list-first'
-      ? ['list', 'create']
-      : ['create', 'list']
     await saveFormConfigApi(props.appId, props.formId, {
-      workspaceTabOrder,
       recordActions: { ...actions },
     })
     ElMessage.success('保存成功')
@@ -157,6 +179,10 @@ async function save() {
   font-size: 13px;
   line-height: 20px;
   color: var(--el-text-color-secondary);
+}
+
+.publish-desc-inline {
+  margin: 8px 0 0;
 }
 
 .action-list {

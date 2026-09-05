@@ -48,7 +48,6 @@ import { ElMessage } from 'element-plus'
 import { EditPen } from '@element-plus/icons-vue'
 import {
   createFormRecordApi,
-  getFormConfigApi,
   getFormApi,
   listDictionaryItemsByCodesApi,
 } from '../api/apps'
@@ -61,6 +60,8 @@ import { isSelectType as isSelectField } from './form-design/fieldTypes'
 import { walkFormFields } from './form-fill/subformField.js'
 import FormRecordCreateTab from './form-workspace/FormRecordCreateTab.vue'
 import FormRecordManage from './form-workspace/FormRecordManage.vue'
+import { readWorkspaceTabOrder } from './form-workspace/workspaceTabOrder.js'
+import { useUserStore } from '../stores/user'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -69,6 +70,7 @@ const props = defineProps({
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const WORKSPACE_TAB_KEYS = new Set(['create', 'list'])
 
 function goDesign() {
@@ -177,19 +179,12 @@ async function loadSchema() {
   }
 }
 
-async function loadWorkspaceConfig() {
-  const session = loadSession.value
-  workspaceTabOrder.value = []
-  if (!props.form?.id || !props.appId) return
-  try {
-    const config = await getFormConfigApi(props.appId, props.form.id)
-    if (session !== loadSession.value) return
-    if (Array.isArray(config?.workspaceTabOrder)) {
-      workspaceTabOrder.value = config.workspaceTabOrder
-    }
-  } catch {
-    return
-  }
+function loadWorkspaceConfig() {
+  workspaceTabOrder.value = readWorkspaceTabOrder(
+    userStore.user?.id,
+    props.appId,
+    props.form?.id,
+  )
 }
 
 async function loadDictItems() {
@@ -242,6 +237,13 @@ watch(
     loadWorkspaceConfig()
   },
   { immediate: true },
+)
+
+watch(
+  () => userStore.user?.id,
+  () => {
+    loadWorkspaceConfig()
+  },
 )
 
 watch(dictCodes, loadDictItems, { immediate: true })
