@@ -38,18 +38,9 @@ export function normalizeRecordActions(raw: unknown): FormRecordActions {
 export function normalizeFormConfig(value: unknown): Record<string, unknown> {
   const input =
     value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
-  const order = Array.isArray(input.workspaceTabOrder)
-    ? input.workspaceTabOrder.filter(
-        (item): item is 'create' | 'list' => item === 'create' || item === 'list',
-      )
-    : [];
-  const workspaceTabOrder =
-    order.length === 2 && new Set(order).size === 2
-      ? order
-      : ['create', 'list'];
+  const { workspaceTabOrder: _ignored, ...rest } = input;
   return {
-    ...input,
-    workspaceTabOrder,
+    ...rest,
     recordActions: normalizeRecordActions(input.recordActions),
   };
 }
