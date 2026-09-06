@@ -15,7 +15,9 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { Permissions } from '../../auth/permissions.decorator';
 import { PermissionsGuard } from '../../auth/permissions.guard';
 import { AuthPrincipal, PERMISSIONS } from '../permissions';
+import { AdminOwnedAppService } from './admin-owned-app.service';
 import { AdminUserService } from './admin-user.service';
+import { TransferOwnerDto } from '../../application/access/dto/transfer-owner.dto';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { ListAdminUserDto } from './dto/list-admin-user.dto';
 import { ResetUserPasswordDto } from './dto/reset-user-password.dto';
@@ -25,7 +27,10 @@ import { UpdateUserStatusDto } from './dto/update-user-status.dto';
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class AdminUserController {
-  constructor(private readonly adminUserService: AdminUserService) {}
+  constructor(
+    private readonly adminUserService: AdminUserService,
+    private readonly ownedApps: AdminOwnedAppService,
+  ) {}
 
   @Get()
   @Permissions(PERMISSIONS.USERS_READ)
@@ -73,5 +78,31 @@ export class AdminUserController {
     @Body() dto: ResetUserPasswordDto,
   ) {
     return this.adminUserService.resetPassword(id, dto.newPassword);
+  }
+
+  @Get(':userId/owned-apps')
+  @Permissions(PERMISSIONS.ADMIN_ACCESS)
+  listOwnedApps(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Req() req: { user: AuthPrincipal },
+  ) {
+    return this.ownedApps.listOwnedApps(req.user, userId);
+  }
+
+  @Post(':userId/owned-apps/:appId/transfer')
+  @HttpCode(200)
+  @Permissions(PERMISSIONS.ADMIN_ACCESS)
+  transferOwnedApp(
+    @Param('userId', ParseIntPipe) userId: number,
+    @Param('appId', ParseIntPipe) appId: number,
+    @Body() dto: TransferOwnerDto,
+    @Req() req: { user: AuthPrincipal },
+  ) {
+    return this.ownedApps.transferOwnedApp(
+      req.user,
+      userId,
+      appId,
+      dto.userId,
+    );
   }
 }

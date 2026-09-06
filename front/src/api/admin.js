@@ -20,6 +20,16 @@ export function resetAdminUserPasswordApi(id, newPassword) {
   return http.post(`/admin/users/${id}/reset-password`, { newPassword })
 }
 
+export function listOwnedAppsApi(userId) {
+  return http.get(`/admin/users/${userId}/owned-apps`)
+}
+
+export function transferOwnedAppApi(userId, appId, toUserId) {
+  return http.post(`/admin/users/${userId}/owned-apps/${appId}/transfer`, {
+    userId: toUserId,
+  })
+}
+
 export function listDepartmentsApi() {
   return http.get('/admin/departments')
 }

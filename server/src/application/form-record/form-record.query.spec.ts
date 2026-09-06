@@ -553,4 +553,33 @@ describe('buildRecordQuery ids / excludeIds', () => {
     expect(built.filter).toEqual({});
     expect(built.sort).toEqual({ updatedAt: -1 });
   });
+
+  it('pickApproved 且流程表强制已通过', () => {
+    const built = buildRecordQuery(fields, {
+      pickApproved: true,
+      formKind: 'workflow',
+    });
+    expect(built.filter).toEqual({ workflowStatus: 'approved' });
+  });
+
+  it('普通表 pickApproved 不加已通过条件', () => {
+    const built = buildRecordQuery(fields, {
+      pickApproved: true,
+      formKind: 'normal',
+    });
+    expect(built.filter).toEqual({});
+  });
+
+  it('带 ids 时即使 pickApproved 也不加已通过条件', () => {
+    const id = '64b64c4c4c4c4c4c4c4c4c4c';
+    const built = buildRecordQuery(fields, {
+      pickApproved: true,
+      formKind: 'workflow',
+      ids: [id],
+    });
+    expect(built.filter).not.toEqual(
+      expect.objectContaining({ workflowStatus: 'approved' }),
+    );
+    expect(JSON.stringify(built.filter)).not.toContain('workflowStatus');
+  });
 });

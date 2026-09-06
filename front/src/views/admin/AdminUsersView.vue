@@ -159,6 +159,7 @@
       :can-assign-departments="userStore.hasPermission('users.assign_departments')"
       :can-assign-roles="userStore.hasPermission('users.assign_roles')"
       :saving="saving"
+      :is-system-admin="isSystemAdmin"
       @submit="onSubmit"
     />
 
@@ -186,7 +187,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { formatDateTime } from '../../utils/timeValue.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AdminUserForm from '../../components/admin/AdminUserForm.vue'
@@ -204,6 +205,9 @@ import { PAGE_SIZES } from '../../utils/pagination'
 import { Search } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
+const isSystemAdmin = computed(() =>
+  Boolean(userStore.user?.roleCodes?.includes('system_admin')),
+)
 const loading = ref(false)
 const saving = ref(false)
 const resetting = ref(false)

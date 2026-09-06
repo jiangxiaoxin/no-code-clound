@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Like, Not, Repository } from 'typeorm';
-import { Application } from '../application.entity';
+import { AppAccessService } from '../access/app-access.service';
 import { CreateDictionaryDto } from './dto/create-dictionary.dto';
 import { DictionaryItemInputDto } from './dto/dictionary-item-input.dto';
 import { ListDictionaryDto } from './dto/list-dictionary.dto';
@@ -46,13 +46,12 @@ type NormalizedItem = {
 @Injectable()
 export class DictionaryService {
   constructor(
-    @InjectRepository(Application)
-    private readonly appRepo: Repository<Application>,
     @InjectRepository(Dictionary)
     private readonly dictRepo: Repository<Dictionary>,
     @InjectRepository(DictionaryItem)
     private readonly itemRepo: Repository<DictionaryItem>,
     private readonly dataSource: DataSource,
+    private readonly access: AppAccessService,
   ) {}
 
   async list(
@@ -65,7 +64,7 @@ export class DictionaryService {
     page: number;
     pageSize: number;
   }> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireUse(ownerId, appId);
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 10;
     const keyword = query.keyword?.trim();
@@ -109,7 +108,7 @@ export class DictionaryService {
     appId: number,
     id: number,
   ): Promise<DictionaryDetail> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireUse(ownerId, appId);
     const dict = await this.requireDict(appId, id);
     return this.toDetail(dict);
   }
@@ -119,7 +118,7 @@ export class DictionaryService {
     appId: number,
     dto: CreateDictionaryDto,
   ): Promise<DictionaryDetail> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const name = this.requireName(dto.name);
     const code = dto.code.trim();
     this.assertCode(code);
@@ -161,7 +160,7 @@ export class DictionaryService {
     id: number,
     dto: UpdateDictionaryDto,
   ): Promise<DictionaryDetail> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const dict = await this.requireDict(appId, id);
     const name = dto.name === undefined ? dict.name : this.requireName(dto.name);
     if (name !== dict.name) {
@@ -204,7 +203,7 @@ export class DictionaryService {
   }
 
   async delete(ownerId: number, appId: number, id: number): Promise<void> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     await this.requireDict(appId, id);
     await this.dataSource.transaction(async (manager) => {
       await manager.delete(DictionaryItem, { dictionaryId: id });
@@ -216,7 +215,7 @@ export class DictionaryService {
     ownerId: number,
     appId: number,
   ): Promise<{ id: number; name: string; code: string }[]> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireUse(ownerId, appId);
     const rows = await this.dictRepo.find({
       where: { applicationId: appId, status: 'active' },
       order: { name: 'ASC' },
@@ -242,7 +241,14 @@ export class DictionaryService {
     appId: number,
     codes: string[],
   ): Promise<{ code: string; items: { label: string; value: string }[] }[]> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireUse(ownerId, appId);
+    return this.listEnabledItemsByApp(appId, codes);
+  }
+
+  async listEnabledItemsByApp(
+    appId: number,
+    codes: string[],
+  ): Promise<{ code: string; items: { label: string; value: string }[] }[]> {
     const unique: string[] = [];
     const seen = new Set<string>();
     for (const raw of codes) {
@@ -282,14 +288,6 @@ export class DictionaryService {
         items: dict ? (itemsByDictId.get(dict.id) ?? []) : [],
       };
     });
-  }
-
-  private async requireOwnedApp(ownerId: number, id: number) {
-    const app = await this.appRepo.findOne({ where: { id, ownerId } });
-    if (!app) {
-      throw new NotFoundException('应用不存在');
-    }
-    return app;
   }
 
   private async requireDict(applicationId: number, id: number) {

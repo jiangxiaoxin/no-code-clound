@@ -25,7 +25,8 @@ http.interceptors.response.use(
   },
   async (error) => {
     const status = error.response?.status
-    const message = error.response?.data?.message || '请求失败'
+    const raw = error.response?.data?.message
+    const message = Array.isArray(raw) ? raw.join('；') : raw || '请求失败'
     if (!(error.config?.silent404 && status === 404)) {
       ElMessage.error(message)
     }

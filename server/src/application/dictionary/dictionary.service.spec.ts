@@ -6,15 +6,17 @@ import {
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, In, Like } from 'typeorm';
-import { Application } from '../application.entity';
+import { AppAccessService } from '../access/app-access.service';
 import { DictionaryItem } from './dictionary-item.entity';
 import { Dictionary } from './dictionary.entity';
 import { DictionaryService } from './dictionary.service';
 
 describe('DictionaryService', () => {
   let service: DictionaryService;
-  const appRepo = {
-    findOne: jest.fn(),
+  const access = {
+    requireUse: jest.fn(),
+    requireConfigure: jest.fn(),
+    requireOwner: jest.fn(),
   };
   const dictRepo = {
     find: jest.fn(),
@@ -48,6 +50,8 @@ describe('DictionaryService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    access.requireUse.mockResolvedValue(ownedApp);
+    access.requireConfigure.mockResolvedValue(ownedApp);
     dataSource.transaction.mockImplementation(
       async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager),
     );
@@ -67,7 +71,7 @@ describe('DictionaryService', () => {
     const module = await Test.createTestingModule({
       providers: [
         DictionaryService,
-        { provide: getRepositoryToken(Application), useValue: appRepo },
+        { provide: AppAccessService, useValue: access },
         { provide: getRepositoryToken(Dictionary), useValue: dictRepo },
         { provide: getRepositoryToken(DictionaryItem), useValue: itemRepo },
         { provide: DataSource, useValue: dataSource },
@@ -78,7 +82,7 @@ describe('DictionaryService', () => {
 
   describe('create', () => {
     it('rejects create when app is not owned', async () => {
-      appRepo.findOne.mockResolvedValue(null);
+      access.requireConfigure.mockRejectedValue(new NotFoundException('应用不存在'));
       await expect(
         service.create(1, 8, {
           name: '请假类型',
@@ -91,7 +95,6 @@ describe('DictionaryService', () => {
     });
 
     it('rejects invalid codes', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       await expect(
         service.create(1, 8, {
           name: '请假类型',
@@ -102,7 +105,6 @@ describe('DictionaryService', () => {
     });
 
     it('rejects duplicate name in the same app', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue({ id: 3, name: '请假类型' });
       await expect(
         service.create(1, 8, {
@@ -117,7 +119,6 @@ describe('DictionaryService', () => {
     });
 
     it('rejects duplicate code in the same app', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce({ id: 3, code: 'leave_type' });
@@ -134,7 +135,7 @@ describe('DictionaryService', () => {
     });
 
     it('allows the same code in another application', async () => {
-      appRepo.findOne.mockResolvedValue({ id: 9, ownerId: 1 });
+      access.requireConfigure.mockResolvedValue({ id: 9, ownerId: 1 });
       dictRepo.findOne.mockResolvedValue(null);
 
       await expect(
@@ -151,7 +152,6 @@ describe('DictionaryService', () => {
     });
 
     it('rejects duplicate item values in the same request', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue(null);
       await expect(
         service.create(1, 8, {
@@ -169,7 +169,6 @@ describe('DictionaryService', () => {
     });
 
     it('saves dictionary then items in a transaction and returns counts', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue(null);
 
       const result = await service.create(1, 8, {
@@ -201,7 +200,6 @@ describe('DictionaryService', () => {
 
   describe('list', () => {
     it('filters by application, keyword, status and includes itemCount', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findAndCount.mockResolvedValue([
         [
           {
@@ -263,7 +261,6 @@ describe('DictionaryService', () => {
     });
 
     it('defaults to page 1 and pageSize 10', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findAndCount.mockResolvedValue([[], 0]);
 
       const result = await service.list(1, 8, {});
@@ -277,7 +274,6 @@ describe('DictionaryService', () => {
 
   describe('getOne', () => {
     it('returns all items including disabled', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue({
         id: 4,
         applicationId: 8,
@@ -314,7 +310,6 @@ describe('DictionaryService', () => {
     });
 
     it('rejects dictionaries that belong to another app', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue(null);
       await expect(service.getOne(1, 8, 99)).rejects.toMatchObject({
         constructor: NotFoundException,
@@ -334,7 +329,6 @@ describe('DictionaryService', () => {
     };
 
     it('does not change code even if a code field is present on the dto object', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce(null);
@@ -352,7 +346,6 @@ describe('DictionaryService', () => {
     });
 
     it('rejects renaming onto an existing name', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne
         .mockResolvedValueOnce(existing)
         .mockResolvedValueOnce({ id: 9, name: '加班类型' });
@@ -365,7 +358,6 @@ describe('DictionaryService', () => {
     });
 
     it('replaces items when items is provided', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue(existing);
       itemRepo.find.mockResolvedValue([]);
 
@@ -382,7 +374,6 @@ describe('DictionaryService', () => {
     });
 
     it('does not delete items when items is omitted', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue(existing);
       itemRepo.find.mockResolvedValue([]);
 
@@ -393,8 +384,18 @@ describe('DictionaryService', () => {
   });
 
   describe('delete', () => {
+    it('write requires configure even if the user can use the app', async () => {
+      access.requireConfigure.mockRejectedValue(
+        new NotFoundException('应用不存在'),
+      );
+      await expect(service.delete(5, 8, 4)).rejects.toMatchObject({
+        message: '应用不存在',
+      });
+      expect(access.requireConfigure).toHaveBeenCalledWith(5, 8);
+      expect(dictRepo.findOne).not.toHaveBeenCalled();
+    });
+
     it('rejects missing dictionaries', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue(null);
       await expect(service.delete(1, 8, 4)).rejects.toMatchObject({
         constructor: NotFoundException,
@@ -403,7 +404,6 @@ describe('DictionaryService', () => {
     });
 
     it('deletes items then the dictionary without occupancy checks', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.findOne.mockResolvedValue({
         id: 4,
         applicationId: 8,
@@ -421,7 +421,6 @@ describe('DictionaryService', () => {
 
   describe('options', () => {
     it('returns only enabled dictionaries of this app by name', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.find.mockResolvedValue([
         { id: 2, name: '请假类型', code: 'leave_type' },
         { id: 1, name: '加班类型', code: 'ot_type' },
@@ -439,7 +438,7 @@ describe('DictionaryService', () => {
     });
 
     it('rejects when app is not owned', async () => {
-      appRepo.findOne.mockResolvedValue(null);
+      access.requireUse.mockRejectedValue(new NotFoundException('应用不存在'));
       await expect(service.options(1, 8)).rejects.toMatchObject({
         message: '应用不存在',
       });
@@ -448,7 +447,6 @@ describe('DictionaryService', () => {
 
   describe('listEnabledItemsByCode', () => {
     it('returns empty when dictionary is missing', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.find.mockResolvedValue([]);
       await expect(
         service.listEnabledItemsByCode(1, 8, 'leave_type'),
@@ -456,7 +454,6 @@ describe('DictionaryService', () => {
     });
 
     it('returns enabled items even if dictionary is disabled', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.find.mockResolvedValue([
         {
           id: 4,
@@ -477,7 +474,6 @@ describe('DictionaryService', () => {
 
   describe('listEnabledItemsByCodes', () => {
     it('returns items aligned to unique codes', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       dictRepo.find.mockResolvedValue([
         { id: 4, code: 'leave_type', status: 'disabled' },
         { id: 5, code: 'ot_type', status: 'active' },
@@ -506,7 +502,6 @@ describe('DictionaryService', () => {
     });
 
     it('returns empty for empty codes', async () => {
-      appRepo.findOne.mockResolvedValue(ownedApp);
       await expect(service.listEnabledItemsByCodes(1, 8, [])).resolves.toEqual(
         [],
       );

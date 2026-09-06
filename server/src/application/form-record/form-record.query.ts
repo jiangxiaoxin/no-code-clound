@@ -48,6 +48,14 @@ export type RecordQueryBody = {
   ids?: string[];
   /** 排除这些数据（关联本表时排除正在编辑的自己） */
   excludeIds?: string[];
+  workflowStatus?:
+    | 'draft'
+    | 'running'
+    | 'approved'
+    | 'rejected'
+    | 'error';
+  pickApproved?: boolean;
+  formKind?: 'normal' | 'workflow';
 };
 
 const STRING_CONTAINS_TYPES = new Set([
@@ -582,6 +590,14 @@ export function buildRecordQuery(
   }
   if (body.ids !== undefined) {
     parts.push({ _id: { $in: toObjectIds(body.ids) } });
+  }
+  const forceApproved =
+    body.pickApproved === true &&
+    body.formKind === 'workflow' &&
+    body.ids === undefined;
+  const workflowStatus = forceApproved ? 'approved' : body.workflowStatus;
+  if (workflowStatus) {
+    parts.push({ workflowStatus });
   }
   const excluded = toObjectIds(body.excludeIds);
   if (excluded.length) {

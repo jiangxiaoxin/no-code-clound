@@ -4,11 +4,9 @@
 
 ## 开发分支
 
-- 默认在 `master` 分支开发。
-- **未经使用者允许**，不创建功能分支、Git worktree 或 Cursor worktree。Superpowers、SDD、计划里的「先开分支」都不算允许；必须使用者点名（例如「开 worktree 写流水号」）。
-- 未获允许且当前不在 `master` 时，继续工作前先切回主目录的 `master`；不要擅自合并或删除其他分支。
-- 已被允许使用的功能分支或 worktree：就在那份目录、那条分支上改，不要擅自把改动写进主干。
-- Cursor 云端 / Agent 已经开好的修 bug 分支（如 `origin/cursor/critical-bug-management-*`），以及使用者允许后在本地开的功能分支，合进本地 `master` 时优先 `git merge --no-ff`，保留来源分支和 merge 记录；不要 cherry-pick。使用者给的是 commit SHA 时，先找到包含它的远程分支再 merge。未要求时不要删除远程分支、不要删除 worktree，也不要 push。
+- 不强制只在 `master` 上开发。功能较大、需要并行或计划建议隔离时，可以开功能分支、Git worktree 或 Cursor worktree；小改动可直接在 `master`（或当前分支）上改。
+- 已在某条功能分支或某个 worktree 里开工：继续在该目录、该分支上改，不要擅自切回 `master` 把半成品写进主干。新分支 / worktree 用清晰命名（如 `feat/workflow-form`）。
+- 功能分支或 Cursor 云端修 bug 分支（如 `origin/cursor/critical-bug-management-*`）合进本地 `master` 时优先 `git merge --no-ff`，保留来源分支和 merge 记录；不要 cherry-pick。使用者给的是 commit SHA 时，先找到包含它的远程分支再 merge。未要求时不要 push、不要删除远程分支、不要删除 worktree。
 
 ## 实现原则
 

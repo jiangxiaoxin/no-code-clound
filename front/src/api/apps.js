@@ -22,6 +22,34 @@ export function renameAppApi(id, payload) {
   return http.patch(`/apps/${id}`, payload)
 }
 
+export function listConfiguratorsApi(appId) {
+  return http.get(`/apps/${appId}/configurators`)
+}
+
+export function addConfiguratorsApi(appId, userIds) {
+  return http.post(`/apps/${appId}/configurators`, { userIds })
+}
+
+export function removeConfiguratorApi(appId, userId) {
+  return http.delete(`/apps/${appId}/configurators/${userId}`)
+}
+
+export function listAccessScopesApi(appId) {
+  return http.get(`/apps/${appId}/access-scopes`)
+}
+
+export function addAccessScopeApi(appId, payload) {
+  return http.post(`/apps/${appId}/access-scopes`, payload)
+}
+
+export function removeAccessScopeApi(appId, id) {
+  return http.delete(`/apps/${appId}/access-scopes/${id}`)
+}
+
+export function transferAppOwnerApi(appId, userId) {
+  return http.post(`/apps/${appId}/transfer`, { userId })
+}
+
 export function getDirectoryApi(id) {
   return http.get(`/apps/${id}/directory`)
 }
@@ -48,6 +76,12 @@ export function getFormApi(appId, formId) {
 
 export function renameFormApi(appId, formId, payload) {
   return http.patch(`/apps/${appId}/forms/${formId}`, payload)
+}
+
+export function convertFormKindApi(appId, formId) {
+  return http.patch(`/apps/${appId}/forms/${formId}/kind`, {
+    formKind: 'workflow',
+  })
 }
 
 export function deleteFormApi(appId, formId) {
@@ -102,8 +136,11 @@ export function listDictionaryItemsByCodesApi(appId, codes) {
   return http.post(`/apps/${appId}/dictionaries/items-by-codes`, { codes })
 }
 
-export function createFormRecordApi(appId, formId, data) {
-  return http.post(`/apps/${appId}/forms/${formId}/records`, { data })
+export function createFormRecordApi(appId, formId, data, intent) {
+  return http.post(`/apps/${appId}/forms/${formId}/records`, {
+    data,
+    ...(intent ? { intent } : {}),
+  })
 }
 
 export function getFormRecordApi(appId, formId, recordId, config = {}) {
@@ -118,8 +155,11 @@ export function queryFormRecordsApi(appId, formId, payload) {
   return http.post(`/apps/${appId}/forms/${formId}/records/query`, payload)
 }
 
-export function updateFormRecordApi(appId, formId, recordId, data) {
-  return http.patch(`/apps/${appId}/forms/${formId}/records/${recordId}`, { data })
+export function updateFormRecordApi(appId, formId, recordId, data, intent) {
+  return http.patch(`/apps/${appId}/forms/${formId}/records/${recordId}`, {
+    data,
+    ...(intent ? { intent } : {}),
+  })
 }
 
 export function deleteFormRecordApi(appId, formId, recordId) {

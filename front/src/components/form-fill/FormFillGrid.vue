@@ -11,14 +11,14 @@
           >
             <div class="fill-grid">
               <FormFillField
-                v-for="paneField in pane.fields"
+                v-for="paneField in visiblePaneFields(pane)"
                 :key="paneField.key"
                 :app-id="appId"
                 :field="paneField"
                 :fill-tip="fillTips[paneField.key]"
                 :items="itemsFor(paneField)"
                 :model-value="values[paneField.key]"
-                :disabled="disabled"
+                :disabled="isFieldDisabled(paneField)"
                 :updating="updating"
                 :record-values="values"
                 :form-fields="flatFields"
@@ -26,6 +26,7 @@
                 :user-names="fillUserNames"
                 :dept-names="fillDeptNames"
                 :record-id="recordId"
+                :data-source="dataSource"
                 @fill="onFill"
               />
             </div>
@@ -33,13 +34,13 @@
         </el-tabs>
       </div>
       <FormFillField
-        v-else
+        v-else-if="accessOf(field) !== 'hidden'"
         :app-id="appId"
         :field="field"
         :fill-tip="fillTips[field.key]"
         :items="itemsFor(field)"
         :model-value="values[field.key]"
-        :disabled="disabled"
+        :disabled="isFieldDisabled(field)"
         :updating="updating"
         :record-values="values"
         :form-fields="flatFields"
@@ -47,6 +48,7 @@
         :user-names="fillUserNames"
         :dept-names="fillDeptNames"
         :record-id="recordId"
+        :data-source="dataSource"
         @fill="onFill"
       />
     </template>
@@ -91,6 +93,9 @@ const props = defineProps({
   userNames: { type: Object, default: () => ({}) },
   deptNames: { type: Object, default: () => ({}) },
   recordId: { type: String, default: '' },
+  fieldAccess: { type: Object, default: () => ({}) },
+  dataSource: { type: Object, default: null },
+  lockSubform: { type: Boolean, default: false },
 })
 
 const linkageUserNames = ref({})
@@ -294,11 +299,36 @@ function hasFieldFilterRefs() {
   })
 }
 
-function queryRecordsOnce(appId, formId, query) {
-  const key = `${appId}:${formId}:${JSON.stringify(query)}`
+function accessOf(field) {
+  return props.fieldAccess?.[field?.key] || ''
+}
+
+function isFieldDisabled(field) {
+  if (props.disabled) return true
+  if (field?.type === 'subform' && props.lockSubform) return true
+  return accessOf(field) === 'readonly'
+}
+
+function visiblePaneFields(pane) {
+  return (pane.fields || []).filter((field) => accessOf(field) !== 'hidden')
+}
+
+function queryRecordsOnce(appId, formId, query, fieldKey) {
+  const key = `${appId}:${formId}:${fieldKey || ''}:${JSON.stringify(query)}`
   const hit = pendingQueries.get(key)
   if (hit) return hit
-  const pending = queryFormRecordsApi(appId, formId, query)
+  const pending = (
+    props.dataSource?.querySource
+      ? props.dataSource.querySource({
+          fieldKey,
+          sourceFormId: formId,
+          body: query,
+        })
+      : queryFormRecordsApi(appId, formId, {
+          ...query,
+          pickApproved: true,
+        })
+  )
     .then((result) => {
       const extra = result?.userNames
       if (extra && typeof extra === 'object') {
@@ -315,7 +345,11 @@ function queryRecordsOnce(appId, formId, query) {
 
 function canWriteLinkageValue(field) {
   if (props.disabled) return false
-  if (props.updating && field.editable === false) return false
+  const access = accessOf(field)
+  if (access === 'readonly' || access === 'hidden') return false
+  if (props.updating && field.editable === false && access !== 'editable') {
+    return false
+  }
   return true
 }
 
@@ -324,7 +358,7 @@ let subformSeq = 0
 
 async function loadSubformLinkages() {
   const seq = ++subformSeq
-  if (props.disabled || !props.appId) {
+  if (props.disabled || (!props.appId && !props.dataSource)) {
     lastSubformKeys = {}
     return
   }
@@ -359,6 +393,7 @@ async function loadSubformLinkages() {
             flatFields.value,
             { page: 1, pageSize: 2 },
           ),
+          field.key,
         )
         const total =
           typeof result?.total === 'number'
@@ -424,7 +459,7 @@ function pendingEmptyWrite(field, writeValues) {
 
 async function loadTableItems() {
   const seq = ++loadSeq
-  if (!props.appId) {
+  if (!props.appId && !props.dataSource) {
     tableItemsByKey.value = {}
     lastLoadKeys = {}
     return
@@ -450,6 +485,7 @@ async function loadTableItems() {
           props.appId,
           resolveSourceFormId(field),
           buildSourceQuery(field.optionFilters, props.values, flatFields.value),
+          field.key,
         )
         next[field.key] = recordsToSelectItems(
           result?.items,
@@ -468,7 +504,7 @@ async function loadTableItems() {
 
 async function loadLinkage() {
   const seq = ++linkageSeq
-  if (props.disabled || !props.appId) {
+  if (props.disabled || (!props.appId && !props.dataSource)) {
     linkagePrimed = false
     lastLinkageKeys = {}
     return
@@ -498,6 +534,27 @@ async function loadLinkage() {
         return
       }
       try {
+        if (props.dataSource?.linkage) {
+          const query = buildSourceQuery(
+            {
+              match: field.linkage.match,
+              conditions: field.linkage.conditions,
+            },
+            props.values,
+            flatFields.value,
+            linkageQueryPaging(field),
+          )
+          const mapped = await props.dataSource.linkage({
+            fieldKey: field.key,
+            body: { conditions: query.filters },
+          })
+          if (writeValues && canWriteLinkageValue(field)) {
+            for (const [targetKey, value] of Object.entries(mapped?.data || {})) {
+              writes.push({ key: targetKey, value })
+            }
+          }
+          return
+        }
         const result = await queryRecordsOnce(
           props.appId,
           resolveLinkageFormId(field),
@@ -510,6 +567,7 @@ async function loadLinkage() {
             flatFields.value,
             linkageQueryPaging(field),
           ),
+          field.key,
         )
         const applied = applyLinkageResult(
           field,

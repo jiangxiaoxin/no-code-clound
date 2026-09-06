@@ -203,7 +203,10 @@ async function loadRows() {
     const result = await queryFormRecordsApi(
       props.appId,
       Number(props.field.childFormId),
-      relateSubformQuery(props.field, props.recordId, page.value, pageSize.value),
+      {
+        ...relateSubformQuery(props.field, props.recordId, page.value, pageSize.value),
+        pickApproved: true,
+      },
     )
     rows.value = result?.items || []
     total.value = result?.total || 0

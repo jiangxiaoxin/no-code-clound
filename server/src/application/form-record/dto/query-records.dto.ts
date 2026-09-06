@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  Max,
+  Min,
+} from 'class-validator';
 import type { DatePrecision } from '../form-record.query';
 
 export class QueryRecordsDto {
@@ -46,4 +54,12 @@ export class QueryRecordsDto {
   @IsOptional()
   @IsArray()
   excludeIds?: string[];
+
+  @IsOptional()
+  @IsIn(['draft', 'running', 'approved', 'rejected', 'error'])
+  workflowStatus?: 'draft' | 'running' | 'approved' | 'rejected' | 'error';
+
+  @IsOptional()
+  @IsBoolean()
+  pickApproved?: boolean;
 }

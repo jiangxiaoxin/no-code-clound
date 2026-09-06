@@ -17,6 +17,11 @@ export const router = createRouter({
       component: () => import('../views/HomeView.vue'),
     },
     {
+      path: '/inbox/:kind',
+      name: 'workflow-inbox',
+      component: () => import('../views/WorkflowInboxView.vue'),
+    },
+    {
       path: '/apps/:id/forms/:formId/design',
       name: 'form-design',
       component: () => import('../views/FormDesignView.vue'),
@@ -49,6 +54,16 @@ export const router = createRouter({
           path: 'dictionaries',
           name: 'app-dictionaries',
           component: () => import('../views/app-backend/AppDictionariesView.vue'),
+        },
+        {
+          path: 'configurators',
+          name: 'app-configurators',
+          component: () => import('../views/app-backend/AppConfiguratorsView.vue'),
+        },
+        {
+          path: 'access-scopes',
+          name: 'app-access-scopes',
+          component: () => import('../views/app-backend/AppAccessScopesView.vue'),
         },
       ],
     },

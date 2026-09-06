@@ -1,0 +1,155 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { AppAccessService } from '../access/app-access.service';
+import { AppForm } from '../app-form.entity';
+import { FormRecordPersistService } from '../form-record/form-record.persist';
+import { CompleteTaskDto } from './dto/complete-task.dto';
+import { WorkflowEngine } from './workflow.engine';
+import { WorkflowInstance } from './workflow-instance.entity';
+import { WorkflowTask } from './workflow-task.entity';
+import { InstanceStatus } from './workflow.types';
+
+const EDITABLE: InstanceStatus[] = ['draft', 'rejected', 'error'];
+
+@Injectable()
+export class WorkflowInstanceService {
+  constructor(
+    @InjectRepository(WorkflowInstance)
+    private readonly instanceRepo: Repository<WorkflowInstance>,
+    @InjectRepository(WorkflowTask)
+    private readonly taskRepo: Repository<WorkflowTask>,
+    @InjectRepository(AppForm)
+    private readonly formRepo: Repository<AppForm>,
+    private readonly persist: FormRecordPersistService,
+    private readonly engine: WorkflowEngine,
+    private readonly access: AppAccessService,
+  ) {}
+
+  async saveDraft(
+    instanceId: number,
+    actorId: number,
+    data: Record<string, unknown>,
+  ) {
+    const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
+    const form = await this.requireForm(instance.formId);
+    await this.persist.persist({
+      form,
+      actorId,
+      recordId: instance.recordId,
+      data,
+      requiredKeys: 'all',
+    });
+    await this.engine.ensureDraft({
+      form,
+      recordId: instance.recordId,
+      actorId,
+    });
+  }
+
+  async submit(
+    instanceId: number,
+    actorId: number,
+    data: Record<string, unknown>,
+  ) {
+    const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
+    const form = await this.requireForm(instance.formId);
+    await this.persist.persist({
+      form,
+      actorId,
+      recordId: instance.recordId,
+      data,
+      requiredKeys: 'all',
+    });
+    const updated = await this.engine.submit({
+      form,
+      recordId: instance.recordId,
+      actorId,
+    });
+    return {
+      nextNodeTitle: updated.graph.nodes.find(
+        (node) => node.key === updated.currentNodeKey,
+      )?.title,
+    };
+  }
+
+  async cancel(instanceId: number, actorId: number) {
+    await this.requireInitiator(instanceId, actorId, ['running', 'error']);
+    await this.engine.cancel({ instanceId, actorId });
+  }
+
+  async retry(instanceId: number, actorId: number) {
+    const instance = await this.instanceRepo.findOne({
+      where: { id: instanceId },
+    });
+    if (!instance) throw new NotFoundException('单据不存在');
+    if (instance.initiatorId === actorId) {
+      await this.engine.retry({ instanceId });
+      return;
+    }
+    const access = await this.access.getAccess(actorId, instance.appId);
+    if (!access.canConfigure) throw new NotFoundException('单据不存在');
+    await this.engine.retry({ instanceId });
+  }
+
+  async complete(taskId: number, actorId: number, dto: CompleteTaskDto) {
+    const task = await this.taskRepo.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('待办不存在');
+    const instance = await this.instanceRepo.findOne({
+      where: { id: task.instanceId },
+    });
+    if (!instance) throw new NotFoundException('单据不存在');
+    const node = instance.graph.nodes.find((item) => item.key === task.nodeKey);
+    if (!node || node.type !== 'approve') {
+      throw new NotFoundException('审批节点不存在');
+    }
+    const comment = String(dto.comment || '').trim();
+    if (dto.action === 'reject' && !comment) {
+      throw new BadRequestException('请填写驳回意见');
+    }
+    if (dto.action === 'approve' && node.commentRequiredOnApprove && !comment) {
+      throw new BadRequestException('请填写审批意见');
+    }
+    const dataPatch: Record<string, unknown> = {};
+    const incoming = dto.data || {};
+    for (const [key, access] of Object.entries(node.fieldAccess || {})) {
+      if (access === 'editable' && key in incoming) {
+        dataPatch[key] = incoming[key];
+      }
+    }
+    return this.engine.completeTask({
+      taskId,
+      actorId,
+      action: dto.action,
+      comment,
+      dataPatch,
+    });
+  }
+
+  private async requireInitiator(
+    instanceId: number,
+    actorId: number,
+    allowed: InstanceStatus[],
+  ) {
+    const instance = await this.instanceRepo.findOne({
+      where: { id: instanceId },
+    });
+    if (!instance || instance.initiatorId !== actorId) {
+      throw new NotFoundException('单据不存在');
+    }
+    if (!allowed.includes(instance.status)) {
+      throw new BadRequestException('当前状态不能修改');
+    }
+    return instance;
+  }
+
+  private async requireForm(formId: number) {
+    const form = await this.formRepo.findOne({ where: { id: formId } });
+    if (!form) throw new NotFoundException('表单不存在');
+    return form;
+  }
+}

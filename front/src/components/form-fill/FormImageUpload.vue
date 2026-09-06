@@ -59,6 +59,7 @@ const props = defineProps({
   appId: { type: Number, default: 0 },
   modelValue: { default: () => [] },
   disabled: { type: Boolean, default: false },
+  dataSource: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -103,7 +104,7 @@ function onRemove(file) {
 
 async function beforeUpload(file) {
   if (props.disabled) return false
-  if (!props.appId) {
+  if (!props.appId && !props.dataSource) {
     ElMessage.warning('无法上传图片')
     return false
   }
@@ -124,6 +125,12 @@ async function beforeUpload(file) {
 }
 
 function doUpload(options) {
+  if (props.dataSource?.uploadImage) {
+    return props.dataSource.uploadImage({
+      fieldKey: props.field.key,
+      file: options.file,
+    })
+  }
   return uploadAppImageApi(props.appId, options.file)
 }
 

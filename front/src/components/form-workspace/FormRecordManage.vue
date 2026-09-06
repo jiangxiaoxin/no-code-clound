@@ -20,8 +20,11 @@
       :dict-items-by-code="dictItemsByCode"
       :app-id="appId"
       :form-id="form?.id"
+      :form-kind="form?.formKind || 'normal'"
       :can-edit="recordActions.edit"
+      :can-configure="Boolean(detailRecord?.canConfigure ?? canConfigure)"
       :start-editing="detailStartEditing"
+      :data-source="recordSource"
       @saved="onDetailSaved"
     />
     <FormRecordCreateDrawer
@@ -33,7 +36,11 @@
       :dict-items-by-code="dictItemsByCode"
       :schema-loading="schemaLoading"
       :saving="saving"
+      :unpublished="workflowUnpublished"
+      :workflow-enabled="workflowEnabled"
       @save="onCreate"
+      @draft="onCreateDraft"
+      @submit="onCreateSubmit"
       @closed="resetValues"
     />
   </div>
@@ -46,8 +53,11 @@ import {
   createFormRecordApi,
   getFormApi,
   getFormConfigApi,
+  getFormRecordApi,
   listDictionaryItemsByCodesApi,
 } from '../../api/apps'
+import { appRecordSource } from './recordDataSource.js'
+import { submitSuccessText } from '../workflow-inbox/workflowStatus.js'
 import {
   buildRecordData,
   emptyRecordValues,
@@ -63,6 +73,7 @@ import FormRecordDetailDrawer from './FormRecordDetailDrawer.vue'
 const props = defineProps({
   appId: { type: Number, required: true },
   formId: { type: Number, required: true },
+  canConfigure: { type: Boolean, default: false },
 })
 
 const listRef = ref(null)
@@ -80,6 +91,15 @@ const detailRecord = ref(null)
 const detailStartEditing = ref(false)
 // 切换表单时作废进行中的请求，避免把上一张表的字段写进来
 const loadSession = ref(0)
+const workflowUnpublished = computed(
+  () => form.value?.formKind === 'workflow' && !form.value?.workflowPublished,
+)
+const workflowEnabled = computed(
+  () => form.value?.formKind === 'workflow' && Boolean(form.value?.workflowEnabled),
+)
+const recordSource = computed(() =>
+  appRecordSource({ appId: props.appId, formId: props.formId }),
+)
 
 watch(detailRecord, (newval, oldval) => {
   console.log('watch detailRecord======');
@@ -176,33 +196,60 @@ async function loadDictItems() {
 }
 
 function openCreate() {
+  if (workflowUnpublished.value) {
+    ElMessage.warning('这张表单还没有配置流程，发布流程之后才能使用')
+    return
+  }
   resetValues()
   createVisible.value = true
 }
 
-function openDetail(row) {
+async function openRecord(row, startEditing) {
   console.log("🚀 ~ FormRecordManage.vue:184 ~ openDetail ~ row:", row)
-
-  detailStartEditing.value = false
-  detailRecord.value = row
+  detailStartEditing.value = startEditing
+  try {
+    detailRecord.value = await getFormRecordApi(props.appId, props.formId, row.id)
+  } catch {
+    detailRecord.value = row
+  }
   detailVisible.value = true
+}
+
+function openDetail(row) {
+  return openRecord(row, false)
 }
 
 function openEdit(row) {
   console.log("🚀 ~ FormRecordManage.vue:192 ~ openEdit ~ row:", row)
-
-  detailStartEditing.value = true
-  detailRecord.value = row
-  detailVisible.value = true
+  return openRecord(row, true)
 }
 
 function onDetailSaved(updated) {
   detailStartEditing.value = false
   detailVisible.value = false
-  listRef.value?.upsertRecord(updated)
+  if (updated?.id) {
+    listRef.value?.upsertRecord(updated)
+  }
+  listRef.value?.reload()
 }
 
 async function onCreate() {
+  return createRecord()
+}
+
+async function onCreateDraft() {
+  return createRecord('draft')
+}
+
+async function onCreateSubmit() {
+  return createRecord('submit')
+}
+
+async function createRecord(intent) {
+  if (workflowUnpublished.value) {
+    ElMessage.warning('这张表单还没有配置流程，发布流程之后才能使用')
+    return
+  }
   const err = firstRequiredError(fields.value, values)
   if (err) {
     ElMessage.warning(err.message)
@@ -214,12 +261,15 @@ async function onCreate() {
   }
   saving.value = true
   try {
-    await createFormRecordApi(
+    const saved = await createFormRecordApi(
       props.appId,
       form.value.id,
       buildRecordData(fields.value, values),
+      intent,
     )
-    ElMessage.success('保存成功')
+    ElMessage.success(
+      intent === 'submit' ? submitSuccessText(saved?.nextNodeTitle) : '保存成功',
+    )
     resetValues()
     createVisible.value = false
     await listRef.value?.reload({ resetPage: true })

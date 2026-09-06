@@ -1,0 +1,369 @@
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { User } from '../../user/user.entity';
+import { AppForm } from '../app-form.entity';
+import { Application } from '../application.entity';
+import { DictionaryService } from '../dictionary/dictionary.service';
+import { flattenFields } from '../form-record/flatten-fields';
+import { parseFormSchema } from '../form-schema';
+import { FormRecordStore } from '../form-record/form-record.store';
+import { FormField } from '../form-record/form-record.types';
+import { WorkflowInstance } from './workflow-instance.entity';
+import { WorkflowTask } from './workflow-task.entity';
+import { InstanceStatus, WorkflowNode } from './workflow.types';
+
+const STATUS_TEXT: Record<InstanceStatus, string> = {
+  draft: '草稿',
+  running: '审批中',
+  approved: '已通过',
+  rejected: '已驳回',
+  error: '异常',
+};
+
+@Injectable()
+export class WorkflowInboxService {
+  constructor(
+    @InjectRepository(WorkflowTask)
+    private readonly taskRepo: Repository<WorkflowTask>,
+    @InjectRepository(WorkflowInstance)
+    private readonly instanceRepo: Repository<WorkflowInstance>,
+    @InjectRepository(AppForm)
+    private readonly formRepo: Repository<AppForm>,
+    @InjectRepository(Application)
+    private readonly appRepo: Repository<Application>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    private readonly store: FormRecordStore,
+    private readonly dictionary: DictionaryService,
+  ) {}
+
+  async query(
+    userId: number,
+    body: { kind: 'todo' | 'mine' | 'done'; appId?: number; page?: number; pageSize?: number },
+  ) {
+    const page = body.page ?? 1;
+    const pageSize = body.pageSize ?? 20;
+    if (body.kind === 'mine') {
+      const qb = this.instanceRepo
+        .createQueryBuilder('instance')
+        .where('instance.initiatorId = :userId', { userId })
+        .orderBy('instance.updatedAt', 'DESC')
+        .skip((page - 1) * pageSize)
+        .take(pageSize);
+      if (body.appId) qb.andWhere('instance.appId = :appId', { appId: body.appId });
+      const [items, total] = await qb.getManyAndCount();
+      return {
+        items: await this.toMineCards(items),
+        total,
+        page,
+        pageSize,
+      };
+    }
+    const qb = this.taskRepo
+      .createQueryBuilder('task')
+      .innerJoin(WorkflowInstance, 'instance', 'instance.id = task.instanceId')
+      .where('task.assigneeId = :userId', { userId })
+      .orderBy(body.kind === 'done' ? 'task.finishedAt' : 'task.createdAt', 'DESC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize);
+    if (body.kind === 'todo') {
+      qb.andWhere('task.status = :status', { status: 'pending' });
+    } else {
+      qb.andWhere('task.status = :status', { status: 'done' });
+      qb.andWhere('task.action IS NOT NULL');
+    }
+    if (body.appId) qb.andWhere('instance.appId = :appId', { appId: body.appId });
+    const [items, total] = await qb.getManyAndCount();
+    return {
+      items: await this.toTaskCards(items, body.kind),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
+  async count(userId: number, appId?: number) {
+    const qb = this.taskRepo
+      .createQueryBuilder('task')
+      .innerJoin(WorkflowInstance, 'instance', 'instance.id = task.instanceId')
+      .where('task.assigneeId = :userId', { userId })
+      .andWhere('task.status = :status', { status: 'pending' });
+    if (appId) qb.andWhere('instance.appId = :appId', { appId });
+    return { todo: await qb.getCount() };
+  }
+
+  async open(userId: number, kind: 'todo' | 'mine' | 'done', id: number) {
+    let task: WorkflowTask | null = null;
+    let instance: WorkflowInstance | null = null;
+    if (kind === 'mine') {
+      instance = await this.instanceRepo.findOne({ where: { id } });
+      if (!instance || instance.initiatorId !== userId) {
+        throw new NotFoundException('单据不存在');
+      }
+    } else {
+      task = await this.taskRepo.findOne({ where: { id } });
+      if (!task || task.assigneeId !== userId) {
+        throw new NotFoundException('待办不存在');
+      }
+      if (kind === 'todo' && task.status !== 'pending') {
+        throw new NotFoundException('待办不存在');
+      }
+      if (kind === 'done' && task.status !== 'done') {
+        throw new NotFoundException('待办不存在');
+      }
+      instance = await this.instanceRepo.findOne({ where: { id: task.instanceId } });
+      if (!instance) throw new NotFoundException('单据不存在');
+    }
+    const form = await this.formRepo.findOne({ where: { id: instance.formId } });
+    if (!form) throw new NotFoundException('表单不存在');
+    const record = await this.store.findById(instance.formId, instance.recordId);
+    const tasks = await this.taskRepo.find({
+      where: { instanceId: instance.id },
+      order: { createdAt: 'ASC' },
+    });
+    const userIds = new Set<number>([instance.initiatorId]);
+    for (const row of tasks) userIds.add(row.assigneeId);
+    const users = userIds.size
+      ? await this.userRepo.find({ where: { id: In([...userIds]) } })
+      : [];
+    const names: Record<string, string> = {};
+    const disabled = new Set<number>();
+    for (const user of users) {
+      names[String(user.id)] = user.displayName;
+      if (user.status !== 'active') disabled.add(user.id);
+    }
+    const fields = parseFormSchema(form.fields).fields;
+    const dictCodes = flattenFields(fields)
+      .map((field) => field.dictCode)
+      .filter((code): code is string => Boolean(code));
+    const dictionaries = await this.dictionary.listEnabledItemsByApp(
+      instance.appId,
+      dictCodes,
+    );
+    const node = instance.currentNodeKey
+      ? instance.graph.nodes.find((item) => item.key === instance.currentNodeKey)
+      : undefined;
+    const approve = node?.type === 'approve' ? node : undefined;
+    return {
+      kind,
+      form: {
+        id: form.id,
+        name: form.name,
+        fields,
+        formKind: form.formKind,
+      },
+      record: record ? { id: instance.recordId, data: record.data ?? {} } : null,
+      recordMissing: !record,
+      dictionaries,
+      instance: {
+        id: instance.id,
+        status: instance.status,
+        currentNodeKey: instance.currentNodeKey,
+        visitedNodeKeys: instance.visitedNodeKeys,
+        round: instance.round,
+        errorReason: instance.errorReason,
+        notes: instance.notes,
+        graph: instance.graph,
+        initiatorId: instance.initiatorId,
+        hasApproved: instance.hasApproved,
+        definitionVersion: instance.definitionVersion,
+      },
+      tasks: tasks.map((row) => ({
+        id: row.id,
+        nodeKey: row.nodeKey,
+        assigneeId: row.assigneeId,
+        assigneeName: names[String(row.assigneeId)] || '',
+        assigneeDisabled: disabled.has(row.assigneeId),
+        status: row.status,
+        action: row.action,
+        comment: row.comment,
+        cancelReason: row.cancelReason,
+        finishedAt: row.finishedAt,
+        createdAt: row.createdAt,
+      })),
+      names,
+      actions: this.actionsOf(kind, instance, task),
+      fieldAccess: kind === 'todo' ? approve?.fieldAccess || {} : {},
+      commentRequiredOnApprove: Boolean(approve?.commentRequiredOnApprove),
+    };
+  }
+
+  private actionsOf(
+    kind: 'todo' | 'mine' | 'done',
+    instance: WorkflowInstance,
+    task: WorkflowTask | null,
+  ) {
+    if (kind === 'todo') {
+      return {
+        canApprove: task?.status === 'pending',
+        canReject: task?.status === 'pending',
+        canDraft: false,
+        canSubmit: false,
+        canCancel: false,
+        canRetry: false,
+        readOnly: false,
+      };
+    }
+    if (kind === 'done') {
+      return {
+        canApprove: false,
+        canReject: false,
+        canDraft: false,
+        canSubmit: false,
+        canCancel: false,
+        canRetry: false,
+        readOnly: true,
+      };
+    }
+    if (instance.status === 'approved') {
+      return {
+        canApprove: false,
+        canReject: false,
+        canDraft: false,
+        canSubmit: false,
+        canCancel: false,
+        canRetry: false,
+        readOnly: true,
+      };
+    }
+    return {
+      canApprove: false,
+      canReject: false,
+      canDraft:
+        instance.status === 'draft' ||
+        instance.status === 'rejected' ||
+        instance.status === 'error',
+      canSubmit:
+        instance.status === 'draft' ||
+        instance.status === 'rejected' ||
+        instance.status === 'error',
+      canCancel:
+        (instance.status === 'running' || instance.status === 'error') &&
+        !instance.hasApproved,
+      canRetry: instance.status === 'error',
+      readOnly: false,
+    };
+  }
+
+  private async toMineCards(instances: WorkflowInstance[]) {
+    const ctx = await this.loadCardContext(instances);
+    return Promise.all(
+      instances.map(async (instance) => {
+        const record = await this.store.findById(instance.formId, instance.recordId);
+        const form = ctx.forms.get(instance.formId);
+        const missing = !record;
+        return {
+          id: instance.id,
+          kind: 'mine' as const,
+          appId: instance.appId,
+          appName: ctx.apps.get(instance.appId)?.name || '',
+          formId: instance.formId,
+          formName: form?.name || '',
+          summary: missing
+            ? '数据已删除'
+            : this.summaryOf(form?.fields, record?.data, instance.recordId),
+          status: instance.status,
+          statusText: STATUS_TEXT[instance.status],
+          currentNodeTitle: titleOf(instance.graph.nodes, instance.currentNodeKey),
+          initiatorName: ctx.users.get(instance.initiatorId) || '',
+          time: instance.updatedAt,
+          recordMissing: missing,
+        };
+      }),
+    );
+  }
+
+  private async toTaskCards(tasks: WorkflowTask[], kind: 'todo' | 'done') {
+    const instanceIds = [...new Set(tasks.map((row) => row.instanceId))];
+    const instances = instanceIds.length
+      ? await this.instanceRepo.find({ where: { id: In(instanceIds) } })
+      : [];
+    const byId = new Map(instances.map((row) => [row.id, row]));
+    const ctx = await this.loadCardContext(instances);
+    return Promise.all(
+      tasks.map(async (task) => {
+        const instance = byId.get(task.instanceId);
+        const record = instance
+          ? await this.store.findById(instance.formId, instance.recordId)
+          : null;
+        const form = instance ? ctx.forms.get(instance.formId) : undefined;
+        const missing = !record;
+        return {
+          id: task.id,
+          kind,
+          appId: instance?.appId,
+          appName: instance ? ctx.apps.get(instance.appId)?.name || '' : '',
+          formId: instance?.formId,
+          formName: form?.name || '',
+          summary: missing
+            ? '数据已删除'
+            : this.summaryOf(form?.fields, record?.data, instance?.recordId),
+          status: instance?.status,
+          statusText:
+            kind === 'done'
+              ? task.action === 'reject'
+                ? '已驳回'
+                : '已通过'
+              : titleOf(instance?.graph.nodes, task.nodeKey) ||
+                STATUS_TEXT[instance?.status || 'running'],
+          currentNodeTitle: titleOf(instance?.graph.nodes, instance?.currentNodeKey),
+          initiatorName: instance ? ctx.users.get(instance.initiatorId) || '' : '',
+          time: kind === 'done' ? task.finishedAt : task.createdAt,
+          recordMissing: missing,
+        };
+      }),
+    );
+  }
+
+  private async loadCardContext(instances: WorkflowInstance[]) {
+    const formIds = [...new Set(instances.map((row) => row.formId))];
+    const appIds = [...new Set(instances.map((row) => row.appId))];
+    const userIds = [...new Set(instances.map((row) => row.initiatorId))];
+    const [forms, apps, users] = await Promise.all([
+      formIds.length ? this.formRepo.find({ where: { id: In(formIds) } }) : [],
+      appIds.length ? this.appRepo.find({ where: { id: In(appIds) } }) : [],
+      userIds.length ? this.userRepo.find({ where: { id: In(userIds) } }) : [],
+    ]);
+    return {
+      forms: new Map(forms.map((row) => [row.id, row])),
+      apps: new Map(apps.map((row) => [row.id, row])),
+      users: new Map(users.map((row) => [row.id, row.displayName])),
+    };
+  }
+
+  private summaryOf(
+    fields: AppForm['fields'] | FormField[] | null | undefined,
+    data: Record<string, unknown> | undefined,
+    recordId?: string,
+  ) {
+    const parsed = Array.isArray(fields)
+      ? (fields as FormField[])
+      : parseFormSchema(fields).fields;
+    const parts: string[] = [];
+    for (const field of flattenFields(parsed)) {
+      if (
+        field.type === 'subform' ||
+        field.type === 'divider' ||
+        field.type === 'tabs' ||
+        field.type === 'relate-subform'
+      ) {
+        continue;
+      }
+      const value = data?.[field.key];
+      if (value == null || value === '') continue;
+      if (Array.isArray(value) && !value.length) continue;
+      parts.push(String(value));
+      if (parts.length >= 2) break;
+    }
+    return parts.join(' / ') || recordId || '';
+  }
+}
+
+function titleOf(
+  nodes: WorkflowNode[] | undefined,
+  key: string | null | undefined,
+) {
+  if (!key || !nodes) return '';
+  return nodes.find((node) => node.key === key)?.title || '';
+}

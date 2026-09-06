@@ -8,8 +8,13 @@ import { Application } from './application.entity';
 import { ApplicationService } from './application.service';
 import { Dictionary } from './dictionary/dictionary.entity';
 import { DictionaryItem } from './dictionary/dictionary-item.entity';
+import { AppAccessAdminService } from './access/app-access-admin.service';
+import { AppAccessService } from './access/app-access.service';
 import { FormRecordStore } from './form-record/form-record.store';
 import { FormSerialSeq } from './form-record/form-serial-seq.entity';
+import { WorkflowDefinition } from './workflow/workflow-definition.entity';
+import { WorkflowInstance } from './workflow/workflow-instance.entity';
+import { WorkflowTask } from './workflow/workflow-task.entity';
 
 describe('ApplicationService', () => {
   let service: ApplicationService;
@@ -53,11 +58,34 @@ describe('ApplicationService', () => {
   const serialSeqRepo = {
     delete: jest.fn(),
   };
+  const workflowDefinitionRepo = {
+    delete: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+  };
+  const workflowInstanceRepo = {
+    find: jest.fn(),
+    delete: jest.fn(),
+  };
+  const workflowTaskRepo = {
+    delete: jest.fn(),
+  };
 
   const formRecordStore = {
     dropFormCollection: jest.fn(),
     dropAppCollections: jest.fn(),
     syncIndexes: jest.fn(),
+    backfillApprovedMissing: jest.fn(),
+  };
+  const access = {
+    getAccess: jest.fn(),
+    listAccessible: jest.fn(),
+    requireUse: jest.fn(),
+    requireConfigure: jest.fn(),
+    requireOwner: jest.fn(),
+  };
+  const accessAdmin = {
+    deleteForApp: jest.fn(),
   };
 
   const ownedApp = {
@@ -69,6 +97,19 @@ describe('ApplicationService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    access.requireUse.mockImplementation(async () => ({ ...ownedApp }));
+    access.requireConfigure.mockImplementation(async () => ({ ...ownedApp }));
+    access.requireOwner.mockImplementation(async () => ({ ...ownedApp }));
+    access.getAccess.mockImplementation(async () => ({
+      app: { ...ownedApp },
+      canUse: true,
+      canConfigure: true,
+      isOwner: true,
+    }));
+    access.listAccessible.mockResolvedValue([]);
+    workflowInstanceRepo.find.mockResolvedValue([]);
+    workflowDefinitionRepo.find.mockResolvedValue([]);
+    workflowDefinitionRepo.findOne.mockResolvedValue(null);
     const module = await Test.createTestingModule({
       providers: [
         ApplicationService,
@@ -79,40 +120,49 @@ describe('ApplicationService', () => {
         { provide: getRepositoryToken(Dictionary), useValue: dictRepo },
         { provide: getRepositoryToken(DictionaryItem), useValue: itemRepo },
         { provide: getRepositoryToken(FormSerialSeq), useValue: serialSeqRepo },
+        {
+          provide: getRepositoryToken(WorkflowDefinition),
+          useValue: workflowDefinitionRepo,
+        },
+        {
+          provide: getRepositoryToken(WorkflowInstance),
+          useValue: workflowInstanceRepo,
+        },
+        {
+          provide: getRepositoryToken(WorkflowTask),
+          useValue: workflowTaskRepo,
+        },
         { provide: FormRecordStore, useValue: formRecordStore },
+        { provide: AppAccessService, useValue: access },
+        { provide: AppAccessAdminService, useValue: accessAdmin },
       ],
     }).compile();
     service = module.get(ApplicationService);
   });
 
   describe('list', () => {
-    it('returns current owner apps newest first without extra fields', async () => {
-      repo.find.mockResolvedValue([
+    it('returns accessible apps with owner and configure flags', async () => {
+      access.listAccessible.mockResolvedValue([
         {
-          id: 2,
-          name: '仓库',
-          icon: '#2F6BFF',
-          ownerId: 1,
-          createdAt: new Date('2026-08-19T04:00:00.000Z'),
-        },
-        {
-          id: 1,
-          name: '进销存',
+          id: 8,
+          name: '人事',
           icon: '#E8A317',
-          ownerId: 1,
-          createdAt: new Date('2026-08-19T03:00:00.000Z'),
+          isOwner: false,
+          canConfigure: false,
         },
       ]);
 
-      const result = await service.list(1);
+      const result = await service.list(5);
 
-      expect(repo.find).toHaveBeenCalledWith({
-        where: { ownerId: 1 },
-        order: { createdAt: 'DESC' },
-      });
+      expect(access.listAccessible).toHaveBeenCalledWith(5);
       expect(result).toEqual([
-        { id: 2, name: '仓库', icon: '#2F6BFF' },
-        { id: 1, name: '进销存', icon: '#E8A317' },
+        {
+          id: 8,
+          name: '人事',
+          icon: '#E8A317',
+          isOwner: false,
+          canConfigure: false,
+        },
       ]);
     });
   });
@@ -140,6 +190,8 @@ describe('ApplicationService', () => {
         id: 3,
         name: '我的应用',
         icon: saved.icon,
+        isOwner: true,
+        canConfigure: true,
       });
     });
 
@@ -153,20 +205,23 @@ describe('ApplicationService', () => {
 
   describe('getOne', () => {
     it('returns id+name+icon for owner', async () => {
-      repo.findOne.mockResolvedValue(ownedApp);
-
       await expect(service.getOne(1, 8)).resolves.toEqual({
         id: 8,
         name: '进销存',
         icon: '#E8A317',
+        canConfigure: true,
+        isOwner: true,
       });
-      expect(repo.findOne).toHaveBeenCalledWith({
-        where: { id: 8, ownerId: 1 },
-      });
+      expect(access.getAccess).toHaveBeenCalledWith(1, 8);
     });
 
     it('throws 404 when missing or not owner', async () => {
-      repo.findOne.mockResolvedValue(null);
+      access.getAccess.mockResolvedValue({
+        app: { ...ownedApp },
+        canUse: false,
+        canConfigure: false,
+        isOwner: false,
+      });
 
       await expect(service.getOne(1, 8)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -181,7 +236,7 @@ describe('ApplicationService', () => {
 
   describe('renameApp', () => {
     it('updates name', async () => {
-      repo.findOne.mockResolvedValue({ ...ownedApp, name: '旧名' });
+      access.requireConfigure.mockResolvedValue({ ...ownedApp, name: '旧名' });
       repo.save.mockImplementation(async (row: Application) => row);
 
       await expect(
@@ -194,7 +249,7 @@ describe('ApplicationService', () => {
     });
 
     it('throws 404 when missing or not owner', async () => {
-      repo.findOne.mockResolvedValue(null);
+      access.requireConfigure.mockRejectedValue(new NotFoundException('应用不存在'));
 
       await expect(
         service.renameApp(1, 8, { name: '新名' }),
@@ -213,6 +268,7 @@ describe('ApplicationService', () => {
 
       await service.deleteApp(1, 8);
 
+      expect(accessAdmin.deleteForApp).toHaveBeenCalledWith(8);
       expect(formRecordStore.dropAppCollections).toHaveBeenCalledWith(8, [
         10, 11,
       ]);
@@ -256,10 +312,11 @@ describe('ApplicationService', () => {
       await expect(service.deleteApp(1, 8)).rejects.toThrow('mongo down');
       expect(repo.remove).not.toHaveBeenCalled();
       expect(formRepo.delete).not.toHaveBeenCalled();
+      expect(accessAdmin.deleteForApp).not.toHaveBeenCalled();
     });
 
     it('throws 404 when missing or not owner', async () => {
-      repo.findOne.mockResolvedValue(null);
+      access.requireOwner.mockRejectedValue(new NotFoundException('应用不存在'));
 
       await expect(service.deleteApp(1, 8)).rejects.toBeInstanceOf(
         NotFoundException,
@@ -284,8 +341,11 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: 2,
+        formKind: 'normal',
         fields: null,
         columns: 1,
+        workflowPublished: false,
+        workflowEnabled: false,
       });
     });
 
@@ -303,8 +363,11 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: 2,
+        formKind: 'normal',
         fields: [{ key: 'a1', type: 'input', title: '姓名' }],
         columns: 1,
+        workflowPublished: false,
+        workflowEnabled: false,
       });
     });
 
@@ -325,8 +388,11 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: 2,
+        formKind: 'normal',
         fields: [{ key: 'a1', type: 'input', title: '姓名' }],
         columns: 3,
+        workflowPublished: false,
+        workflowEnabled: false,
       });
     });
 
@@ -364,18 +430,43 @@ describe('ApplicationService', () => {
         order: { createdAt: 'DESC' },
       });
       expect(result).toEqual({
+        canConfigure: true,
+        isOwner: true,
         groups: [
           {
             id: 2,
             name: '人事',
             forms: [
-              { id: 10, name: '入职登记', groupId: 2 },
-              { id: 9, name: '入职登记', groupId: 2 },
+              {
+                id: 10,
+                name: '入职登记',
+                groupId: 2,
+                formKind: 'normal',
+                workflowPublished: false,
+                workflowEnabled: false,
+              },
+              {
+                id: 9,
+                name: '入职登记',
+                groupId: 2,
+                formKind: 'normal',
+                workflowPublished: false,
+                workflowEnabled: false,
+              },
             ],
           },
           { id: 1, name: '人事', forms: [] },
         ],
-        forms: [{ id: 11, name: '未分组', groupId: null }],
+        forms: [
+          {
+            id: 11,
+            name: '未分组',
+            groupId: null,
+            formKind: 'normal',
+            workflowPublished: false,
+            workflowEnabled: false,
+          },
+        ],
       });
     });
   });
@@ -479,6 +570,7 @@ describe('ApplicationService', () => {
         id: 11,
         name: '未分组',
         groupId: null,
+        formKind: 'normal',
       });
     });
 
@@ -501,6 +593,7 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: 2,
+        formKind: 'normal',
       });
     });
 
@@ -516,6 +609,74 @@ describe('ApplicationService', () => {
         expect((e as BadRequestException).message).toBe('分组不存在');
       }
       expect(formRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('defaults formKind to normal when omitted', async () => {
+      formRepo.create.mockImplementation((x: Partial<AppForm>) => x);
+      formRepo.save.mockImplementation(async (row: Partial<AppForm>) => ({
+        id: 12,
+        ...row,
+      }));
+
+      await expect(
+        service.createForm(1, 8, { name: '加班单' }),
+      ).resolves.toEqual({
+        id: 12,
+        name: '加班单',
+        groupId: null,
+        formKind: 'normal',
+      });
+      expect(formRepo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ formKind: 'normal' }),
+      );
+    });
+
+    it('creates a workflow form when formKind is workflow', async () => {
+      formRepo.create.mockImplementation((x: Partial<AppForm>) => x);
+      formRepo.save.mockImplementation(async (row: Partial<AppForm>) => ({
+        id: 13,
+        ...row,
+      }));
+
+      await expect(
+        service.createForm(1, 8, { name: '请假单', formKind: 'workflow' }),
+      ).resolves.toEqual({
+        id: 13,
+        name: '请假单',
+        groupId: null,
+        formKind: 'workflow',
+      });
+    });
+  });
+
+  describe('convertFormKind', () => {
+    it('普通表单转为流程并回填已有记录', async () => {
+      formRepo.findOne.mockResolvedValue({
+        id: 12,
+        applicationId: 8,
+        name: '加班单',
+        groupId: null,
+        formKind: 'normal',
+      });
+      formRepo.save.mockImplementation(async (row: AppForm) => row);
+      formRecordStore.backfillApprovedMissing.mockResolvedValue(3);
+
+      const result = await service.convertFormKind(1, 8, 12, {
+        formKind: 'workflow',
+      });
+      expect(formRecordStore.backfillApprovedMissing).toHaveBeenCalledWith(12);
+      expect(result.formKind).toBe('workflow');
+    });
+
+    it('流程表单不能转回普通', async () => {
+      formRepo.findOne.mockResolvedValue({
+        id: 12,
+        applicationId: 8,
+        formKind: 'workflow',
+      });
+      await expect(
+        service.convertFormKind(1, 8, 12, { formKind: 'normal' }),
+      ).rejects.toThrow('流程表单不能转回普通表单');
     });
   });
 
@@ -536,6 +697,7 @@ describe('ApplicationService', () => {
         id: 10,
         name: '新名',
         groupId: 2,
+        formKind: 'normal',
       });
     });
   });
@@ -627,6 +789,7 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: 2,
+        formKind: 'normal',
         fields,
         columns: 1,
       });
@@ -650,6 +813,7 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: null,
+        formKind: 'normal',
         fields: [],
         columns: 1,
       });
@@ -672,6 +836,7 @@ describe('ApplicationService', () => {
         id: 10,
         name: '入职登记',
         groupId: 2,
+        formKind: 'normal',
         fields,
         columns: 2,
       });

@@ -13,12 +13,18 @@ import { Application } from './application.entity';
 import { Dictionary } from './dictionary/dictionary.entity';
 import { DictionaryItem } from './dictionary/dictionary-item.entity';
 import { CreateApplicationDto } from './dto/create-application.dto';
+import { ConvertFormKindDto } from './dto/convert-form-kind.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
+import { AppAccessAdminService } from './access/app-access-admin.service';
+import { AppAccessService } from './access/app-access.service';
 import { flattenFields } from './form-record/flatten-fields';
 import { FormField } from './form-record/form-record.types';
 import { FormRecordStore } from './form-record/form-record.store';
 import { FormSerialSeq } from './form-record/form-serial-seq.entity';
+import { WorkflowDefinition } from './workflow/workflow-definition.entity';
+import { WorkflowInstance } from './workflow/workflow-instance.entity';
+import { WorkflowTask } from './workflow/workflow-task.entity';
 import { mergeFormConfig, normalizeFormConfig } from './form-config';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
 import { assertSerialSchema } from './form-record/serial-number';
@@ -83,15 +89,27 @@ export class ApplicationService {
     private readonly itemRepo: Repository<DictionaryItem>,
     @InjectRepository(FormSerialSeq)
     private readonly serialSeqRepo: Repository<FormSerialSeq>,
+    @InjectRepository(WorkflowDefinition)
+    private readonly workflowDefinitionRepo: Repository<WorkflowDefinition>,
+    @InjectRepository(WorkflowInstance)
+    private readonly workflowInstanceRepo: Repository<WorkflowInstance>,
+    @InjectRepository(WorkflowTask)
+    private readonly workflowTaskRepo: Repository<WorkflowTask>,
     private readonly formRecordStore: FormRecordStore,
+    private readonly access: AppAccessService,
+    private readonly accessAdmin: AppAccessAdminService,
   ) {}
 
-  async list(ownerId: number): Promise<{ id: number; name: string; icon: string }[]> {
-    const rows = await this.appRepo.find({
-      where: { ownerId },
-      order: { createdAt: 'DESC' },
-    });
-    return rows.map((row) => this.toAppItem(row));
+  async list(ownerId: number): Promise<
+    {
+      id: number;
+      name: string;
+      icon: string;
+      isOwner: boolean;
+      canConfigure: boolean;
+    }[]
+  > {
+    return this.access.listAccessible(ownerId);
   }
 
   async create(
@@ -110,15 +128,26 @@ export class ApplicationService {
         ownerId,
       }),
     );
-    return this.toAppItem(saved);
+    return { ...this.toAppItem(saved), isOwner: true, canConfigure: true };
   }
 
   async getOne(
     ownerId: number,
     id: number,
-  ): Promise<{ id: number; name: string; icon: string }> {
-    const app = await this.requireOwnedApp(ownerId, id);
-    return this.toAppItem(app);
+  ): Promise<{
+    id: number;
+    name: string;
+    icon: string;
+    canConfigure: boolean;
+    isOwner: boolean;
+  }> {
+    const access = await this.access.getAccess(ownerId, id);
+    if (!access.canUse) throw new NotFoundException('应用不存在');
+    return {
+      ...this.toAppItem(access.app),
+      canConfigure: access.canConfigure,
+      isOwner: access.isOwner,
+    };
   }
 
   async renameApp(
@@ -126,14 +155,14 @@ export class ApplicationService {
     id: number,
     dto: NameDto,
   ): Promise<{ id: number; name: string; icon: string }> {
-    const app = await this.requireOwnedApp(ownerId, id);
+    const app = await this.access.requireConfigure(ownerId, id);
     app.name = this.requireName(dto.name);
     const saved = await this.appRepo.save(app);
     return this.toAppItem(saved);
   }
 
   async deleteApp(ownerId: number, id: number): Promise<void> {
-    const app = await this.requireOwnedApp(ownerId, id);
+    const app = await this.access.requireOwner(ownerId, id);
     const forms = await this.formRepo.find({
       where: { applicationId: id },
     });
@@ -145,6 +174,8 @@ export class ApplicationService {
 
     await this.formRecordStore.dropAppCollections(id, formIds);
 
+    await this.deleteWorkflowByApp(id);
+
     if (formIds.length) {
       await this.serialSeqRepo.delete({ formId: In(formIds) });
       await this.formConfigRepo.delete({ formId: In(formIds) });
@@ -155,13 +186,18 @@ export class ApplicationService {
     await this.dictRepo.delete({ applicationId: id });
     await this.formRepo.delete({ applicationId: id });
     await this.groupRepo.delete({ applicationId: id });
+    await this.accessAdmin.deleteForApp(id);
     await this.appRepo.remove(app);
   }
 
   async getForm(ownerId: number, appId: number, formId: number) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireUse(ownerId, appId);
     const form = await this.requireForm(appId, formId);
-    return this.toFormDetail(form);
+    const def = await this.workflowDefinitionRepo.findOne({ where: { formId } });
+    return {
+      ...this.toFormDetail(form),
+      ...this.toWorkflowFlags(def),
+    };
   }
 
   async saveFields(
@@ -174,7 +210,7 @@ export class ApplicationService {
     if (!Array.isArray(fields)) {
       throw new BadRequestException('请提交字段列表');
     }
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const form = await this.requireForm(appId, formId);
     assertSerialSchema(flattenFields(fields as FormField[]));
     form.fields = serializeFormSchema(
@@ -195,7 +231,7 @@ export class ApplicationService {
     excludeFormId?: number,
     include?: string,
   ): Promise<{ id: number; name: string; fields: OptionField[] }[]> {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireUse(ownerId, appId);
     const forms = await this.formRepo.find({
       where: { applicationId: appId },
       order: { createdAt: 'DESC' },
@@ -226,7 +262,7 @@ export class ApplicationService {
   }
 
   async getFormConfig(ownerId: number, appId: number, formId: number) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireUse(ownerId, appId);
     await this.requireForm(appId, formId);
     const row = await this.formConfigRepo.findOne({ where: { formId } });
     return this.toFormConfig(row?.config);
@@ -238,7 +274,7 @@ export class ApplicationService {
     formId: number,
     config: unknown,
   ) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     await this.requireForm(appId, formId);
     const existing = await this.formConfigRepo.findOne({ where: { formId } });
     const next = mergeFormConfig(existing?.config, config);
@@ -253,7 +289,8 @@ export class ApplicationService {
   }
 
   async directory(ownerId: number, id: number) {
-    await this.requireOwnedApp(ownerId, id);
+    const access = await this.access.getAccess(ownerId, id);
+    if (!access.canUse) throw new NotFoundException('应用不存在');
     const groups = await this.groupRepo.find({
       where: { applicationId: id },
       order: { createdAt: 'DESC' },
@@ -263,13 +300,22 @@ export class ApplicationService {
       order: { createdAt: 'DESC' },
     });
 
+    const defs = forms.length
+      ? await this.workflowDefinitionRepo.find({
+          where: { formId: In(forms.map((form) => form.id)) },
+        })
+      : [];
+    const defByForm = new Map(defs.map((row) => [row.formId, row]));
     const formsByGroup = new Map<
       number,
-      { id: number; name: string; groupId: number | null }[]
+      ReturnType<ApplicationService['toFormItem']>[]
     >();
-    const rootForms: { id: number; name: string; groupId: number | null }[] = [];
+    const rootForms: ReturnType<ApplicationService['toFormItem']>[] = [];
     for (const form of forms) {
-      const item = this.toFormItem(form);
+      const item = {
+        ...this.toFormItem(form),
+        ...this.toWorkflowFlags(defByForm.get(form.id)),
+      };
       if (form.groupId == null) {
         rootForms.push(item);
         continue;
@@ -280,6 +326,8 @@ export class ApplicationService {
     }
 
     return {
+      canConfigure: access.canConfigure,
+      isOwner: access.isOwner,
       groups: groups.map((group) => ({
         id: group.id,
         name: group.name,
@@ -290,7 +338,7 @@ export class ApplicationService {
   }
 
   async createGroup(ownerId: number, appId: number, dto: NameDto) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const saved = await this.groupRepo.save(
       this.groupRepo.create({
         applicationId: appId,
@@ -306,7 +354,7 @@ export class ApplicationService {
     groupId: number,
     dto: NameDto,
   ) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const group = await this.requireGroup(appId, groupId);
     group.name = this.requireName(dto.name);
     const saved = await this.groupRepo.save(group);
@@ -314,7 +362,7 @@ export class ApplicationService {
   }
 
   async deleteGroup(ownerId: number, appId: number, groupId: number) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const group = await this.requireGroup(appId, groupId);
     const formCount = await this.formRepo.count({
       where: { applicationId: appId, groupId },
@@ -326,7 +374,7 @@ export class ApplicationService {
   }
 
   async createForm(ownerId: number, appId: number, dto: CreateFormDto) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const groupId = dto.groupId ?? null;
     if (groupId != null) {
       const group = await this.groupRepo.findOne({
@@ -341,8 +389,29 @@ export class ApplicationService {
         applicationId: appId,
         groupId,
         name: this.requireName(dto.name),
+        formKind: dto.formKind ?? 'normal',
       }),
     );
+    return this.toFormItem(saved);
+  }
+
+  async convertFormKind(
+    ownerId: number,
+    appId: number,
+    formId: number,
+    dto: ConvertFormKindDto,
+  ) {
+    await this.access.requireConfigure(ownerId, appId);
+    const form = await this.requireForm(appId, formId);
+    if (form.formKind === 'workflow') {
+      throw new BadRequestException('流程表单不能转回普通表单');
+    }
+    if (dto.formKind !== 'workflow') {
+      throw new BadRequestException('请指定转为流程表单');
+    }
+    form.formKind = 'workflow';
+    const saved = await this.formRepo.save(form);
+    await this.formRecordStore.backfillApprovedMissing(formId);
     return this.toFormItem(saved);
   }
 
@@ -352,7 +421,7 @@ export class ApplicationService {
     formId: number,
     dto: NameDto,
   ) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const form = await this.requireForm(appId, formId);
     form.name = this.requireName(dto.name);
     const saved = await this.formRepo.save(form);
@@ -360,8 +429,9 @@ export class ApplicationService {
   }
 
   async deleteForm(ownerId: number, appId: number, formId: number) {
-    await this.requireOwnedApp(ownerId, appId);
+    await this.access.requireConfigure(ownerId, appId);
     const form = await this.requireForm(appId, formId);
+    await this.deleteWorkflowByForm(formId);
     await this.formRepo.remove(form);
     try {
       await this.formRecordStore.dropFormCollection(formId);
@@ -373,12 +443,30 @@ export class ApplicationService {
     }
   }
 
-  private async requireOwnedApp(ownerId: number, id: number) {
-    const app = await this.appRepo.findOne({ where: { id, ownerId } });
-    if (!app) {
-      throw new NotFoundException('应用不存在');
+  private async deleteWorkflowByForm(formId: number) {
+    const instances = await this.workflowInstanceRepo.find({
+      where: { formId },
+      select: ['id'],
+    });
+    const instanceIds = instances.map((row) => row.id);
+    if (instanceIds.length) {
+      await this.workflowTaskRepo.delete({ instanceId: In(instanceIds) });
     }
-    return app;
+    await this.workflowInstanceRepo.delete({ formId });
+    await this.workflowDefinitionRepo.delete({ formId });
+  }
+
+  private async deleteWorkflowByApp(appId: number) {
+    const instances = await this.workflowInstanceRepo.find({
+      where: { appId },
+      select: ['id'],
+    });
+    const instanceIds = instances.map((row) => row.id);
+    if (instanceIds.length) {
+      await this.workflowTaskRepo.delete({ instanceId: In(instanceIds) });
+    }
+    await this.workflowInstanceRepo.delete({ appId });
+    await this.workflowDefinitionRepo.delete({ appId });
   }
 
   private async requireGroup(applicationId: number, groupId: number) {
@@ -413,12 +501,25 @@ export class ApplicationService {
     return { id: row.id, name: row.name, icon: row.icon };
   }
 
+  private toWorkflowFlags(def?: WorkflowDefinition | null) {
+    return {
+      workflowPublished: Boolean(def?.publishedVersion),
+      workflowEnabled: Boolean(def?.enabled),
+    };
+  }
+
   private toFormItem(row: AppForm): {
     id: number;
     name: string;
     groupId: number | null;
+    formKind: 'normal' | 'workflow';
   } {
-    return { id: row.id, name: row.name, groupId: row.groupId };
+    return {
+      id: row.id,
+      name: row.name,
+      groupId: row.groupId,
+      formKind: row.formKind === 'workflow' ? 'workflow' : 'normal',
+    };
   }
 
   private toFormDetail(row: AppForm) {

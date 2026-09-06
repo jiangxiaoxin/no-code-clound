@@ -193,6 +193,7 @@ const props = defineProps({
   deptNames: { type: Object, default: () => ({}) },
   relateTitles: { type: Object, default: () => ({}) },
   editing: { type: Boolean, default: false },
+  inlineDisabled: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['start', 'close', 'saved'])
@@ -296,6 +297,7 @@ async function loadTableItems() {
 }
 
 function startEdit() {
+  if (props.inlineDisabled) return
   emit('start')
 }
 

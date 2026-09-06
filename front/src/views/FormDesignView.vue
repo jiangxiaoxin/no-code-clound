@@ -14,6 +14,14 @@
           表单设计
         </span>
         <span
+          v-if="isWorkflowForm"
+          class="form-tab"
+          :class="{ 'is-active': page === 'workflow' }"
+          @click="setPage('workflow')"
+        >
+          流程设计
+        </span>
+        <span
           class="form-tab"
           :class="{ 'is-active': page === 'publish' }"
           @click="setPage('publish')"
@@ -41,10 +49,24 @@
       @saved="onSaved"
     />
     <el-main
+      v-else-if="!loading && page === 'workflow' && form"
+      class="form-records"
+    >
+      <WorkflowDesignPanel
+        :app-id="appId"
+        :form-id="formId"
+        :form-fields="Array.isArray(form.fields) ? form.fields : []"
+      />
+    </el-main>
+    <el-main
       v-else-if="!loading && page === 'records'"
       class="form-records"
     >
-      <FormRecordManage :app-id="appId" :form-id="formId" />
+      <FormRecordManage
+        :app-id="appId"
+        :form-id="formId"
+        :can-configure="true"
+      />
     </el-main>
     <FormPublishPanel
       v-else-if="!loading && page === 'publish' && form"
@@ -59,10 +81,11 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
-import { getFormApi } from '../api/apps'
+import { getAppApi, getFormApi } from '../api/apps'
 import FormDesignPanel from '../components/FormDesignPanel.vue'
 import FormPublishPanel from '../components/FormPublishPanel.vue'
 import FormRecordManage from '../components/form-workspace/FormRecordManage.vue'
+import WorkflowDesignPanel from '../components/workflow-design/WorkflowDesignPanel.vue'
 import { useDocumentTitle } from '../utils/documentTitle.js'
 
 const route = useRoute()
@@ -74,14 +97,17 @@ useDocumentTitle(() => form.value?.name)
 const appId = computed(() => Number(route.params.id))
 const formId = computed(() => Number(route.params.formId))
 
-const PAGE_TABS = new Set(['design', 'records', 'publish'])
+const PAGE_TABS = new Set(['design', 'workflow', 'records', 'publish'])
+const isWorkflowForm = computed(() => form.value?.formKind === 'workflow')
 const page = computed(() => {
   const tab = route.query.tab
+  if (tab === 'workflow' && !isWorkflowForm.value) return 'design'
   return PAGE_TABS.has(tab) ? tab : 'design'
 })
 
 function setPage(tab) {
-  const next = PAGE_TABS.has(tab) ? tab : 'design'
+  const allowed = tab === 'workflow' ? isWorkflowForm.value : PAGE_TABS.has(tab)
+  const next = allowed ? tab : 'design'
   if (page.value === next) return
   router.replace({
     name: 'form-design',
@@ -116,6 +142,11 @@ async function loadForm() {
 
   loading.value = true
   try {
+    const app = await getAppApi(appId.value)
+    if (!app?.canConfigure) {
+      router.replace({ name: 'app-workspace', params: { id: appId.value } })
+      return
+    }
     form.value = await getFormApi(appId.value, formId.value)
   } catch (error) {
     if (error.response?.status !== 401) {

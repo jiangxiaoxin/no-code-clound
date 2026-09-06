@@ -37,6 +37,7 @@
           @click="openApp(app)"
         >
           <el-dropdown
+            v-if="app.canConfigure || app.isOwner"
             class="app-card-menu"
             trigger="click"
             placement="bottom"
@@ -52,10 +53,18 @@
             />
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item command="rename" :icon="EditPen">
+                <el-dropdown-item
+                  v-if="app.canConfigure"
+                  command="rename"
+                  :icon="EditPen"
+                >
                   修改名称
                 </el-dropdown-item>
-                <el-dropdown-item command="delete" :icon="Delete">
+                <el-dropdown-item
+                  v-if="app.isOwner"
+                  command="delete"
+                  :icon="Delete"
+                >
                   删除应用
                 </el-dropdown-item>
               </el-dropdown-menu>

@@ -24,6 +24,7 @@ import { join, relative, sep } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApplicationService } from './application.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
+import { ConvertFormKindDto } from './dto/convert-form-kind.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { ListFormFieldsDto } from './dto/list-form-fields.dto';
 import { NameDto } from './dto/name.dto';
@@ -263,6 +264,21 @@ export class ApplicationController {
     @Body() dto: CreateFormDto,
   ) {
     return this.applicationService.createForm(req.user.id, id, dto);
+  }
+
+  @Patch(':id/forms/:formId/kind')
+  convertFormKind(
+    @Req() req: { user: { id: number } },
+    @Param('id', ParseIntPipe) id: number,
+    @Param('formId', ParseIntPipe) formId: number,
+    @Body() dto: ConvertFormKindDto,
+  ) {
+    return this.applicationService.convertFormKind(
+      req.user.id,
+      id,
+      formId,
+      dto,
+    );
   }
 
   @Patch(':id/forms/:formId')

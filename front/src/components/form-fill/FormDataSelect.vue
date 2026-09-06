@@ -147,6 +147,7 @@ const props = defineProps({
   compact: { type: Boolean, default: false },
   mode: { type: String, default: 'data' }, // 'data'-选择数据 'relate'-关联数据
   excludeRecordId: { type: String, default: '' },
+  dataSource: { type: Object, default: null },
 })
 
 const FormRecordDetailDrawer = defineAsyncComponent(
@@ -464,17 +465,25 @@ async function loadRecords() {
       keyword.value,
       dictItemsByCode.value,
     )
-    const result = await queryFormRecordsApi(
-      props.appId,
-      props.field.sourceFormId,
-      {
-        page: page.value,
-        pageSize: pageSize.value,
-        // 关联本表时排除正在编辑的这条；关联他表时这个 id 不在源表里，排除不到任何数据
-        ...(props.excludeRecordId ? { excludeIds: [props.excludeRecordId] } : {}),
-        ...mergeFilterQueries(optionQuery, searchQuery),
-      },
-    )
+    const queryBody = {
+      page: page.value,
+      pageSize: pageSize.value,
+      // 关联本表时排除正在编辑的这条；关联他表时这个 id 不在源表里，排除不到任何数据
+      ...(props.excludeRecordId ? { excludeIds: [props.excludeRecordId] } : {}),
+      ...mergeFilterQueries(optionQuery, searchQuery),
+      pickApproved: true,
+    }
+    const result = props.dataSource?.querySource
+      ? await props.dataSource.querySource({
+          fieldKey: props.field.key,
+          sourceFormId: props.field.sourceFormId,
+          body: queryBody,
+        })
+      : await queryFormRecordsApi(
+          props.appId,
+          props.field.sourceFormId,
+          queryBody,
+        )
     records.value = result?.items || []
     total.value = result?.total || 0
     mergeUserNames(result?.userNames)

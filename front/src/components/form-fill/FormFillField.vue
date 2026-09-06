@@ -174,6 +174,7 @@
       :record-values="recordValues"
       :form-fields="formFields"
       :exclude-record-id="recordId"
+      :data-source="dataSource"
       @update:model-value="onUpdateModelValue"
       @fill="onFill"
     />
@@ -188,6 +189,7 @@
       :form-fields="formFields"
       :multiple="multiple"
       :compact="compact"
+      :data-source="dataSource"
       @update:model-value="onUpdateModelValue"
       @fill="onFill"
       @fill-rows="onFillRows"
@@ -218,6 +220,7 @@
       :app-id="appId"
       :model-value="modelValue"
       :disabled="isDisabled"
+      :data-source="dataSource"
       @update:model-value="onUpdateModelValue"
     />
     <FormFileUpload
@@ -226,6 +229,7 @@
       :app-id="appId"
       :model-value="modelValue"
       :disabled="isDisabled"
+      :data-source="dataSource"
       @update:model-value="onUpdateModelValue"
     />
     <FormAddressSelect
@@ -302,6 +306,7 @@ const props = defineProps({
   userNames: { type: Object, default: () => ({}) },
   deptNames: { type: Object, default: () => ({}) },
   recordId: { type: String, default: '' },
+  dataSource: { type: Object, default: null },
 })
 
 const emit = defineEmits(['update:modelValue', 'fill', 'fill-rows'])

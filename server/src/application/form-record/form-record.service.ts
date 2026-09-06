@@ -1,9 +1,22 @@
-import { Injectable, ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
-import { Application } from '../application.entity';
-import { coerceRecordData, mergeRecordData } from './form-record.coerce';
+import { WorkflowDefinitionService } from '../workflow/workflow-definition.service';
+import { WorkflowEngine } from '../workflow/workflow.engine';
+import { WorkflowInstance } from '../workflow/workflow-instance.entity';
+import { WorkflowTask } from '../workflow/workflow-task.entity';
+import { InstanceStatus } from '../workflow/workflow.types';
+import {
+  FormRecordPersistService,
+  uniqueComparableValue,
+} from './form-record.persist';
 import { flattenFields } from './flatten-fields';
 import {
   buildRecordQuery,
@@ -26,12 +39,6 @@ import {
   parseImportRows,
 } from './form-record.import';
 import ExcelJS from 'exceljs';
-import { FormSerialSeqService } from './form-serial-seq.service';
-import {
-  findSerialField,
-  periodKey,
-  renderSerialValue,
-} from './serial-number';
 
 export type FormRecordView = {
   id: string;
@@ -45,47 +52,101 @@ export type FormRecordView = {
   updatedAt: Date;
     data: Record<string, unknown>;
     userNames?: Record<string, string>;
+    workflowStatus?: InstanceStatus;
+    workflowInstanceId?: number;
+    workflowInstance?: {
+      id: number;
+      initiatorId: number;
+      status: InstanceStatus;
+    };
+    nextNodeTitle?: string;
+    workflowHint?: string;
+    canConfigure?: boolean;
+    workflowProgress?: {
+      graph: WorkflowInstance['graph'];
+      visitedNodeKeys: string[];
+      currentNodeKey: string | null;
+      notes: WorkflowInstance['notes'];
+      errorReason: string | null;
+      tasks: {
+        id: number;
+        nodeKey: string;
+        assigneeId: number;
+        assigneeName: string;
+        assigneeDisabled: boolean;
+        status: string;
+        action: string | null;
+        comment: string | null;
+        cancelReason: string | null;
+        finishedAt: Date | null;
+        createdAt: Date;
+      }[];
+    };
   };
 
 @Injectable()
 export class FormRecordService {
   constructor(
-    @InjectRepository(Application)
-    private readonly appRepo: Repository<Application>,
     @InjectRepository(AppForm)
     private readonly formRepo: Repository<AppForm>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly store: FormRecordStore,
     private readonly dictionaryService: DictionaryService,
-    private readonly serialSeq: FormSerialSeqService,
+    private readonly access: AppAccessService,
+    private readonly persist: FormRecordPersistService,
+    private readonly definition: WorkflowDefinitionService,
+    private readonly engine: WorkflowEngine,
+    @InjectRepository(WorkflowInstance)
+    private readonly instanceRepo: Repository<WorkflowInstance>,
+    @InjectRepository(WorkflowTask)
+    private readonly taskRepo: Repository<WorkflowTask>,
   ) {}
 
   async create(
-    ownerId: number,
+    actorId: number,
     appId: number,
     formId: number,
     data: Record<string, unknown>,
+    intent?: 'draft' | 'submit',
   ): Promise<FormRecordView> {
-    const form = await this.requireForm(ownerId, appId, formId);
-    const fields = this.readFields(form);
-    const coerced = coerceRecordData(fields, data); // 强制转换
-    this.assertSubformConstraints(fields, coerced);
-    await this.assertUniqueFields(formId, fields, coerced);
-    await this.applySerialNumber(formId, fields, coerced);
-    const now = new Date();
-    const inserted = await this.store.insert({
-      appId,
-      formId,
-      createdBy: ownerId,
-      createdAt: now,
-      updatedBy: ownerId,
-      updatedAt: now,
-      data: coerced,
+    const form = await this.requireForm(actorId, appId, formId);
+    if (form.formKind !== 'workflow') {
+      const doc = await this.persist.persist({ form, actorId, data });
+      return this.toRecordView(doc, form);
+    }
+    const runtime = await this.definition.getRuntime(formId);
+    if (!runtime.published) {
+      throw new BadRequestException(
+        '这张表单还没有配置流程，发布流程之后才能使用',
+      );
+    }
+    if (!runtime.enabled) {
+      const doc = await this.persist.persist({ form, actorId, data });
+      await this.store.setWorkflowMeta(formId, doc._id.toHexString(), {
+        workflowStatus: 'approved',
+      });
+      const saved = await this.store.findById(formId, doc._id.toHexString());
+      return this.toRecordView(saved ?? doc, form);
+    }
+    const doc = await this.persist.persist({
+      form,
+      actorId,
+      data,
+      requiredKeys: 'all',
     });
-    const doc = await this.store.findById(formId, inserted.id);
-    if (!doc) throw new NotFoundException('记录不存在');
-    return this.toView(doc, await this.loadUserNames([doc], fields));
+    const recordId = doc._id.toHexString();
+    let submitted: WorkflowInstance | null = null;
+    if (intent === 'submit') {
+      submitted = await this.engine.submit({ form, recordId, actorId });
+    } else {
+      await this.engine.ensureDraft({ form, recordId, actorId });
+    }
+    const saved = await this.store.findById(formId, recordId);
+    return this.withNextNodeTitle(
+      await this.toRecordView(saved ?? doc, form),
+      submitted,
+    );
   }
 
   async query(
@@ -98,6 +159,7 @@ export class FormRecordService {
     const fields = this.readFields(form);
     const built = buildRecordQuery(fields, {
       ...body,
+      formKind: form.formKind,
       filters: await this.resolveDictFilters(
         ownerId,
         appId,
@@ -121,8 +183,17 @@ export class FormRecordService {
     const { items, total } = await this.store.query(formId, built);
     const names = await this.loadUserNames(items, fields);
     const userNames = this.userNamesRecord(names);
+    const instances = await this.loadInstancesByIds(
+      items
+        .map((item) => item.workflowInstanceId)
+        .filter((id): id is number => Number.isInteger(id)),
+    );
     return {
-      items: items.map((item) => this.toView(item, names)),
+      items: items.map((item) => {
+        const view = this.toView(item, names);
+        this.attachInstance(view, instances.get(item.workflowInstanceId ?? 0));
+        return view;
+      }),
       total,
       page: built.page,
       pageSize: built.pageSize,
@@ -139,29 +210,113 @@ export class FormRecordService {
     const form = await this.requireForm(ownerId, appId, formId);
     const doc = await this.store.findById(formId, recordId);
     if (!doc) throw new NotFoundException('记录不存在');
-    return this.toView(
+    const view = await this.attachProgress(
+      await this.toRecordView(doc, form),
+      form,
       doc,
-      await this.loadUserNames([doc], this.readFields(form)),
     );
+    const access = await this.access.getAccess(ownerId, appId);
+    view.canConfigure = access.canConfigure;
+    return view;
   }
 
   async update(
-    ownerId: number,
+    actorId: number,
     appId: number,
     formId: number,
     recordId: string,
     data: Record<string, unknown>,
+    intent?: 'draft' | 'submit',
   ): Promise<FormRecordView> {
-    const form = await this.requireForm(ownerId, appId, formId);
+    const form = await this.requireForm(actorId, appId, formId);
+    if (form.formKind !== 'workflow') {
+      const doc = await this.persist.persist({ form, actorId, data, recordId });
+      return this.toRecordView(doc, form);
+    }
+    const runtime = await this.definition.getRuntime(formId);
+    if (!runtime.published) {
+      throw new BadRequestException(
+        '这张表单还没有配置流程，发布流程之后才能使用',
+      );
+    }
     const existing = await this.store.findById(formId, recordId);
     if (!existing) throw new NotFoundException('记录不存在');
-    const fields = this.readFields(form);
-    const merged = mergeRecordData(existing.data ?? {}, data, fields);
-    this.assertSubformConstraints(fields, merged);
-    await this.assertUniqueFields(formId, fields, merged, recordId);
-    const doc = await this.store.replaceData(formId, recordId, merged, ownerId);
-    if (!doc) throw new NotFoundException('记录不存在');
-    return this.toView(doc, await this.loadUserNames([doc], fields));
+    const status = existing.workflowStatus as InstanceStatus | undefined;
+    const instance = await this.findInstance(formId, recordId, existing.workflowInstanceId);
+
+    if (status === 'running') {
+      throw new BadRequestException(
+        '审批中的数据不能编辑，请到「我发起的」撤回或等待审批',
+      );
+    }
+
+    if (!runtime.enabled) {
+      const doc = await this.persist.persist({ form, actorId, data, recordId });
+      if (!status || status === 'approved' || !instance) {
+        await this.store.setWorkflowMeta(formId, recordId, {
+          workflowStatus: 'approved',
+        });
+      }
+      const saved = await this.store.findById(formId, recordId);
+      return this.toRecordView(saved ?? doc, form);
+    }
+
+    if (status === 'approved') {
+      if (!instance) {
+        throw new BadRequestException('这条数据没有审批记录，不能重新提交');
+      }
+      this.assertInitiator(instance, actorId);
+      if (intent !== 'submit') {
+        throw new BadRequestException('已通过的数据要重新提交审批，请点「提交」');
+      }
+      const doc = await this.persist.persist({
+        form,
+        actorId,
+        data,
+        recordId,
+        requiredKeys: 'all',
+      });
+      const submitted = await this.engine.resubmitApproved({
+        form,
+        recordId,
+        actorId,
+      });
+      const saved = await this.store.findById(formId, recordId);
+      return this.withNextNodeTitle(
+        await this.toRecordView(saved ?? doc, form),
+        submitted,
+      );
+    }
+
+    if (
+      status === 'draft' ||
+      status === 'rejected' ||
+      status === 'error' ||
+      !status
+    ) {
+      if (instance) this.assertInitiator(instance, actorId);
+      const doc = await this.persist.persist({
+        form,
+        actorId,
+        data,
+        recordId,
+        requiredKeys: 'all',
+      });
+      let submitted: WorkflowInstance | null = null;
+      if (intent === 'submit') {
+        submitted = await this.engine.submit({ form, recordId, actorId });
+      } else {
+        await this.engine.ensureDraft({ form, recordId, actorId });
+      }
+      const saved = await this.store.findById(formId, recordId);
+      return this.withNextNodeTitle(
+        await this.toRecordView(saved ?? doc, form),
+        submitted,
+      );
+    }
+
+    const doc = await this.persist.persist({ form, actorId, data, recordId });
+    return this.toRecordView(doc, form);
   }
 
   async remove(
@@ -170,9 +325,34 @@ export class FormRecordService {
     formId: number,
     recordId: string,
   ): Promise<{ ok: true }> {
-    await this.requireForm(ownerId, appId, formId);
+    const form = await this.requireForm(ownerId, appId, formId);
+    const existing = await this.store.findById(formId, recordId);
+    if (!existing) throw new NotFoundException('记录不存在');
+    if (form.formKind === 'workflow') {
+      const status = existing.workflowStatus as InstanceStatus | undefined;
+      const instance = await this.findInstance(
+        formId,
+        recordId,
+        existing.workflowInstanceId,
+      );
+      if (status === 'running') {
+        throw new BadRequestException('审批中的数据不能删除');
+      }
+      if (
+        status === 'draft' ||
+        status === 'rejected' ||
+        status === 'error'
+      ) {
+        if (!instance || instance.initiatorId !== ownerId) {
+          throw new ForbiddenException('只有发起人能修改这条数据');
+        }
+      }
+    }
     const deleted = await this.store.deleteById(formId, recordId);
     if (!deleted) throw new NotFoundException('记录不存在');
+    if (form.formKind === 'workflow') {
+      await this.engine.onRecordDeleted(formId, recordId);
+    }
     return { ok: true };
   }
 
@@ -282,7 +462,7 @@ export class FormRecordService {
         bucket.add(value);
       }
       if (skip) continue;
-      await this.applySerialNumber(formId, fields, data);
+      await this.persist.applySerialNumber(formId, fields, data);
       docs.push({
         appId,
         formId,
@@ -297,138 +477,8 @@ export class FormRecordService {
     return { imported };
   }
 
-  private assertSubformConstraints(
-    fields: FormField[] | null,
-    data: Record<string, unknown>,
-  ) {
-    for (const field of flattenFields(fields ?? [])) {
-      if (field.type !== 'subform') {
-        continue;
-      }
-      const rows = Array.isArray(data[field.key])
-        ? (data[field.key] as Record<string, unknown>[])
-        : [];
-      if (field.required && rows.length === 0) {
-        throw new BadRequestException(
-          `[${field.title || '未命名'}]不能为空`,
-        );
-      }
-      const children = field.fields ?? [];
-      for (const row of rows) {
-        for (const child of children) {
-          if (!child.required) {
-            continue;
-          }
-          if (isSubformChildEmpty(child, row[child.key])) {
-            throw new BadRequestException(
-              `[${field.title || '未命名'}.${child.title || '未命名'}]不能为空`,
-            );
-          }
-        }
-      }
-      for (const child of children) {
-        if (!child.unique && !child.uniqueInRows) {
-          continue;
-        }
-        const seen = new Set<string | number>();
-        for (const row of rows) {
-          const value = uniqueChildComparableValue(child, row[child.key]);
-          if (value === undefined) {
-            continue;
-          }
-          if (seen.has(value)) {
-            throw new ConflictException(
-              `[${child.title || '未命名'}]同一子表内不允许重复值`,
-            );
-          }
-          seen.add(value);
-        }
-      }
-    }
-  }
-
-  private async applySerialNumber(
-    formId: number,
-    fields: FormField[] | null,
-    data: Record<string, unknown>,
-  ) {
-    const field = findSerialField(fields);
-    if (!field?.key) return;
-    const rule = Array.isArray(field.serialRule) ? field.serialRule : [];
-    const counter = rule.find((item) => item.kind === 'counter');
-    const now = new Date();
-    let counterValue: number | undefined;
-    if (counter) {
-      const rawStart = Number(counter.start);
-      const start = Number.isInteger(rawStart) && rawStart >= 0 ? rawStart : 1;
-      const bucket = periodKey(Boolean(counter.reset), counter.resetPeriod, now);
-      counterValue = await this.serialSeq.takeNext(
-        formId,
-        field.key,
-        bucket,
-        start,
-      );
-    }
-    data[field.key] = renderSerialValue(field, data, now, counterValue);
-  }
-
-  private async assertUniqueFields(
-    formId: number,
-    fields: FormField[] | null,
-    data: Record<string, unknown>,
-    excludeRecordId?: string,
-  ) {
-    for (const field of flattenFields(fields ?? [])) {
-      if (field.type === 'subform') {
-        const rows = Array.isArray(data[field.key])
-          ? (data[field.key] as Record<string, unknown>[])
-          : [];
-        for (const child of field.fields ?? []) {
-          if (!child.unique) {
-            continue;
-          }
-          for (const row of rows) {
-            const value = uniqueComparableValue(child, row[child.key]);
-            if (value === undefined) {
-              continue;
-            }
-            const exists = await this.store.existsByDataValue(
-              formId,
-              `${field.key}.${child.key}`,
-              value,
-              excludeRecordId,
-            );
-            if (exists) {
-              throw new ConflictException(
-                `[${child.title || '未命名'}]不允许重复值`,
-              );
-            }
-          }
-        }
-        continue;
-      }
-      // 目前进对[单行文本]进行重复值检测
-      const value = uniqueComparableValue(field, data[field.key]);
-      if (value === undefined) {
-        continue;
-      }
-      const exists = await this.store.existsByDataValue(
-        formId,
-        field.key,
-        value,
-        excludeRecordId,
-      );
-      if (exists) {
-        throw new ConflictException(
-          `[${field.title || '未命名'}]不允许重复值`,
-        );
-      }
-    }
-  }
-
   private async requireForm(ownerId: number, appId: number, formId: number) {
-    const app = await this.appRepo.findOne({ where: { id: appId, ownerId } });
-    if (!app) throw new NotFoundException('应用不存在');
+    await this.access.requireUse(ownerId, appId);
     const form = await this.formRepo.findOne({
       where: { id: formId, applicationId: appId },
     });
@@ -490,12 +540,134 @@ export class FormRecordService {
     return out;
   }
 
+  private async toRecordView(
+    doc: FormRecordDoc,
+    form: AppForm,
+  ): Promise<FormRecordView> {
+    const view = this.toView(
+      doc,
+      await this.loadUserNames([doc], this.readFields(form)),
+    );
+    if (doc.workflowInstanceId) {
+      const inst = await this.instanceRepo.findOne({
+        where: { id: doc.workflowInstanceId },
+      });
+      this.attachInstance(view, inst);
+    }
+    return view;
+  }
+
+  private attachInstance(
+    view: FormRecordView,
+    inst: WorkflowInstance | null | undefined,
+  ) {
+    if (!inst) return;
+    view.workflowInstance = {
+      id: inst.id,
+      initiatorId: inst.initiatorId,
+      status: inst.status,
+    };
+  }
+
+  private withNextNodeTitle(
+    view: FormRecordView,
+    instance: WorkflowInstance | null | undefined,
+  ) {
+    const title = instance
+      ? instance.graph.nodes.find((node) => node.key === instance.currentNodeKey)
+          ?.title
+      : undefined;
+    if (title) view.nextNodeTitle = title;
+    return view;
+  }
+
+  private async loadInstancesByIds(ids: number[]) {
+    const unique = [...new Set(ids)];
+    if (!unique.length) return new Map<number, WorkflowInstance>();
+    const rows = await this.instanceRepo.find({ where: { id: In(unique) } });
+    return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  private async attachProgress(
+    view: FormRecordView,
+    form: AppForm,
+    doc: FormRecordDoc,
+  ): Promise<FormRecordView> {
+    if (form.formKind !== 'workflow') return view;
+    if (!doc.workflowInstanceId) {
+      if (doc.workflowStatus === 'approved') {
+        const runtime = await this.definition.getRuntime(form.id);
+        view.workflowHint = runtime?.enabled
+          ? '转为流程表单之前保存，没有审批记录'
+          : '流程停用期间保存，没有审批记录';
+      }
+      return view;
+    }
+    const inst = await this.instanceRepo.findOne({
+      where: { id: doc.workflowInstanceId },
+    });
+    if (!inst) return view;
+    const tasks = await this.taskRepo.find({
+      where: { instanceId: inst.id },
+      order: { createdAt: 'ASC' },
+    });
+    const userIds = [...new Set(tasks.map((row) => row.assigneeId))];
+    const users = userIds.length
+      ? await this.userRepo.find({ where: { id: In(userIds) } })
+      : [];
+    const names = new Map(users.map((user) => [user.id, user.displayName]));
+    const disabled = new Set(
+      users.filter((user) => user.status !== 'active').map((user) => user.id),
+    );
+    view.workflowProgress = {
+      graph: inst.graph,
+      visitedNodeKeys: inst.visitedNodeKeys || [],
+      currentNodeKey: inst.currentNodeKey,
+      notes: inst.notes,
+      errorReason: inst.errorReason,
+      tasks: tasks.map((row) => ({
+        id: row.id,
+        nodeKey: row.nodeKey,
+        assigneeId: row.assigneeId,
+        assigneeName: names.get(row.assigneeId) || '',
+        assigneeDisabled: disabled.has(row.assigneeId),
+        status: row.status,
+        action: row.action,
+        comment: row.comment,
+        cancelReason: row.cancelReason,
+        finishedAt: row.finishedAt,
+        createdAt: row.createdAt,
+      })),
+    };
+    return view;
+  }
+
+  private async findInstance(
+    formId: number,
+    recordId: string,
+    workflowInstanceId?: number,
+  ) {
+    if (workflowInstanceId) {
+      return this.instanceRepo.findOne({ where: { id: workflowInstanceId } });
+    }
+    return this.instanceRepo.findOne({ where: { formId, recordId } });
+  }
+
+  private assertInitiator(
+    instance: { initiatorId: number },
+    actorId: number,
+  ) {
+    if (instance.initiatorId !== actorId) {
+      throw new ForbiddenException('只有发起人能修改这条数据');
+    }
+  }
+
   private toView(
     doc: FormRecordDoc,
     names: Map<number, string>,
   ): FormRecordView {
     const updatedBy = doc.updatedBy ?? doc.createdBy;
-    return {
+    const view: FormRecordView = {
       id: doc._id.toHexString(),
       appId: doc.appId,
       formId: doc.formId,
@@ -508,6 +680,13 @@ export class FormRecordService {
       data: doc.data ?? {},
       userNames: this.userNamesRecord(names),
     };
+    if (doc.workflowStatus) {
+      view.workflowStatus = doc.workflowStatus as InstanceStatus;
+    }
+    if (doc.workflowInstanceId) {
+      view.workflowInstanceId = doc.workflowInstanceId;
+    }
+    return view;
   }
 }
 
@@ -546,54 +725,4 @@ function collectMemberIds(
       }
     }
   }
-}
-
-function uniqueChildComparableValue(
-  field: FormField,
-  value: unknown,
-): string | number | undefined {
-  if (field.type === 'input' || field.type === 'data') {
-    if (typeof value !== 'string' || value === '') return undefined;
-    return value;
-  }
-  if (field.type === 'number') {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
-    return value;
-  }
-  return undefined;
-}
-
-function uniqueComparableValue(
-  field: FormField,
-  value: unknown,
-): string | number | undefined {
-  if (!field.unique) return undefined;
-  return uniqueChildComparableValue(field, value);
-}
-
-function isSubformChildEmpty(field: FormField, value: unknown): boolean {
-  if (value === undefined || value === null || value === '') {
-    return true;
-  }
-  if (
-    field.type === 'checkbox' ||
-    field.type === 'select-multiple' ||
-    field.type === 'image' ||
-    field.type === 'file' ||
-    field.type === 'member-multiple' ||
-    field.type === 'dept-multiple'
-  ) {
-    return !Array.isArray(value) || value.length === 0;
-  }
-  if (field.type === 'member' || field.type === 'dept') {
-    return typeof value !== 'number' || !Number.isInteger(value) || value <= 0;
-  }
-  if (field.type === 'address') {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return true;
-    }
-    const ids = (value as { ids?: unknown }).ids;
-    return !Array.isArray(ids) || ids.length === 0;
-  }
-  return false;
 }

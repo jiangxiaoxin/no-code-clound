@@ -414,7 +414,10 @@ function queryRecordsOnce(appId, formId, query) {
   if (hit) {
     return hit
   }
-  const pending = queryFormRecordsApi(appId, formId, query)
+  const pending = queryFormRecordsApi(appId, formId, {
+    ...query,
+    pickApproved: true,
+  })
     .then((result) => {
       const extra = result?.userNames
       if (extra && typeof extra === 'object') {

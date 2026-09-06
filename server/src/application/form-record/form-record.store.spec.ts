@@ -154,4 +154,33 @@ describe('FormRecordStore', () => {
       expect(byName.has('users')).toBe(false);
     });
   });
+
+  it('backfills missing workflowStatus in batches of 500', async () => {
+    const ids1 = Array.from({ length: 500 }, (_, i) => ({ _id: `a${i}` }));
+    const ids2 = Array.from({ length: 500 }, (_, i) => ({ _id: `b${i}` }));
+    const ids3 = Array.from({ length: 120 }, (_, i) => ({ _id: `c${i}` }));
+    const toArray = jest
+      .fn()
+      .mockResolvedValueOnce(ids1)
+      .mockResolvedValueOnce(ids2)
+      .mockResolvedValueOnce(ids3)
+      .mockResolvedValueOnce([]);
+    collection.find.mockReturnValue({
+      limit: () => ({ toArray }),
+    });
+    collection.updateMany = jest
+      .fn()
+      .mockResolvedValueOnce({ modifiedCount: 500 })
+      .mockResolvedValueOnce({ modifiedCount: 500 })
+      .mockResolvedValueOnce({ modifiedCount: 120 });
+
+    const total = await store.backfillApprovedMissing(12);
+
+    expect(total).toBe(1120);
+    expect(collection.updateMany).toHaveBeenCalledTimes(3);
+    expect(collection.find).toHaveBeenCalledWith(
+      { workflowStatus: { $exists: false } },
+      { projection: { _id: 1 } },
+    );
+  });
 });

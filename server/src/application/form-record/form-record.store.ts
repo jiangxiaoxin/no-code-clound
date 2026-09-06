@@ -19,6 +19,8 @@ export type FormRecordDoc = {
   updatedBy: number;
   updatedAt: Date;
   data: Record<string, unknown>;
+  workflowStatus?: string;
+  workflowInstanceId?: number;
 };
 
 const OBJECT_ID_RE = /^[a-fA-F0-9]{24}$/;
@@ -155,6 +157,27 @@ export class FormRecordStore {
     );
   }
 
+  async backfillApprovedMissing(formId: number): Promise<number> {
+    const col = this.col(formId);
+    let total = 0;
+    for (;;) {
+      const ids = await col
+        .find({ workflowStatus: { $exists: false } }, { projection: { _id: 1 } })
+        .limit(500)
+        .toArray();
+      if (!ids.length) return total;
+      const result = await col.updateMany(
+        {
+          _id: { $in: ids.map((item) => item._id) },
+          workflowStatus: { $exists: false },
+        },
+        { $set: { workflowStatus: 'approved' } },
+      );
+      total += result.modifiedCount;
+      if (result.modifiedCount === 0) return total;
+    }
+  }
+
   async deleteById(formId: number, id: string): Promise<boolean> {
     const objectId = this.parseId(id);
     if (!objectId) return false;
@@ -180,5 +203,24 @@ export class FormRecordStore {
       .limit(built.limit)
       .toArray();
     return { items, total };
+  }
+
+  async setWorkflowMeta(
+    formId: number,
+    id: string,
+    meta: {
+      workflowStatus: string;
+      workflowInstanceId?: number;
+    },
+  ): Promise<void> {
+    const objectId = this.parseId(id);
+    if (!objectId) return;
+    const $set: Record<string, unknown> = {
+      workflowStatus: meta.workflowStatus,
+    };
+    if (meta.workflowInstanceId != null) {
+      $set.workflowInstanceId = meta.workflowInstanceId;
+    }
+    await this.col(formId).updateOne({ _id: objectId }, { $set });
   }
 }

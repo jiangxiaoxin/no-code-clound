@@ -74,6 +74,10 @@
         </el-select>
       </el-form-item>
     </el-form>
+    <AdminUserOwnedApps
+      :user="user"
+      :is-system-admin="isSystemAdmin"
+    />
     <template #footer>
       <el-button @click="onClose">取消</el-button>
       <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>
@@ -83,6 +87,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import AdminUserOwnedApps from './AdminUserOwnedApps.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -92,6 +97,7 @@ const props = defineProps({
   canAssignDepartments: { type: Boolean, default: false },
   canAssignRoles: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
+  isSystemAdmin: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:visible', 'submit'])

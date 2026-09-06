@@ -13,7 +13,7 @@
           <el-button
             v-if="actions.edit"
             type="warning"
-            :disabled="selectedRecords.length !== 1"
+            :disabled="!canEditSelected"
             @click="onEditClick"
             link
           >
@@ -23,14 +23,14 @@
             v-if="actions.delete"
             type="danger"
             link
-            :disabled="!selectedRecords.length"
+            :disabled="!canDeleteSelected"
             @click="onDeleteSelected"
           >
             删除
           </el-button>
-          <el-button v-if="actions.import" type="success" @click="openImport" link>导入</el-button>
+          <el-button v-if="showImport" type="success" @click="openImport" link>导入</el-button>
           <el-button
-            v-if="actions.downloadTemplate"
+            v-if="showImportTemplate"
             type="info"
             @click="onDownloadTemplate"
             link
@@ -39,6 +39,21 @@
           </el-button>
         </div>
         <div class="list-toolbar-extra">
+          <el-select
+            v-if="isWorkflowForm"
+            :model-value="workflowStatus"
+            clearable
+            placeholder="流程状态"
+            class="workflow-status-filter"
+            @change="onWorkflowStatusChange"
+          >
+            <el-option label="全部" value="" />
+            <el-option label="草稿" value="draft" />
+            <el-option label="审批中" value="running" />
+            <el-option label="已通过" value="approved" />
+            <el-option label="已驳回" value="rejected" />
+            <el-option label="异常" value="error" />
+          </el-select>
           <FormRecordQuickSearch
             :key="quickSearchKey"
             :app-id="appId"
@@ -77,6 +92,15 @@
           />
           <el-table-column type="index" width="55" label="序号" fixed="left" />
           <el-table-column
+            v-if="isWorkflowForm"
+            label="流程状态"
+            width="100"
+          >
+            <template #default="{ row }">
+              {{ workflowStatusText(row.workflowStatus) }}
+            </template>
+          </el-table-column>
+          <el-table-column
             v-for="col in visibleColumns"
             :key="col.key"
             :label="col.title"
@@ -114,6 +138,7 @@
                 :dept-names="deptNames"
                 :relate-titles="relateTitles"
                 :editing="editingCell === cellKey(row.id, col.key)"
+                :inline-disabled="isWorkflowForm"
                 @start="editingCell = cellKey(row.id, col.key)"
                 @close="onCellClose(row.id, col.key)"
                 @saved="upsertRecord"
@@ -177,6 +202,12 @@ import {
 import { buildQuickSearchQuery, isQuickSearchField } from './quickSearch'
 import { PAGE_SIZES } from '../../utils/pagination'
 import { normalizeRecordActions } from '../../utils/recordActions'
+import {
+  canDeleteWorkflowRecord,
+  canEditWorkflowRecord,
+  workflowStatusText,
+} from '../workflow-inbox/workflowStatus.js'
+import { useUserStore } from '../../stores/user'
 import { useSortPrefs } from './sortPrefs'
 
 const props = defineProps({
@@ -189,6 +220,7 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['create', 'edit', 'row-click'])
+const userStore = useUserStore()
 
 const listLoading = ref(false)
 const tableRef = ref(null)
@@ -206,6 +238,44 @@ const relateFields = computed(() => relateColumnFields(props.fields))
 // 切换表单时作废进行中的请求，避免把上一张表的记录写进来
 const loadSession = ref(0)
 const actions = computed(() => normalizeRecordActions(props.recordActions))
+const isWorkflowForm = computed(() => props.form?.formKind === 'workflow')
+const showImport = computed(() => actions.value.import && !isWorkflowForm.value)
+const showImportTemplate = computed(
+  () => actions.value.downloadTemplate && !isWorkflowForm.value,
+)
+const workflowStatus = ref('')
+const actorId = computed(() => userStore.user?.id)
+const canEditSelected = computed(() => {
+  if (selectedRecords.value.length !== 1) return false
+  return rowCanEdit(selectedRecords.value[0])
+})
+const canDeleteSelected = computed(() => {
+  if (!selectedRecords.value.length) return false
+  return selectedRecords.value.every(rowCanDelete)
+})
+
+function rowCanEdit(row) {
+  if (!isWorkflowForm.value) return true
+  return canEditWorkflowRecord({
+    formKind: 'workflow',
+    status: row.workflowStatus,
+    initiatorId: row.workflowInstance?.initiatorId,
+    actorId: actorId.value,
+    hasInstance: Boolean(row.workflowInstanceId),
+    publishEdit: actions.value.edit,
+  })
+}
+
+function rowCanDelete(row) {
+  if (!isWorkflowForm.value) return true
+  return canDeleteWorkflowRecord({
+    formKind: 'workflow',
+    status: row.workflowStatus,
+    initiatorId: row.workflowInstance?.initiatorId,
+    actorId: actorId.value,
+    publishDelete: actions.value.delete,
+  })
+}
 
 const tableFields = computed(() => flattenFields(props.fields).filter(isListColumn))
 const sortFields = computed(() => tableFields.value.filter(isFillable))
@@ -288,6 +358,9 @@ async function loadRecords() {
         ? { sort: sortRules.value.map(({ key, order }) => ({ key, order })) }
         : {}),
       ...(searchQuery || {}),
+      ...(isWorkflowForm.value && workflowStatus.value
+        ? { workflowStatus: workflowStatus.value }
+        : {}),
     })
     if (session !== loadSession.value) return
     records.value = result?.items || []
@@ -321,6 +394,12 @@ function onPageSizeChange(next) {
   loadRecords()
 }
 
+function onWorkflowStatusChange(value) {
+  workflowStatus.value = value || ''
+  page.value = 1
+  loadRecords()
+}
+
 function onCreateClick() {
   emit('create')
 }
@@ -331,7 +410,12 @@ function onEditClick() {
     return
   }
   console.log("🚀 ~ FormRecordList.vue:321 ~ onEditClick ~ selectedRecords.value[0]:", selectedRecords.value[0])
-  emit('edit', selectedRecords.value[0])
+  const row = selectedRecords.value[0]
+  if (!rowCanEdit(row)) {
+    ElMessage.warning('当前状态不能编辑')
+    return
+  }
+  emit('edit', row)
 }
 
 function onSelectionChange(rows) {
@@ -363,6 +447,10 @@ async function onDeleteSelected() {
       { type: 'warning' },
     )
   } catch {
+    return
+  }
+  if (!selectedRecords.value.every(rowCanDelete)) {
+    ElMessage.warning('审批中的数据不能删除，草稿和已驳回只能由发起人删除')
     return
   }
   const ids = selectedRecords.value.map((row) => row.id)

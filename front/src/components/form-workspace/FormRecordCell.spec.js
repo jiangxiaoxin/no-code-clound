@@ -15,4 +15,6 @@ test('inline table-data editors import option loaders', () => {
   )
   assert.match(source, /buildSourceQuery\(/)
   assert.match(source, /recordsToSelectItems\(/)
+  assert.match(source, /inlineDisabled/)
+  assert.match(source, /if \(props\.inlineDisabled\) return/)
 })

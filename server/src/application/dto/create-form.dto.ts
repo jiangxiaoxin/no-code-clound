@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, Min } from 'class-validator';
 import { NameDto } from './name.dto';
 
 export class CreateFormDto extends NameDto {
@@ -12,4 +12,8 @@ export class CreateFormDto extends NameDto {
   @IsInt()
   @Min(1)
   groupId?: number | null;
+
+  @IsOptional()
+  @IsIn(['normal', 'workflow'])
+  formKind?: 'normal' | 'workflow';
 }

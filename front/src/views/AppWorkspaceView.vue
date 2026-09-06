@@ -10,6 +10,34 @@
         <el-text truncated>{{ app?.name || ' ' }}</el-text>
       </div>
 
+      <div class="aside-inbox">
+        <button
+          type="button"
+          class="aside-inbox-item"
+          :class="{ 'is-active': inboxKind === 'todo' }"
+          @click="openInbox('todo')"
+        >
+          我的待办
+          <span v-if="appTodoCount" class="aside-inbox-count">{{ appTodoCount }}</span>
+        </button>
+        <button
+          type="button"
+          class="aside-inbox-item"
+          :class="{ 'is-active': inboxKind === 'mine' }"
+          @click="openInbox('mine')"
+        >
+          我发起的
+        </button>
+        <button
+          type="button"
+          class="aside-inbox-item"
+          :class="{ 'is-active': inboxKind === 'done' }"
+          @click="openInbox('done')"
+        >
+          我处理的
+        </button>
+      </div>
+
       <div class="aside-toolbar">
         <el-input
           v-model="keyword"
@@ -17,7 +45,7 @@
           placeholder="搜索分组或表单"
           :prefix-icon="Search"
         />
-        <el-dropdown trigger="click" @command="onCreateCommand">
+        <el-dropdown v-if="canConfigure" trigger="click" @command="onCreateCommand">
           <el-button :icon="Plus" circle />
           <template #dropdown>
             <el-dropdown-menu>
@@ -54,6 +82,7 @@
             </el-icon>
             <el-text truncated>{{ data.name }}</el-text>
             <el-dropdown
+              v-if="canConfigure"
               trigger="click"
               popper-class="tree-node-menu"
               @command="(cmd) => onNodeCommand(cmd, data)"
@@ -67,6 +96,12 @@
                 </el-dropdown-menu>
                 <el-dropdown-menu v-else>
                   <el-dropdown-item command="edit">编辑表单</el-dropdown-item>
+                  <el-dropdown-item
+                    v-if="data.formKind !== 'workflow'"
+                    command="convert-workflow"
+                  >
+                    转为流程表单
+                  </el-dropdown-item>
                   <el-dropdown-item command="rename">修改名称</el-dropdown-item>
                   <el-dropdown-item command="delete">删除表单</el-dropdown-item>
                 </el-dropdown-menu>
@@ -77,10 +112,30 @@
       </el-tree>
       </div>
       <div class="aside-footer">
-        <el-button class="aside-backend" text :icon="Setting" @click="goBackend">应用后台</el-button>
+        <el-button
+          v-if="canConfigure"
+          class="aside-backend"
+          text
+          :icon="Setting"
+          @click="goBackend"
+        >
+          应用后台
+        </el-button>
       </div>
     </el-aside>
-    <AppWorkspaceMain :app-id="appId" :form="currentForm" />
+    <WorkflowInboxList
+      v-if="inboxKind"
+      class="workspace-inbox"
+      :kind="inboxKind"
+      :app-id="appId"
+      @changed="loadAppTodoCount"
+    />
+    <AppWorkspaceMain
+      v-else
+      :app-id="appId"
+      :form="currentForm"
+      :can-configure="canConfigure"
+    />
   </el-container>
 
   <router-view />
@@ -90,6 +145,7 @@
     :title="nameDialogTitle"
     width="420px"
     align-center
+    draggable
     @closed="resetNameDialog"
   >
     <el-form
@@ -97,7 +153,7 @@
       :model="nameForm"
       :rules="nameRules"
       label-position="top"
-      @submit.prevent="onSubmitName"
+      @submit.prevent="submitNameDialog"
     >
       <el-form-item label="名称" prop="name">
         <el-input
@@ -107,10 +163,19 @@
           placeholder="请输入名称"
         />
       </el-form-item>
+      <el-form-item v-if="nameMode === 'create-form'" label="表单类型">
+        <el-radio-group v-model="nameForm.formKind">
+          <el-radio value="normal">普通表单</el-radio>
+          <el-radio value="workflow">流程表单</el-radio>
+        </el-radio-group>
+        <p class="form-kind-hint">
+          {{ formKindHint }}
+        </p>
+      </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="nameVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="onSubmitName">
+      <el-button @click="closeNameDialog">取消</el-button>
+      <el-button type="primary" :loading="saving" @click="submitNameDialog">
         确定
       </el-button>
     </template>
@@ -131,16 +196,20 @@ import {
   Setting,
 } from '@element-plus/icons-vue'
 import {
+  convertFormKindApi,
   createFormApi,
   createGroupApi,
   deleteFormApi,
   deleteGroupApi,
   getAppApi,
   getDirectoryApi,
+  queryFormRecordsApi,
   renameFormApi,
   renameGroupApi,
 } from '../api/apps'
 import AppWorkspaceMain from '../components/AppWorkspaceMain.vue'
+import WorkflowInboxList from '../components/workflow-inbox/WorkflowInboxList.vue'
+import { getWorkflowInboxCountApi } from '../api/workflow'
 import { useDocumentTitle } from '../utils/documentTitle.js'
 
 const route = useRoute()
@@ -151,10 +220,16 @@ const keyword = ref('')
 const app = ref(null)
 const directory = ref({ groups: [], forms: [] })
 const currentForm = ref(null)
+const appTodoCount = ref(0)
+const INBOX_KINDS = new Set(['todo', 'mine', 'done'])
+const inboxKind = computed(() => {
+  const value = route.query.inbox
+  return typeof value === 'string' && INBOX_KINDS.has(value) ? value : ''
+})
 const treeRef = ref()
 const nameVisible = ref(false)
 const nameFormRef = ref()
-const nameForm = reactive({ name: '' })
+const nameForm = reactive({ name: '', formKind: 'normal' })
 const nameMode = ref('create-group')
 const nameTargetId = ref(null)
 const createFormGroupId = ref(null)
@@ -166,6 +241,7 @@ const nameRules = {
 }
 
 const appId = computed(() => Number(route.params.id))
+const canConfigure = computed(() => Boolean(app.value?.canConfigure))
 useDocumentTitle(() => app.value?.name)
 const formId = computed(() => {
   const n = Number(route.params.formId)
@@ -181,6 +257,13 @@ const nameDialogTitle = computed(() => {
   if (nameMode.value === 'create-form') return '新建表单'
   if (nameMode.value === 'rename-group') return '修改名称'
   return '修改名称'
+})
+
+const formKindHint = computed(() => {
+  if (nameForm.formKind === 'workflow') {
+    return '填完点提交进入审批，要先发布流程才能填。'
+  }
+  return '填完点保存就是正式数据。'
 })
 
 const filteredDirectory = computed(() => {
@@ -230,6 +313,9 @@ function toFormNode(form) {
     id: form.id,
     name: form.name,
     groupId: form.groupId ?? null,
+    formKind: form.formKind === 'workflow' ? 'workflow' : 'normal',
+    workflowPublished: Boolean(form.workflowPublished),
+    workflowEnabled: Boolean(form.workflowEnabled),
     nodeType: 'form',
   }
 }
@@ -260,6 +346,11 @@ function syncTreeCurrent(formNode) {
 }
 
 function applyFormFromRoute() {
+  if (inboxKind.value) {
+    currentForm.value = null
+    syncTreeCurrent(null)
+    return
+  }
   if (!formId.value) {
     currentForm.value = null
     syncTreeCurrent(null)
@@ -275,19 +366,38 @@ function applyFormFromRoute() {
   syncTreeCurrent(node)
 }
 
+function openInbox(kind) {
+  router.push({
+    name: 'app-workspace',
+    params: { id: appId.value },
+    query: { inbox: kind },
+  })
+}
+
+async function loadAppTodoCount() {
+  try {
+    const result = await getWorkflowInboxCountApi(appId.value)
+    appTodoCount.value = Number(result?.todo) || 0
+  } catch {
+    appTodoCount.value = 0
+  }
+}
+
 function onNodeClick(data) {
   if (data.nodeType === 'form') {
-    if (formId.value === data.id) {
+    if (formId.value === data.id && !inboxKind.value) {
       return
     }
     // 模拟路由跳转
     // 虽然是进了新路由，但新路由配置render 为null，所以并不会因为路由跳转了而显示新内容
     // 右侧的表单功能区域依然由组件实现，通过props传入参数
     // 刷新后由本组件从route 上取参数还原选择
+    const query = { ...route.query }
+    delete query.inbox
     router.push({
       name: 'app-workspace-form',
       params: { id: appId.value, formId: data.id },
-      query: route.query,
+      query,
     })
     return
   }
@@ -321,6 +431,10 @@ function onNodeCommand(command, data) {
     )
     return
   }
+  if (command === 'convert-workflow') {
+    onConvertToWorkflow(data)
+    return
+  }
   if (command === 'delete') {
     onDelete(data)
   }
@@ -331,17 +445,23 @@ function openNameDialog(mode, extra = {}) {
   nameTargetId.value = extra.id ?? null
   createFormGroupId.value = extra.groupId ?? null
   nameForm.name = extra.name || ''
+  nameForm.formKind = 'normal'
   nameVisible.value = true
+}
+
+function closeNameDialog() {
+  nameVisible.value = false
 }
 
 function resetNameDialog() {
   nameForm.name = ''
+  nameForm.formKind = 'normal'
   nameTargetId.value = null
   createFormGroupId.value = null
   nameFormRef.value?.resetFields()
 }
 
-async function onSubmitName() {
+async function submitNameDialog() {
   await nameFormRef.value.validate()
   saving.value = true
   try {
@@ -353,6 +473,7 @@ async function onSubmitName() {
       const form = await createFormApi(id, {
         name,
         groupId: createFormGroupId.value,
+        formKind: nameForm.formKind,
       })
       nameVisible.value = false
       await loadDirectory()
@@ -376,6 +497,46 @@ async function onSubmitName() {
   }
 }
 
+async function countFormRecords(formId) {
+  try {
+    const result = await queryFormRecordsApi(appId.value, formId, {
+      page: 1,
+      pageSize: 1,
+    })
+    const total = Number(result?.total)
+    return Number.isInteger(total) && total >= 0 ? total : null
+  } catch {
+    return null
+  }
+}
+
+async function onConvertToWorkflow(data) {
+  const total = await countFormRecords(data.id)
+  const countText =
+    total == null ? '已有数据' : `已有的 ${total} 条数据`
+  try {
+    await ElMessageBox.confirm(
+      `${countText}将记为已通过，且发布流程之前不能再填报。确定把「${data.name}」转为流程表单？`,
+      '转为流程表单',
+      {
+        confirmButtonText: '转为流程表单',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+  try {
+    await convertFormKindApi(appId.value, data.id)
+    ElMessage.success('已转为流程表单')
+    await loadDirectory()
+    applyFormFromRoute()
+  } catch {
+    // 错误已由 http 拦截器提示
+  }
+}
+
 async function onDelete(data) {
   if (data.nodeType === 'group' && (data.children || []).length > 0) {
     ElMessage.warning('请先删除分组内的表单')
@@ -383,9 +544,16 @@ async function onDelete(data) {
   }
 
   const isGroup = data.nodeType === 'group'
+  let formDeleteMessage = `确定删除表单「${data.name}」？`
+  if (!isGroup) {
+    const total = await countFormRecords(data.id)
+    const countText =
+      total == null ? '已填报的数据' : `该表单已填报的 ${total} 条数据`
+    formDeleteMessage = `将同时删除${countText}，不可恢复。确定删除表单「${data.name}」？`
+  }
   try {
     await ElMessageBox.confirm(
-      isGroup ? `确定删除分组「${data.name}」？` : `确定删除表单「${data.name}」？`,
+      isGroup ? `确定删除分组「${data.name}」？` : formDeleteMessage,
       isGroup ? '删除分组' : '删除',
       {
         confirmButtonText: '删除',
@@ -427,6 +595,7 @@ async function loadWorkspace() {
   try {
     app.value = await getAppApi(appId.value)
     await loadDirectory()
+    await loadAppTodoCount()
     applyFormFromRoute()
   } catch (error) {
     if (error.response?.status !== 401) {
@@ -439,7 +608,7 @@ async function loadWorkspace() {
 
 watch(appId, loadWorkspace, { immediate: true })
 
-watch(formId, () => {
+watch([formId, inboxKind], () => {
   if (loading.value) {
     return
   }
@@ -463,11 +632,53 @@ watch(formId, () => {
 }
 
 .aside-head,
-.aside-toolbar {
+.aside-toolbar,
+.aside-inbox {
   display: flex;
   align-items: center;
   margin-bottom: 12px;
   margin-right: 6px;
+}
+
+.aside-inbox {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.aside-inbox-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px;
+  color: var(--el-text-color-regular);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.aside-inbox-item.is-active,
+.aside-inbox-item:hover {
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+}
+
+.aside-inbox-count {
+  padding: 0 6px;
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  background: var(--el-color-danger);
+  border-radius: 9px;
+}
+
+.workspace-inbox {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: var(--el-bg-color);
 }
 
 .aside-head {
@@ -533,5 +744,12 @@ watch(formId, () => {
 .aside-backend {
   width: 100%;
   justify-content: flex-start;
+}
+
+.form-kind-hint {
+  margin: 8px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>

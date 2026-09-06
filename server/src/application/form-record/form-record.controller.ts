@@ -35,7 +35,13 @@ export class FormRecordController {
     @Param('formId', ParseIntPipe) formId: number,
     @Body() dto: CreateRecordDto,
   ) {
-    return this.formRecordService.create(req.user.id, appId, formId, dto.data);
+    return this.formRecordService.create(
+      req.user.id,
+      appId,
+      formId,
+      dto.data,
+      dto.intent,
+    );
   }
 
   @Post('query')
@@ -107,6 +113,7 @@ export class FormRecordController {
       formId,
       recordId,
       dto.data,
+      dto.intent,
     );
   }
 

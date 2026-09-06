@@ -14,9 +14,16 @@
           :dict-items-by-code="dictItemsByCode"
         />
       </div>
+      <div v-if="unpublished" class="wf-unpublished">
+        这张表单还没有配置流程，暂时不能填报
+      </div>
       <div class="fill-footer">
         <el-button @click="onCancel">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="onSave">
+        <template v-if="workflowEnabled">
+          <el-button :loading="saving" @click="onDraft">保存草稿</el-button>
+          <el-button type="primary" :loading="saving" @click="onSubmit">提交</el-button>
+        </template>
+        <el-button v-else type="primary" :loading="saving" @click="onSave">
           保存
         </el-button>
       </div>
@@ -35,9 +42,11 @@ defineProps({
   dictItemsByCode: { type: Object, default: () => ({}) },
   schemaLoading: { type: Boolean, default: false },
   saving: { type: Boolean, default: false },
+  unpublished: { type: Boolean, default: false },
+  workflowEnabled: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['cancel', 'save'])
+const emit = defineEmits(['cancel', 'save', 'draft', 'submit'])
 const gridRef = ref(null)
 
 function onCancel() {
@@ -48,6 +57,14 @@ function onSave() {
   emit('save')
 }
 
+function onDraft() {
+  emit('draft')
+}
+
+function onSubmit() {
+  emit('submit')
+}
+
 defineExpose({
   revealField: (key) => gridRef.value?.revealField(key),
 })
@@ -55,4 +72,13 @@ defineExpose({
 
 <style scoped lang="less">
 @import '../form-fill/fillLayout.less';
+
+.wf-unpublished {
+  margin: 0 16px 8px;
+  padding: 8px 12px;
+  color: var(--el-color-warning-dark-2);
+  background: var(--el-color-warning-light-9);
+  border-radius: 6px;
+  line-height: 1.5;
+}
 </style>

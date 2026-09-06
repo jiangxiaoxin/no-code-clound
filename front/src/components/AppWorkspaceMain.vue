@@ -5,7 +5,14 @@
       <div class="form-work-head">
         <div class="form-work-title">
           <span class="form-work-name">{{ form.name }}</span>
-          <el-icon style="cursor: pointer;" title="编辑表单" @click="goDesign"><EditPen /></el-icon>
+          <el-icon
+            v-if="canConfigure"
+            style="cursor: pointer;"
+            title="编辑表单"
+            @click="goDesign"
+          >
+            <EditPen />
+          </el-icon>
         </div>
         <div class="form-work-tabs">
           <span
@@ -29,13 +36,18 @@
         :dict-items-by-code="dictItemsByCode"
         :schema-loading="schemaLoading"
         :saving="saving"
+        :unpublished="workflowUnpublished"
+        :workflow-enabled="workflowEnabled"
         @cancel="resetValues"
         @save="onSave"
+        @draft="onDraft"
+        @submit="onSubmit"
       />
       <FormRecordManage
         v-if="tab === 'list' && form"
         :app-id="appId"
         :form-id="form.id"
+        :can-configure="canConfigure"
       />
     </div>
   </el-main>
@@ -62,10 +74,12 @@ import FormRecordCreateTab from './form-workspace/FormRecordCreateTab.vue'
 import FormRecordManage from './form-workspace/FormRecordManage.vue'
 import { readWorkspaceTabOrder } from './form-workspace/workspaceTabOrder.js'
 import { useUserStore } from '../stores/user'
+import { submitSuccessText } from './workflow-inbox/workflowStatus.js'
 
 const props = defineProps({
   appId: { type: Number, required: true },
   form: { type: Object, default: null },
+  canConfigure: { type: Boolean, default: false },
 })
 
 const route = useRoute()
@@ -124,6 +138,12 @@ const workspaceTabs = computed(() => {
 
 const defaultTab = computed(() => workspaceTabs.value[0]?.key || 'create')
 const tab = computed(() => tabFromQuery() || defaultTab.value)
+const workflowUnpublished = computed(
+  () => props.form?.formKind === 'workflow' && !props.form?.workflowPublished,
+)
+const workflowEnabled = computed(
+  () => props.form?.formKind === 'workflow' && Boolean(props.form?.workflowEnabled),
+)
 
 function resetValues() {
   console.log('--resteValues');
@@ -207,6 +227,22 @@ async function loadDictItems() {
 }
 
 async function onSave() {
+  return saveRecord()
+}
+
+async function onDraft() {
+  return saveRecord('draft')
+}
+
+async function onSubmit() {
+  return saveRecord('submit')
+}
+
+async function saveRecord(intent) {
+  if (workflowUnpublished.value) {
+    ElMessage.warning('这张表单还没有配置流程，发布流程之后才能使用')
+    return
+  }
   const err = firstRequiredError(fields.value, values)
   if (err) {
     ElMessage.warning(err.message)
@@ -215,12 +251,17 @@ async function onSave() {
   }
   saving.value = true
   try {
-    await createFormRecordApi(
+    const saved = await createFormRecordApi(
       props.appId,
       props.form.id,
       buildRecordData(fields.value, values),
+      intent,
     )
-    ElMessage.success('保存成功')
+    if (intent === 'submit') {
+      ElMessage.success(submitSuccessText(saved?.nextNodeTitle))
+    } else {
+      ElMessage.success('保存成功')
+    }
     resetValues()
   } catch {
     return

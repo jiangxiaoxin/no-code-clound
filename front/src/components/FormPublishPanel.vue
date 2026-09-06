@@ -34,13 +34,18 @@
             <div class="publish-card-title">数据管理按钮</div>
           </template>
           <p class="publish-desc">新增、编辑、删除默认开启；导入、导出、下载导入模版默认关闭。关闭后数据管理页不显示对应按钮。导出暂未开放。</p>
+          <p v-if="isWorkflowForm" class="publish-desc">
+            流程表单不能导入。改已通过的数据会重新进入审批，通过之前不能再被别的表选到。
+          </p>
           <div class="action-list">
             <el-checkbox v-model="actions.create">新增</el-checkbox>
             <el-checkbox v-model="actions.edit">编辑</el-checkbox>
             <el-checkbox v-model="actions.delete">删除</el-checkbox>
-            <el-checkbox v-model="actions.import">导入</el-checkbox>
+            <el-checkbox v-model="actions.import" :disabled="isWorkflowForm">导入</el-checkbox>
             <el-checkbox v-model="actions.export">导出</el-checkbox>
-            <el-checkbox v-model="actions.downloadTemplate">下载导入模版</el-checkbox>
+            <el-checkbox v-model="actions.downloadTemplate" :disabled="isWorkflowForm">
+              下载导入模版
+            </el-checkbox>
           </div>
           <div class="publish-actions">
             <el-button type="primary" :loading="saving" @click="save">保存设置</el-button>
@@ -52,7 +57,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getFormConfigApi, saveFormConfigApi } from '../api/apps'
 import { normalizeRecordActions } from '../utils/recordActions'
@@ -75,9 +80,14 @@ const tabOrder = ref('create-first')
 const actions = reactive(normalizeRecordActions())
 const saving = ref(false)
 const activeSetting = ref('workspace')
+const isWorkflowForm = computed(() => props.form?.formKind === 'workflow')
 
 function applyActions(raw) {
   const next = normalizeRecordActions(raw)
+  if (isWorkflowForm.value) {
+    next.import = false
+    next.downloadTemplate = false
+  }
   for (const key of Object.keys(next)) {
     actions[key] = next[key]
   }
@@ -124,8 +134,13 @@ async function save() {
   }
   saving.value = true
   try {
+    const recordActions = { ...actions }
+    if (isWorkflowForm.value) {
+      recordActions.import = false
+      recordActions.downloadTemplate = false
+    }
     await saveFormConfigApi(props.appId, props.formId, {
-      recordActions: { ...actions },
+      recordActions,
     })
     ElMessage.success('保存成功')
   } catch {
