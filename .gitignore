@@ -9,3 +9,5 @@ front/dist/
 .vscode/
 *.local
 uploads/
+.superpowers/
+server/tmp-run-*.mjs
