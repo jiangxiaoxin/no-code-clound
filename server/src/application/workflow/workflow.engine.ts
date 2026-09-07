@@ -10,7 +10,7 @@ import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
 import { FormRecordStore } from '../form-record/form-record.store';
-import { WorkflowApproverService } from './workflow.approver';
+import { WorkflowApproverService, type ResolvedApprovers } from './workflow.approver';
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
@@ -306,6 +306,30 @@ export class WorkflowEngine {
           instance.retryPatch ?? {},
           instance.retryActorId ?? instance.initiatorId,
         );
+        // 会签：写回不等于节点完成。还有人没批就回到审批中等他，不能直接推进
+        if (node.signMode === 'all') {
+          const pending = await this.taskRepo.count({
+            where: {
+              instanceId: instance.id,
+              nodeKey: node.key,
+              round: instance.round,
+              status: 'pending',
+            },
+          });
+          if (pending > 0) {
+            await this.instanceRepo.update(
+              { id: instance.id, status: 'error' },
+              {
+                status: 'running',
+                errorReason: null,
+                retryStep: null,
+                retryPatch: null,
+                retryActorId: null,
+              },
+            );
+            return;
+          }
+        }
       }
       await this.instanceRepo.update(
         { id: instance.id, status: 'error' },
@@ -324,21 +348,95 @@ export class WorkflowEngine {
       : null;
     if (instance.retryStep === 'dispatch' && stuckNode?.type === 'approve') {
       await this.cancelDisabledPending(instance);
-      await this.instanceRepo.update(
-        { id: instance.id, status: 'error' },
-        { status: 'running', errorReason: null, retryStep: null },
-      );
-      instance.status = 'running';
       const record = await this.store.findById(
         instance.formId,
         instance.recordId,
       );
+      const data = record?.data ?? {};
+      const resolved = await this.approver.resolve({
+        nodeTitle: stuckNode.title,
+        approver: stuckNode.approver,
+        initiatorId: instance.initiatorId,
+        recordData: data,
+      });
+      if (!resolved.userIds.length) {
+        // 解析不到人：保持异常态并写清原因，不能翻回审批中变成没人有待办
+        await this.instanceRepo.update(
+          { id: instance.id, status: 'error' },
+          {
+            status: 'error',
+            errorReason:
+              resolved.emptyReason || `节点「${stuckNode.title}」没有可用的审批人`,
+            retryStep: 'dispatch',
+          },
+        );
+        return;
+      }
+      const existing = await this.taskRepo.find({
+        where: {
+          instanceId: instance.id,
+          nodeKey: stuckNode.key,
+          round: instance.round,
+        },
+      });
+      // 这一轮重试必须真的派得出待办，否则翻回审批中会变成零待办死单
+      const byAssignee = new Map(existing.map((row) => [row.assigneeId, row]));
+      const willHavePending =
+        existing.some((row) => row.status === 'pending') ||
+        resolved.userIds.some((id) => {
+          const row = byAssignee.get(id);
+          return !row || row.status === 'cancelled';
+        });
+      if (!willHavePending) {
+        await this.instanceRepo.update(
+          { id: instance.id, status: 'error' },
+          {
+            status: 'error',
+            errorReason: `节点「${stuckNode.title}」这一轮解析出的审批人都已通过，重试派不出新的待办；如果是会签节点，请先恢复被停用成员的账号再点【重试】`,
+            retryStep: 'dispatch',
+          },
+        );
+        return;
+      }
+      // 带状态条件翻转：发起人恰好撤回时这里落空，不能给已撤回的单派待办
+      const resumed = await this.instanceRepo.update(
+        { id: instance.id, status: 'error' },
+        { status: 'running', errorReason: null, retryStep: null },
+      );
+      if (!resumed.affected) {
+        return;
+      }
+      instance.status = 'running';
       await this.dispatchApprove(
         instance,
         stuckNode.key,
         instance.visitedNodeKeys ?? [],
-        record?.data ?? {},
+        data,
+        resolved,
+        existing,
       );
+      // 派发期间单据可能又被撤回：撤掉刚派的待办，Mongo 跟数据库实际状态对齐
+      const after = await this.instanceRepo.findOne({
+        where: { id: instance.id },
+      });
+      if (after && after.status === 'running') {
+        return;
+      }
+      await this.taskRepo.update(
+        {
+          instanceId: instance.id,
+          nodeKey: stuckNode.key,
+          round: instance.round,
+          status: 'pending',
+        },
+        { status: 'cancelled', cancelReason: '单据状态已变化，待办自动撤回' },
+      );
+      if (after) {
+        await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+          workflowStatus: after.status,
+          workflowInstanceId: instance.id,
+        });
+      }
       return;
     }
     await this.advance(instance, instance.currentNodeKey ?? 'start');
@@ -348,7 +446,10 @@ export class WorkflowEngine {
     const instance = await this.instanceRepo.findOne({
       where: { formId, recordId },
     });
-    if (!instance || instance.status !== 'draft') return;
+    if (!instance) return;
+    // 草稿和异常单跟着数据一起删：异常单残留会让重试给已删数据派真待办，
+    // 审批人一处理就报「记录不存在」再进异常，无限循环。已通过、已驳回保留实例看进度。
+    if (instance.status !== 'draft' && instance.status !== 'error') return;
     await this.taskRepo.delete({ instanceId: instance.id });
     await this.instanceRepo.delete({ id: instance.id });
   }
@@ -424,14 +525,18 @@ export class WorkflowEngine {
     nodeKey: string,
     visited: string[],
     data: Record<string, unknown>,
+    preResolved?: ResolvedApprovers,
+    existingTasks?: WorkflowTask[],
   ): Promise<WorkflowInstance> {
     const node = findApproveNode(instance.graph, nodeKey);
-    const resolved = await this.approver.resolve({
-      nodeTitle: node.title,
-      approver: node.approver,
-      initiatorId: instance.initiatorId,
-      recordData: data,
-    });
+    const resolved =
+      preResolved ??
+      (await this.approver.resolve({
+        nodeTitle: node.title,
+        approver: node.approver,
+        initiatorId: instance.initiatorId,
+        recordData: data,
+      }));
     if (!resolved.userIds.length) {
       const reason =
         resolved.emptyReason || `节点「${node.title}」没有可用的审批人`;
@@ -439,7 +544,7 @@ export class WorkflowEngine {
       return { ...instance, status: 'error', errorReason: reason };
     }
     try {
-      await this.dispatchTasks(instance, nodeKey, resolved.userIds);
+      await this.dispatchTasks(instance, nodeKey, resolved.userIds, existingTasks);
     } catch {
       const reason = `节点「${node.title}」派发待办失败，请重试`;
       await this.markError(instance, reason, visited, 'dispatch');
@@ -467,10 +572,13 @@ export class WorkflowEngine {
     instance: WorkflowInstance,
     nodeKey: string,
     userIds: number[],
+    existingTasks?: WorkflowTask[],
   ) {
-    const existing = await this.taskRepo.find({
-      where: { instanceId: instance.id, nodeKey, round: instance.round },
-    });
+    const existing =
+      existingTasks ??
+      (await this.taskRepo.find({
+        where: { instanceId: instance.id, nodeKey, round: instance.round },
+      }));
     const byAssignee = new Map(existing.map((row) => [row.assigneeId, row]));
     const toRevive = userIds.filter(
       (id) => byAssignee.get(id)?.status === 'cancelled',
@@ -515,7 +623,7 @@ export class WorkflowEngine {
   private async writeBack(
     instance: WorkflowInstance,
     node: Extract<WorkflowNode, { type: 'approve' }>,
-    dataPatch: Record<string, unknown>,
+    dataPatch: RetryPatch,
     actorId: number,
   ) {
     const form =
@@ -553,11 +661,15 @@ export class WorkflowEngine {
         workflowInstanceId: instance.id,
       });
     } catch (err) {
+      // 写库失败的这单把补丁槽位占回来：并发下槽位可能已被别人的推进清掉或覆盖，
+      // 不占回来重试就补写不出他改的内容
       await this.instanceRepo.update(
-        { id: instance.id },
+        { id: instance.id, status: In(['running', 'error']) },
         {
           status: 'error',
           retryStep: 'mongo',
+          retryPatch: dataPatch,
+          retryActorId: actorId,
           errorReason: err instanceof Error ? err.message : '写回表单失败',
         },
       );

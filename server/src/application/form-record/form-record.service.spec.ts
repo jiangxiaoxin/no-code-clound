@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { ObjectId } from 'mongodb';
 import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
+import { AppFormConfig } from '../app-form-config.entity';
 import { User } from '../../user/user.entity';
 import { FormRecordPersistService } from './form-record.persist';
 import { FormRecordService } from './form-record.service';
@@ -18,6 +19,7 @@ import { WorkflowTask } from '../workflow/workflow-task.entity';
 describe('FormRecordService', () => {
   let service: FormRecordService;
   const formRepo = { findOne: jest.fn() };
+  const formConfigRepo = { findOne: jest.fn() };
   const access = {
     requireUse: jest.fn(),
     requireConfigure: jest.fn(),
@@ -27,6 +29,7 @@ describe('FormRecordService', () => {
   const userRepo = { find: jest.fn() };
   const store = {
     insert: jest.fn(),
+    insertMany: jest.fn(),
     findById: jest.fn(),
     replaceData: jest.fn(),
     deleteById: jest.fn(),
@@ -71,6 +74,7 @@ describe('FormRecordService', () => {
   beforeEach(async () => {
     jest.resetAllMocks();
     access.requireUse.mockResolvedValue(ownedApp);
+    formConfigRepo.findOne.mockResolvedValue(null);
     access.getAccess.mockResolvedValue({
       app: ownedApp,
       canUse: true,
@@ -81,6 +85,10 @@ describe('FormRecordService', () => {
       providers: [
         FormRecordService,
         { provide: getRepositoryToken(AppForm), useValue: formRepo },
+        {
+          provide: getRepositoryToken(AppFormConfig),
+          useValue: formConfigRepo,
+        },
         { provide: AppAccessService, useValue: access },
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: FormRecordStore, useValue: store },
@@ -338,6 +346,23 @@ describe('FormRecordService', () => {
     expect(result.canConfigure).toBe(true);
   });
 
+  it('getOne 权限只判定一次：直接用 getAccess，不再 requireUse', async () => {
+    formRepo.findOne.mockResolvedValue(form);
+    store.findById.mockResolvedValue(doc);
+    userRepo.find.mockResolvedValue([]);
+
+    const result = await service.getOne(
+      1,
+      8,
+      12,
+      '64b64c4c4c4c4c4c4c4c4c',
+    );
+
+    expect(access.getAccess).toHaveBeenCalledTimes(1);
+    expect(access.requireUse).not.toHaveBeenCalled();
+    expect(result.canConfigure).toBe(true);
+  });
+
   it('throws when record id is missing', async () => {
     formRepo.findOne.mockResolvedValue(form);
     store.findById.mockResolvedValue(null);
@@ -513,5 +538,64 @@ describe('FormRecordService', () => {
       12,
       doc._id.toHexString(),
     );
+  });
+
+  it('发布页关了【编辑】时，直接调修改接口也拒', async () => {
+    formRepo.findOne.mockResolvedValue(form);
+    formConfigRepo.findOne.mockResolvedValue({
+      config: { recordActions: { edit: false } },
+    });
+    await expect(
+      service.update(1, 8, 12, doc._id.toHexString(), { name: '李四' }),
+    ).rejects.toMatchObject({
+      message: '这张表在【表单发布】里关了【编辑】，不能修改数据',
+    });
+    expect(store.replaceData).not.toHaveBeenCalled();
+  });
+
+  it('发布页关了【删除】时，直接调删除接口也拒', async () => {
+    formRepo.findOne.mockResolvedValue(form);
+    formConfigRepo.findOne.mockResolvedValue({
+      config: { recordActions: { delete: false } },
+    });
+    store.findById.mockResolvedValue(doc);
+    await expect(
+      service.remove(1, 8, 12, doc._id.toHexString()),
+    ).rejects.toMatchObject({
+      message: '这张表在【表单发布】里关了【删除】，不能删除数据',
+    });
+    expect(store.deleteById).not.toHaveBeenCalled();
+  });
+
+  it('发布页关了【导入】时，直接调导入接口也拒', async () => {
+    formRepo.findOne.mockResolvedValue(form);
+    formConfigRepo.findOne.mockResolvedValue({
+      config: { recordActions: { import: false } },
+    });
+    await expect(
+      service.importFromExcel(1, 8, 12, {
+        buffer: Buffer.from('x'),
+        size: 1,
+        originalname: 'a.xlsx',
+      }),
+    ).rejects.toMatchObject({
+      message: '这张表在【表单发布】里关了【导入】，不能导入数据',
+    });
+    expect(store.insertMany).not.toHaveBeenCalled();
+  });
+
+  it('发布页关了【下载导入模版】时拒，开着时正常生成', async () => {
+    formRepo.findOne.mockResolvedValue(form);
+    formConfigRepo.findOne.mockResolvedValue({
+      config: { recordActions: { downloadTemplate: false } },
+    });
+    await expect(service.buildImportTemplate(1, 8, 12)).rejects.toMatchObject({
+      message: '这张表在【表单发布】里关了【下载导入模版】，不能下载模版',
+    });
+    formConfigRepo.findOne.mockResolvedValue({
+      config: { recordActions: { downloadTemplate: true } },
+    });
+    const result = await service.buildImportTemplate(1, 8, 12);
+    expect(result.filename).toBe('客户-导入模版.xlsx');
   });
 });

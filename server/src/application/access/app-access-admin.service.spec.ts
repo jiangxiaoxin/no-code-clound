@@ -39,6 +39,7 @@ describe('AppAccessAdminService', () => {
   const manager = {
     save: jest.fn(),
     delete: jest.fn(),
+    update: jest.fn(),
     findOne: jest.fn(),
     create: jest.fn((_entity: unknown, value: unknown) => value),
   };
@@ -60,6 +61,7 @@ describe('AppAccessAdminService', () => {
       async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager),
     );
     manager.create.mockImplementation((_entity: unknown, value: unknown) => value);
+    manager.update.mockResolvedValue({ affected: 1 });
     const module = await Test.createTestingModule({
       providers: [
         AppAccessAdminService,
@@ -129,14 +131,27 @@ describe('AppAccessAdminService', () => {
     ]);
     configuratorRepo.find.mockResolvedValue([]);
     await service.addConfigurators(1, 8, [2]);
-    expect(configuratorRepo.save).toHaveBeenCalledWith([
+    expect(manager.save).toHaveBeenCalledWith(AppConfigurator, [
       { appId: 8, userId: 2 },
     ]);
-    expect(scopeRepo.delete).toHaveBeenCalledWith({
+    expect(manager.delete).toHaveBeenCalledWith(AppAccessScope, {
       appId: 8,
       type: 'user',
       targetId: In([2]),
     });
+  });
+
+  it('加配置者后删范围失败时整体回滚，不留配置者行', async () => {
+    userRepo.find.mockResolvedValue([
+      { id: 2, displayName: '乙', status: 'active' },
+    ]);
+    configuratorRepo.find.mockResolvedValue([]);
+    manager.delete.mockRejectedValueOnce(new Error('删范围失败'));
+
+    await expect(service.addConfigurators(1, 8, [2])).rejects.toThrow(
+      '删范围失败',
+    );
+    expect(configuratorRepo.save).not.toHaveBeenCalled();
   });
 
   it('始终可用不写范围行', async () => {
@@ -203,10 +218,12 @@ describe('AppAccessAdminService', () => {
 
     await service.transferOwner(8, 1, 2);
 
-    expect(manager.save).toHaveBeenCalledWith(
+    expect(manager.update).toHaveBeenCalledWith(
       Application,
-      expect.objectContaining({ ownerId: 2 }),
+      { id: 8, ownerId: 1 },
+      { ownerId: 2 },
     );
+    expect(manager.save).not.toHaveBeenCalledWith(Application, expect.anything());
     expect(manager.delete).toHaveBeenCalledWith(AppConfigurator, {
       appId: 8,
       userId: 2,
@@ -220,6 +237,18 @@ describe('AppAccessAdminService', () => {
       AppAccessScope,
       expect.objectContaining({ appId: 8, type: 'user', targetId: 1 }),
     );
+  });
+
+  it('并发移交：另一笔已换主人时条件更新落空，报当前所有者已变化且不改数据', async () => {
+    appRepo.findOne.mockResolvedValue({ ...app });
+    userRepo.findOne.mockResolvedValue({ id: 2, status: 'active' });
+    manager.update.mockResolvedValue({ affected: 0 });
+
+    await expect(service.transferOwner(8, 1, 2)).rejects.toMatchObject({
+      message: '当前所有者已变化',
+    });
+    expect(manager.save).not.toHaveBeenCalledWith(Application, expect.anything());
+    expect(manager.delete).not.toHaveBeenCalled();
   });
 
   it('配置者不能移交', async () => {

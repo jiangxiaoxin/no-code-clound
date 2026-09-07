@@ -1,6 +1,6 @@
 # 流程表单 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务推进。默认在 `master` 上改。未经使用者允许不开分支、不建 worktree。未经使用者要求不 commit。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务推进。分支 / worktree / commit 规则以根目录 `AGENTS.md`（`.cursor/rules/` 同义）为准，本计划不另复制。
 
 **Goal:** 让【人事】里的【请假单】能按画布走审批：建表时选流程表单、发布流程后才能填，提交后按节点派人，首页和应用内用同一套【我的待办】/【我发起的】/【我处理的】处理。
 
@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- 默认在 `master` 开发；未经允许不开分支、不建 worktree；不自动 commit。
+- 分支 / worktree / commit 规则见根目录 `AGENTS.md`「开发分支」，本计划不复制会过期的口径。
 - TypeORM `synchronize: false`。SQL 脚本写好后必须停下，等使用者点名该文件并同意后才能执行。禁止打开 `synchronize`。
 - 表名单数下划线、列驼峰、普通索引 `IDX_表名_属性`、唯一约束 `uk_表名_属性`。
 - 模板不写行内 JS；布局优先 flex（流程画布是二维连线，允许用 LogicFlow，不算违反 flex 规则）；相邻 `el-button` 容器不加 `gap`；`el-dialog` 默认 `draggable`。

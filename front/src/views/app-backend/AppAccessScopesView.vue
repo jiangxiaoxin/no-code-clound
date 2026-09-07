@@ -141,16 +141,22 @@ function typeLabel(type) {
   return '人员'
 }
 
+// 换应用很快时旧请求可能比新请求后回来：只认最后一次 load 的响应，旧的直接扔掉
+let loadSeq = 0
+
 async function load() {
+  const seq = ++loadSeq
+  const id = appId.value
   loading.value = true
   try {
-    const result = await listAccessScopesApi(appId.value)
+    const result = await listAccessScopesApi(id)
+    if (seq !== loadSeq) return
     alwaysUsers.value = result?.always?.users || []
     scopes.value = result?.scopes || []
   } catch {
     // 错误已由 http 拦截器提示
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
