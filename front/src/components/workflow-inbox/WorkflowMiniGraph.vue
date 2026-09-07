@@ -64,6 +64,8 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  // 每次打开抽屉都会新建一个画布，不销毁会一直堆在内存里
+  lf?.destroy?.()
   lf = null
 })
 </script>

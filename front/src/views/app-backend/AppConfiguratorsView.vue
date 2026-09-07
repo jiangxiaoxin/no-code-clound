@@ -76,7 +76,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import FormMemberSelect from '../../components/form-fill/FormMemberSelect.vue'
@@ -205,7 +205,8 @@ async function onTransfer(userId) {
   }
 }
 
-onMounted(load)
+// 左侧换一个应用时地址里的 id 会变，组件不会重建，所以要跟着 id 重新查
+watch(appId, load, { immediate: true })
 </script>
 
 <style scoped lang="less">

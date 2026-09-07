@@ -115,6 +115,7 @@ describe('WorkflowEngine', () => {
     instanceRepo.save.mockImplementation(async (row) => ({ id: row.id ?? 1, ...row }));
     instanceRepo.update.mockResolvedValue({ affected: 1 });
     taskRepo.update.mockResolvedValue({ affected: 1 });
+    taskRepo.find.mockResolvedValue([]);
     definition.getRuntime.mockResolvedValue({
       published: true,
       enabled: true,
@@ -338,6 +339,115 @@ describe('WorkflowEngine', () => {
     await expect(
       engine.resubmitApproved({ form, recordId, actorId: 5 }),
     ).rejects.toThrow('这条数据没有审批记录，不能重新提交');
+  });
+
+  it('找不到审批人后重试：重新派这个节点，不跳到下一个', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({ status: 'error', retryStep: 'dispatch' }),
+    );
+    approver.resolve.mockResolvedValue({ userIds: [21] });
+    await engine.retry({ instanceId: 1 });
+    expect(taskRepo.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ nodeKey: 'n1', assigneeId: 21, status: 'pending' }),
+    ]);
+    expect(instanceRepo.update).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ currentNodeKey: 'n2' }),
+    );
+  });
+
+  it('重试重新派单：同一轮里取消过的待办改回待处理，不再插一条', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({ status: 'error', retryStep: 'dispatch' }),
+    );
+    taskRepo.find
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 7, assigneeId: 21, nodeKey: 'n1', round: 1, status: 'cancelled' },
+      ]);
+    approver.resolve.mockResolvedValue({ userIds: [21] });
+    await engine.retry({ instanceId: 1 });
+    expect(taskRepo.insert).not.toHaveBeenCalled();
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      expect.objectContaining({ nodeKey: 'n1', round: 1 }),
+      expect.objectContaining({ status: 'pending', cancelReason: null }),
+    );
+  });
+
+  it('派待办失败进异常，不会停在审批中却没有待办', async () => {
+    instanceRepo.findOne.mockResolvedValue(null);
+    taskRepo.insert.mockRejectedValue(new Error('数据库炸了'));
+    await engine.submit({ form, recordId, actorId: 5 });
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'error', retryStep: 'dispatch' }),
+    );
+  });
+
+  it('审批人全部停用：单据转异常，发起人才看得到重试', async () => {
+    const instance = runningInstance() as never;
+    await engine.markStuckByDisabledApprovers(
+      instance,
+      [{ nodeKey: 'n1', round: 1, status: 'pending', assigneeId: 21 }] as never,
+      new Set([21]),
+    );
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1, status: 'running' }),
+      expect.objectContaining({ status: 'error', retryStep: 'dispatch' }),
+    );
+  });
+
+  it('还有一个审批人没停用：单据保持审批中', async () => {
+    const instance = runningInstance() as never;
+    await engine.markStuckByDisabledApprovers(
+      instance,
+      [
+        { nodeKey: 'n1', round: 1, status: 'pending', assigneeId: 21 },
+        { nodeKey: 'n1', round: 1, status: 'pending', assigneeId: 22 },
+      ] as never,
+      new Set([21]),
+    );
+    expect(instanceRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('写回失败后重试：补写审批人当时改的内容', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        status: 'error',
+        retryStep: 'mongo',
+        retryPatch: { field_reason: '审批人改过的事由' },
+        retryActorId: 21,
+      }),
+    );
+    await engine.retry({ instanceId: 1 });
+    expect(persist.persist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 21,
+        data: { field_reason: '审批人改过的事由' },
+      }),
+    );
+  });
+
+  it('发起人已撤回时驳回失败，不会两边都成功', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 3,
+      instanceId: 1,
+      nodeKey: 'n2',
+      assigneeId: 9,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance({ currentNodeKey: 'n2' }));
+    instanceRepo.update.mockResolvedValue({ affected: 0 });
+    await expect(
+      engine.completeTask({
+        taskId: 3,
+        actorId: 9,
+        action: 'reject',
+        comment: '不批',
+        dataPatch: {},
+      }),
+    ).rejects.toThrow('单据状态已变化');
   });
 
   it('重试从 mongo 步开始不再改待办', async () => {

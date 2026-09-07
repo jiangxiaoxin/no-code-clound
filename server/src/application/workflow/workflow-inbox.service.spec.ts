@@ -6,6 +6,7 @@ import { AppForm } from '../app-form.entity';
 import { DictionaryService } from '../dictionary/dictionary.service';
 import { FormRecordStore } from '../form-record/form-record.store';
 import { User } from '../../user/user.entity';
+import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInboxService } from './workflow-inbox.service';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
@@ -29,6 +30,7 @@ describe('WorkflowInboxService', () => {
   const userRepo = { find: jest.fn() };
   const store = { findById: jest.fn() };
   const dictionary = { listEnabledItemsByApp: jest.fn() };
+  const engine = { markStuckByDisabledApprovers: jest.fn() };
 
   function qb(result: { items: unknown[]; total: number }) {
     const chain: Record<string, jest.Mock> = {};
@@ -62,6 +64,7 @@ describe('WorkflowInboxService', () => {
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: FormRecordStore, useValue: store },
         { provide: DictionaryService, useValue: dictionary },
+        { provide: WorkflowEngine, useValue: engine },
       ],
     }).compile();
     service = module.get(WorkflowInboxService);

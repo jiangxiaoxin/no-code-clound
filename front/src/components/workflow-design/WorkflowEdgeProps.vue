@@ -12,6 +12,7 @@
       <FormFilterConditions
         v-if="!edge.isDefault"
         :filters="filterModel"
+        :app-id="appId"
         :source-fields="conditionFields"
         :form-fields="conditionFields"
       />
@@ -24,13 +25,14 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import FormFilterConditions from '../form-design/FormFilterConditions.vue'
 import { flattenFields } from '../form-design/tabsField.js'
 
 const props = defineProps({
   edge: { type: Object, default: null },
   fromBranch: { type: Boolean, default: false },
+  appId: { type: Number, default: 0 },
   formFields: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['change', 'move'])
@@ -39,10 +41,34 @@ const conditionFields = computed(() =>
   flattenFields(props.formFields).filter((field) => field.type !== 'subform'),
 )
 
-const filterModel = computed(() => ({
-  match: props.edge?.when?.logic === 'any' ? 'any' : 'all',
-  conditions: props.edge?.when?.items || [],
-}))
+// 条件组件是就地改传进去的对象，所以这里自己存一份，改完再写回连线。
+// 换连线时才重建，避免写回后又被覆盖。
+const filterModel = ref(modelFromEdge())
+
+watch(() => props.edge?.key, resetFilterModel)
+
+watch(filterModel, saveFilters, { deep: true })
+
+function modelFromEdge() {
+  return {
+    match: props.edge?.when?.logic === 'any' ? 'any' : 'all',
+    conditions: (props.edge?.when?.items || []).map((item) => ({ ...item })),
+  }
+}
+
+function resetFilterModel() {
+  filterModel.value = modelFromEdge()
+}
+
+function saveFilters(value) {
+  if (!props.edge || props.edge.isDefault) return
+  patch({
+    when: {
+      logic: value.match === 'any' ? 'any' : 'all',
+      items: (value.conditions || []).map((item) => ({ ...item })),
+    },
+  })
+}
 
 function patch(next) {
   emit('change', { ...props.edge, ...next })
@@ -56,15 +82,6 @@ function onDefault(isDefault) {
   patch({
     isDefault,
     when: isDefault ? undefined : props.edge.when,
-  })
-}
-
-function onFilters(value) {
-  patch({
-    when: {
-      logic: value.match === 'any' ? 'any' : 'all',
-      items: value.conditions || [],
-    },
   })
 }
 

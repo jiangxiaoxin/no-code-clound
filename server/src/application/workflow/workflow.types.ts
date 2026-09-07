@@ -48,6 +48,16 @@ export type InstanceStatus =
   | 'rejected'
   | 'error';
 
+// 异常停在哪一步：dispatch 表示待办还没派出去，重试要重新解析当前节点的审批人
+export type RetryStep = 'dispatch' | 'mongo' | 'advance' | null;
+
+// 审批人通过时填的内容，写回失败后留着给重试补写。
+// 值用 any 而不是 unknown：TypeORM 的 update 不接受 unknown 值的 json 列。
+export interface RetryPatch {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
 export type TaskStatus = 'pending' | 'done' | 'cancelled';
 
 export type TaskAction = 'approve' | 'reject';

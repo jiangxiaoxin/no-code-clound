@@ -29,6 +29,7 @@
         v-else-if="selectedEdge"
         :edge="selectedEdge"
         :from-branch="edgeFromBranch"
+        :app-id="appId"
         :form-fields="formFields"
         @change="onEdgeChange"
         @move="onEdgeMove"
@@ -287,6 +288,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  // 只置空不销毁会留下键盘绑定和画布 DOM，来回进出这一页会越来越卡
+  lf?.destroy?.()
   lf = null
 })
 

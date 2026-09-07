@@ -9,6 +9,7 @@ import { flattenFields } from '../form-record/flatten-fields';
 import { parseFormSchema } from '../form-schema';
 import { FormRecordStore } from '../form-record/form-record.store';
 import { FormField } from '../form-record/form-record.types';
+import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
 import { InstanceStatus, WorkflowNode } from './workflow.types';
@@ -36,6 +37,7 @@ export class WorkflowInboxService {
     private readonly userRepo: Repository<User>,
     private readonly store: FormRecordStore,
     private readonly dictionary: DictionaryService,
+    private readonly engine: WorkflowEngine,
   ) {}
 
   async query(
@@ -133,6 +135,7 @@ export class WorkflowInboxService {
       names[String(user.id)] = user.displayName;
       if (user.status !== 'active') disabled.add(user.id);
     }
+    await this.engine.markStuckByDisabledApprovers(instance, tasks, disabled);
     const fields = parseFormSchema(form.fields).fields;
     const dictCodes = flattenFields(fields)
       .map((field) => field.dictCode)

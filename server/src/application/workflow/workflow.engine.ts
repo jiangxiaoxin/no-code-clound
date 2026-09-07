@@ -17,6 +17,8 @@ import { WorkflowTask } from './workflow-task.entity';
 import { nextStay } from './workflow.graph';
 import {
   InstanceNote,
+  RetryPatch,
+  RetryStep,
   TaskAction,
   WorkflowGraph,
   WorkflowNode,
@@ -180,7 +182,7 @@ export class WorkflowEngine {
     actorId: number;
     action: TaskAction;
     comment: string;
-    dataPatch: Record<string, unknown>;
+    dataPatch: RetryPatch;
   }): Promise<{ waitingOthers: boolean; nextNodeTitle?: string }> {
     const task = await this.taskRepo.findOne({ where: { id: input.taskId } });
     if (!task) throw new NotFoundException('待办不存在');
@@ -197,13 +199,9 @@ export class WorkflowEngine {
     const instance = await this.requireInstance(task.instanceId);
     const node = findApproveNode(instance.graph, task.nodeKey);
     if (input.action === 'reject') {
-      await this.cancelPending(
-        instance.id,
-        task.nodeKey,
-        node.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
-      );
-      await this.instanceRepo.update(
-        { id: instance.id },
+      // 带 status 条件：发起人同时撤回时，只允许一边成功
+      const rejected = await this.instanceRepo.update(
+        { id: instance.id, status: 'running' },
         {
           status: 'rejected',
           currentNodeKey: null,
@@ -211,18 +209,37 @@ export class WorkflowEngine {
           retryStep: null,
         },
       );
+      if (!rejected.affected) {
+        throw new ConflictException('单据状态已变化，请刷新后再看');
+      }
+      await this.cancelPending(
+        instance.id,
+        task.nodeKey,
+        node.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
+      );
       await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
         workflowStatus: 'rejected',
         workflowInstanceId: instance.id,
       });
       return { waitingOthers: false };
     }
+    const claimed = await this.instanceRepo.update(
+      { id: instance.id, status: 'running' },
+      {
+        retryStep: 'mongo',
+        hasApproved: true,
+        retryPatch: input.dataPatch,
+        retryActorId: input.actorId,
+      },
+    );
+    if (!claimed.affected) {
+      throw new ConflictException('单据状态已变化，请刷新后再看');
+    }
+    await this.writeBack(instance, node, input.dataPatch, input.actorId);
     await this.instanceRepo.update(
       { id: instance.id },
-      { retryStep: 'mongo', hasApproved: true },
+      { retryStep: 'advance', retryPatch: null, retryActorId: null },
     );
-    await this.writeBack(instance, node, input.dataPatch, input.actorId);
-    await this.instanceRepo.update({ id: instance.id }, { retryStep: 'advance' });
     if (node.signMode === 'all') {
       const pending = await this.taskRepo.count({
         where: {
@@ -283,11 +300,16 @@ export class WorkflowEngine {
         ? findApproveNode(instance.graph, instance.currentNodeKey)
         : null;
       if (node) {
-        await this.writeBack(instance, node, {}, instance.initiatorId);
+        await this.writeBack(
+          instance,
+          node,
+          instance.retryPatch ?? {},
+          instance.retryActorId ?? instance.initiatorId,
+        );
       }
       await this.instanceRepo.update(
         { id: instance.id, status: 'error' },
-        { retryStep: 'advance' },
+        { retryStep: 'advance', retryPatch: null, retryActorId: null },
       );
       await this.advance(instance, instance.currentNodeKey ?? 'start');
       return;
@@ -296,8 +318,28 @@ export class WorkflowEngine {
       await this.advance(instance, instance.currentNodeKey ?? 'start');
       return;
     }
-    if (instance.currentNodeKey) {
+    // 待办没派出去（没人可派、审批人全停用、插待办失败）：重新解析当前节点，不能往下走
+    const stuckNode = instance.currentNodeKey
+      ? nodeOf(instance.graph, instance.currentNodeKey)
+      : null;
+    if (instance.retryStep === 'dispatch' && stuckNode?.type === 'approve') {
       await this.cancelDisabledPending(instance);
+      await this.instanceRepo.update(
+        { id: instance.id, status: 'error' },
+        { status: 'running', errorReason: null, retryStep: null },
+      );
+      instance.status = 'running';
+      const record = await this.store.findById(
+        instance.formId,
+        instance.recordId,
+      );
+      await this.dispatchApprove(
+        instance,
+        stuckNode.key,
+        instance.visitedNodeKeys ?? [],
+        record?.data ?? {},
+      );
+      return;
     }
     await this.advance(instance, instance.currentNodeKey ?? 'start');
   }
@@ -325,8 +367,9 @@ export class WorkflowEngine {
       const notes = stay.passedApprove
         ? instance.notes
         : appendNote(instance.notes, '未经过审批即结束');
-      await this.instanceRepo.update(
-        { id: instance.id },
+      // 和推进到下一个审批节点一样要抢占：别人已驳回或发起人已撤回时不能改成已通过
+      const ended = await this.instanceRepo.update(
+        this.claimWhere(instance, fromNodeKey),
         {
           status: 'approved',
           currentNodeKey: null,
@@ -337,6 +380,7 @@ export class WorkflowEngine {
           notes,
         },
       );
+      if (!ended.affected) return instance;
       await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
         workflowStatus: 'approved',
         workflowInstanceId: instance.id,
@@ -349,51 +393,58 @@ export class WorkflowEngine {
         notes,
       };
     }
-    const where =
-      fromNodeKey === 'start'
-        ? { id: instance.id }
-        : { id: instance.id, currentNodeKey: fromNodeKey };
-    const claimed = await this.instanceRepo.update(where, {
-      currentNodeKey: stay.nodeKey,
-      visitedNodeKeys: stay.visited,
-      status: 'running',
-      retryStep: null,
-      errorReason: null,
-    });
-    if (fromNodeKey !== 'start' && !claimed.affected) {
+    const claimed = await this.instanceRepo.update(
+      this.claimWhere(instance, fromNodeKey),
+      {
+        currentNodeKey: stay.nodeKey,
+        visitedNodeKeys: stay.visited,
+        status: 'running',
+        retryStep: null,
+        errorReason: null,
+      },
+    );
+    if (!claimed.affected) {
       return instance;
     }
     instance.currentNodeKey = stay.nodeKey;
     instance.visitedNodeKeys = stay.visited;
     instance.status = 'running';
-    const node = findApproveNode(instance.graph, stay.nodeKey);
+    return this.dispatchApprove(
+      instance,
+      stay.nodeKey,
+      stay.visited,
+      record?.data ?? {},
+    );
+  }
+
+  // 解析审批人并派待办。派不出去一律进异常并记 retryStep='dispatch'，
+  // 这样点【重试】会重新解析这个节点，而不是往下走把它跳过。
+  private async dispatchApprove(
+    instance: WorkflowInstance,
+    nodeKey: string,
+    visited: string[],
+    data: Record<string, unknown>,
+  ): Promise<WorkflowInstance> {
+    const node = findApproveNode(instance.graph, nodeKey);
     const resolved = await this.approver.resolve({
       nodeTitle: node.title,
       approver: node.approver,
       initiatorId: instance.initiatorId,
-      recordData: record?.data ?? {},
+      recordData: data,
     });
     if (!resolved.userIds.length) {
-      await this.markError(
-        instance,
-        resolved.emptyReason || `节点「${node.title}」没有可用的审批人`,
-        stay.visited,
-      );
-      return {
-        ...instance,
-        status: 'error',
-        errorReason: resolved.emptyReason || `节点「${node.title}」没有可用的审批人`,
-      };
+      const reason =
+        resolved.emptyReason || `节点「${node.title}」没有可用的审批人`;
+      await this.markError(instance, reason, visited, 'dispatch');
+      return { ...instance, status: 'error', errorReason: reason };
     }
-    await this.taskRepo.insert(
-      resolved.userIds.map((assigneeId) => ({
-        instanceId: instance.id,
-        nodeKey: stay.nodeKey,
-        round: instance.round,
-        assigneeId,
-        status: 'pending' as const,
-      })),
-    );
+    try {
+      await this.dispatchTasks(instance, nodeKey, resolved.userIds);
+    } catch {
+      const reason = `节点「${node.title}」派发待办失败，请重试`;
+      await this.markError(instance, reason, visited, 'dispatch');
+      return { ...instance, status: 'error', errorReason: reason };
+    }
     let notes = instance.notes;
     if (resolved.unrestrictedByMissingDept) {
       notes = appendNote(
@@ -408,6 +459,57 @@ export class WorkflowEngine {
       workflowInstanceId: instance.id,
     });
     return instance;
+  }
+
+  // 同一轮里给同一个人派两次会撞唯一约束，所以先把取消过的那条改回待处理，
+  // 只插还没有的人。已经处理过的保持原样，重试不会让他再批一遍。
+  private async dispatchTasks(
+    instance: WorkflowInstance,
+    nodeKey: string,
+    userIds: number[],
+  ) {
+    const existing = await this.taskRepo.find({
+      where: { instanceId: instance.id, nodeKey, round: instance.round },
+    });
+    const byAssignee = new Map(existing.map((row) => [row.assigneeId, row]));
+    const toRevive = userIds.filter(
+      (id) => byAssignee.get(id)?.status === 'cancelled',
+    );
+    const toInsert = userIds.filter((id) => !byAssignee.has(id));
+    if (toRevive.length) {
+      await this.taskRepo.update(
+        {
+          instanceId: instance.id,
+          nodeKey,
+          round: instance.round,
+          assigneeId: In(toRevive),
+        },
+        {
+          status: 'pending',
+          action: null,
+          comment: null,
+          cancelReason: null,
+          finishedAt: null,
+        },
+      );
+    }
+    if (toInsert.length) {
+      await this.taskRepo.insert(
+        toInsert.map((assigneeId) => ({
+          instanceId: instance.id,
+          nodeKey,
+          round: instance.round,
+          assigneeId,
+          status: 'pending' as const,
+        })),
+      );
+    }
+  }
+
+  private claimWhere(instance: WorkflowInstance, fromNodeKey: string) {
+    return fromNodeKey === 'start'
+      ? { id: instance.id, status: In(['running', 'error']) }
+      : { id: instance.id, currentNodeKey: fromNodeKey, status: In(['running', 'error']) };
   }
 
   private async writeBack(
@@ -502,6 +604,7 @@ export class WorkflowEngine {
     instance: WorkflowInstance,
     reason: string,
     visited: string[],
+    retryStep: RetryStep = null,
   ) {
     await this.instanceRepo.update(
       { id: instance.id },
@@ -509,13 +612,44 @@ export class WorkflowEngine {
         status: 'error',
         errorReason: reason,
         visitedNodeKeys: visited,
-        retryStep: null,
+        retryStep,
       },
     );
     await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
       workflowStatus: 'error',
       workflowInstanceId: instance.id,
     });
+  }
+
+  // 派出去之后审批人才被停用：这条单没人能批，转成异常，发起人和配置者才看得到【重试】。
+  // 打开单据详情时顺带检查，本期没有定时任务。
+  async markStuckByDisabledApprovers(
+    instance: WorkflowInstance,
+    tasks: WorkflowTask[],
+    disabledIds: Set<number>,
+  ): Promise<void> {
+    if (instance.status !== 'running' || !instance.currentNodeKey) return;
+    const pending = tasks.filter(
+      (row) =>
+        row.nodeKey === instance.currentNodeKey &&
+        row.round === instance.round &&
+        row.status === 'pending',
+    );
+    if (!pending.length) return;
+    if (!pending.every((row) => disabledIds.has(row.assigneeId))) return;
+    const reason = '审批人已停用，请重试重新派发审批人';
+    const marked = await this.instanceRepo.update(
+      { id: instance.id, status: 'running' },
+      { status: 'error', errorReason: reason, retryStep: 'dispatch' },
+    );
+    if (!marked.affected) return;
+    await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+      workflowStatus: 'error',
+      workflowInstanceId: instance.id,
+    });
+    instance.status = 'error';
+    instance.errorReason = reason;
+    instance.retryStep = 'dispatch';
   }
 
   private async requireInstance(id: number) {
@@ -544,6 +678,10 @@ function findApproveNode(
     throw new NotFoundException('审批节点不存在');
   }
   return node;
+}
+
+function nodeOf(graph: WorkflowGraph, key: string): WorkflowNode | undefined {
+  return graph.nodes.find((item) => item.key === key);
 }
 
 function titleOf(graph: WorkflowGraph, key: string | null): string | undefined {

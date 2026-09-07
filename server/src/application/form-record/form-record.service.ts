@@ -619,6 +619,11 @@ export class FormRecordService {
     const disabled = new Set(
       users.filter((user) => user.status !== 'active').map((user) => user.id),
     );
+    // 审批人全停用时这里会把单据转成异常，详情要按新状态显示才能出现【重试】
+    await this.engine.markStuckByDisabledApprovers(inst, tasks, disabled);
+    if (inst.status === 'error') {
+      view.workflowStatus = 'error';
+    }
     view.workflowProgress = {
       graph: inst.graph,
       visitedNodeKeys: inst.visitedNodeKeys || [],

@@ -9,6 +9,8 @@ import {
 import {
   InstanceNote,
   InstanceStatus,
+  RetryPatch,
+  RetryStep,
   WorkflowGraph,
 } from './workflow.types';
 
@@ -59,7 +61,14 @@ export class WorkflowInstance {
   errorReason: string | null;
 
   @Column({ type: 'varchar', length: 32, nullable: true })
-  retryStep: 'mongo' | 'advance' | null;
+  retryStep: RetryStep;
+
+  // 通过时审批人填的内容，写回失败后靠它重试补写，成功即清空
+  @Column({ type: 'json', nullable: true })
+  retryPatch: RetryPatch | null;
+
+  @Column({ type: 'int', nullable: true })
+  retryActorId: number | null;
 
   @Column({ type: 'json', nullable: true })
   notes: InstanceNote[] | null;
