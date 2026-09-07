@@ -145,11 +145,11 @@ async function onSubmit(payload) {
   saving.value = true
   try {
     if (editing.value) {
-      await updateDepartmentApi(editing.value.id, payload)
-      ElMessage.success('已保存部门')
+      const result = await updateDepartmentApi(editing.value.id, payload)
+      ElMessage.success(result?.leaderReplaceHint || '已保存部门')
     } else {
-      await createDepartmentApi(payload)
-      ElMessage.success('已创建部门')
+      const result = await createDepartmentApi(payload)
+      ElMessage.success(result?.leaderReplaceHint || '已创建部门')
     }
     formVisible.value = false
     await loadTree()

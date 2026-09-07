@@ -28,6 +28,7 @@ export function toLogicflowGraph(product) {
       commentRequiredOnApprove: node.commentRequiredOnApprove,
       commentRequiredOnReject: node.commentRequiredOnReject,
       fieldAccess: node.fieldAccess,
+      briefFieldKeys: node.briefFieldKeys,
     },
   }))
   const edges = (product?.edges || []).map((edge) => ({
@@ -74,6 +75,9 @@ export function toProductGraph(raw) {
           commentRequiredOnApprove: Boolean(props.commentRequiredOnApprove),
           commentRequiredOnReject: props.commentRequiredOnReject !== false,
           fieldAccess: props.fieldAccess || {},
+          briefFieldKeys: Array.isArray(props.briefFieldKeys)
+            ? props.briefFieldKeys.filter((key) => typeof key === 'string' && key)
+            : undefined,
         }
       }
       return base

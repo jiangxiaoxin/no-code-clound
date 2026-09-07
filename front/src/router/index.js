@@ -96,8 +96,13 @@ export const router = createRouter({
   ],
 })
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const userStore = useUserStore()
+
+  if (userStore.accessToken && !userStore.user) {
+    await userStore.restore()
+  }
+
   const loggedIn = Boolean(userStore.accessToken)
 
   if (!loggedIn && !to.meta.guestOnly) {

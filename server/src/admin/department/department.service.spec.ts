@@ -17,11 +17,16 @@ describe('DepartmentService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
+    update: jest.fn(),
     count: jest.fn(),
     delete: jest.fn(),
   };
   const userDepartmentRepo = {
     find: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn(),
+    save: jest.fn(),
+    delete: jest.fn(),
     count: jest.fn(),
   };
   const userRepo = {
@@ -37,8 +42,15 @@ describe('DepartmentService', () => {
       status: 'active',
       sortOrder: 0,
       parentId: null,
+      leaderUserId: x.leaderUserId ?? null,
       ...x,
     }));
+    departmentRepo.update.mockResolvedValue({});
+    userDepartmentRepo.find.mockResolvedValue([]);
+    userDepartmentRepo.count.mockResolvedValue(0);
+    userDepartmentRepo.create.mockImplementation((x: object) => x);
+    userDepartmentRepo.save.mockResolvedValue({});
+    userDepartmentRepo.delete.mockResolvedValue({});
     const module = await Test.createTestingModule({
       providers: [
         DepartmentService,
@@ -189,6 +201,44 @@ describe('DepartmentService', () => {
         service.create({ name: '小组', parentId: 9 }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
+
+    it('指定负责人：挂到新部门，不提示替换', async () => {
+      departmentRepo.findOne.mockResolvedValue(null);
+      departmentRepo.find.mockResolvedValue([]);
+      userRepo.findOne.mockResolvedValue({
+        id: 8,
+        displayName: '李四',
+        status: 'active',
+      });
+      userDepartmentRepo.count.mockResolvedValue(1);
+
+      const result = await service.create({
+        name: '研发',
+        leaderUserId: 8,
+      });
+
+      expect(userDepartmentRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 8, departmentId: 10 }),
+      );
+      expect(result.leader).toEqual({
+        id: 8,
+        displayName: '李四',
+        status: 'active',
+      });
+      expect(result.leaderReplaceHint).toBeUndefined();
+    });
+
+    it('指定的负责人不存在', async () => {
+      departmentRepo.findOne.mockResolvedValue(null);
+      userRepo.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.create({ name: '研发', leaderUserId: 99 }),
+      ).rejects.toMatchObject({
+        constructor: NotFoundException,
+        message: '人员不存在',
+      });
+    });
   });
 
   describe('update', () => {
@@ -217,6 +267,126 @@ describe('DepartmentService', () => {
       await expect(
         service.update(1, { parentId: 2 }),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('换成另一人：提示替换，原负责人不再担任', async () => {
+      const department = {
+        id: 10,
+        name: '研发部',
+        parentId: null,
+        status: 'active' as const,
+        sortOrder: 0,
+        leaderUserId: 7,
+      };
+      departmentRepo.findOne.mockImplementation(async ({ where }: { where: { id?: number } }) => {
+        if (where.id === 10) return { ...department };
+        if (where.id === 7) {
+          return { id: 7, displayName: '张三', status: 'active' };
+        }
+        return null;
+      });
+      userRepo.findOne.mockImplementation(async ({ where }: { where: { id?: number } }) => {
+        if (where.id === 8) {
+          return { id: 8, displayName: '李四', status: 'active' };
+        }
+        if (where.id === 7) {
+          return { id: 7, displayName: '张三', status: 'active' };
+        }
+        return null;
+      });
+      userDepartmentRepo.find.mockResolvedValue([{ userId: 8, departmentId: 10 }]);
+      departmentRepo.find.mockResolvedValue([{ id: 10, leaderUserId: 8 }]);
+      userDepartmentRepo.count.mockResolvedValue(2);
+      departmentRepo.count.mockResolvedValue(0);
+
+      const result = await service.update(10, { leaderUserId: 8 });
+
+      expect(result.leaderReplaceHint).toBe('已将研发部原负责人张三替换为李四');
+      expect(result.leader).toEqual({
+        id: 8,
+        displayName: '李四',
+        status: 'active',
+      });
+    });
+
+    it('清空负责人：列变为空，不把人调出部门', async () => {
+      departmentRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '研发部',
+        parentId: null,
+        status: 'active',
+        sortOrder: 0,
+        leaderUserId: 8,
+      });
+      userDepartmentRepo.count.mockResolvedValue(1);
+      departmentRepo.count.mockResolvedValue(0);
+      userRepo.findOne.mockResolvedValue(null);
+
+      const result = await service.update(10, { leaderUserId: null });
+
+      expect(result.leader).toBeNull();
+      expect(userDepartmentRepo.delete).not.toHaveBeenCalled();
+    });
+
+    it('只改状态时不改负责人', async () => {
+      departmentRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '研发部',
+        parentId: null,
+        status: 'active',
+        sortOrder: 0,
+        leaderUserId: 8,
+      });
+      userDepartmentRepo.count.mockResolvedValue(1);
+      departmentRepo.count.mockResolvedValue(0);
+      userRepo.findOne.mockResolvedValue({
+        id: 8,
+        displayName: '李四',
+        status: 'active',
+      });
+
+      const result = await service.update(10, { status: 'disabled' });
+
+      expect(userDepartmentRepo.save).not.toHaveBeenCalled();
+      expect(result.leader).toEqual({
+        id: 8,
+        displayName: '李四',
+        status: 'active',
+      });
+    });
+
+    it('选了其他部门的人：调进本部门，并摘掉其原部门负责人', async () => {
+      departmentRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '研发部',
+        parentId: null,
+        status: 'active',
+        sortOrder: 0,
+        leaderUserId: null,
+      });
+      userRepo.findOne.mockResolvedValue({
+        id: 8,
+        displayName: '李四',
+        status: 'active',
+      });
+      userDepartmentRepo.find.mockResolvedValue([{ userId: 8, departmentId: 2 }]);
+      departmentRepo.find.mockResolvedValue([
+        { id: 2, name: '销售部', leaderUserId: 8 },
+      ]);
+      userDepartmentRepo.count.mockResolvedValue(1);
+      departmentRepo.count.mockResolvedValue(0);
+
+      const result = await service.update(10, { leaderUserId: 8 });
+
+      expect(userDepartmentRepo.delete).toHaveBeenCalledWith({ userId: 8 });
+      expect(userDepartmentRepo.save).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 8, departmentId: 10 }),
+      );
+      expect(departmentRepo.update).toHaveBeenCalledWith(
+        { id: 2 },
+        { leaderUserId: null },
+      );
+      expect(result.leader?.id).toBe(8);
     });
   });
 

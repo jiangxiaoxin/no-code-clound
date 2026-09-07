@@ -4,8 +4,9 @@
     :title="title"
     width="480px"
     align-center
+    draggable
     destroy-on-close
-    @close="$emit('update:visible', false)"
+    @close="onClose"
   >
     <el-form
       ref="formRef"
@@ -28,12 +29,21 @@
           placeholder="请选择上级部门"
         />
       </el-form-item>
+      <el-form-item label="负责人" prop="leaderUserId">
+        <FormMemberSelect
+          class="field-full"
+          :field="leaderField"
+          :model-value="form.leaderUserId"
+          :user-names="leaderNames"
+          @update:model-value="onLeaderChange"
+        />
+      </el-form-item>
       <el-form-item label="排序" prop="sortOrder">
-        <el-input-number v-model="form.sortOrder" :controls="false" :precision="0" placeholder="请输入排序" align="left"/>
+        <el-input-number v-model="form.sortOrder" :controls="false" :precision="0" placeholder="请输入排序" align="left" style="width: 100%;"/>
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="$emit('update:visible', false)">取消</el-button>
+      <el-button @click="onClose">取消</el-button>
       <el-button type="primary" :loading="saving" @click="onSubmit">保存</el-button>
     </template>
   </el-dialog>
@@ -41,6 +51,7 @@
 
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
+import FormMemberSelect from '../form-fill/FormMemberSelect.vue'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -56,8 +67,10 @@ const formRef = ref()
 const form = reactive({
   name: '',
   parentId: null,
+  leaderUserId: null,
   sortOrder: 0,
 })
+const leaderField = { type: 'member', placeholder: '请选择部门负责人' }
 
 const rules = {
   name: [
@@ -73,6 +86,19 @@ const parentOptions = computed(() => {
   return filterTree(props.tree, excludeId)
 })
 
+const leaderNames = computed(() => {
+  const leader = props.department?.leader
+  if (!leader) return {}
+  const label =
+    leader.status === 'disabled'
+      ? `${leader.displayName}（已停用）`
+      : leader.displayName
+  return {
+    [leader.id]: label,
+    [String(leader.id)]: label,
+  }
+})
+
 watch(
   () => [props.visible, props.department, props.defaultParentId],
   () => {
@@ -83,6 +109,7 @@ watch(
     form.parentId = props.department
       ? props.department.parentId
       : props.defaultParentId
+    form.leaderUserId = props.department?.leader?.id ?? null
     form.sortOrder = props.department?.sortOrder ?? 0
   },
 )
@@ -99,12 +126,22 @@ function filterTree(nodes, excludeId) {
     }))
 }
 
+function onLeaderChange(value) {
+  const id = Number(value)
+  form.leaderUserId = Number.isInteger(id) && id > 0 ? id : null
+}
+
+function onClose() {
+  emit('update:visible', false)
+}
+
 async function onSubmit() {
   await formRef.value.validate()
   emit('submit', {
     name: form.name.trim(),
     parentId: form.parentId ?? null,
     sortOrder: form.sortOrder ?? 0,
+    leaderUserId: form.leaderUserId ?? null,
   })
 }
 </script>
@@ -112,5 +149,28 @@ async function onSubmit() {
 <style scoped lang="less">
 .field-full {
   width: 100%;
+}
+
+.field-full :deep(.member-select-trigger) {
+  width: 100%;
+  box-sizing: border-box;
+  height: var(--el-component-size);
+  min-height: var(--el-component-size);
+  padding: 0 11px;
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.field-full :deep(.member-select-tags),
+.field-full :deep(.member-select-tag) {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.field-full :deep(.member-select-placeholder),
+.field-full :deep(.member-select-tag span) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

@@ -8,34 +8,45 @@
     @update:model-value="onVisibleChange"
     @closed="reset"
   >
-    <div v-loading="loading" class="fill-drawer-body">
+    <div v-loading="loading" class="fill-drawer-body wf-drawer-body">
       <el-empty v-if="!loading && !detail" description="单据不存在" />
       <template v-else-if="detail">
         <p v-if="detail.recordMissing" class="wf-missing">数据已删除</p>
-        <WorkflowMiniGraph
-          :graph="detail.instance?.graph"
-          :visited-node-keys="detail.instance?.visitedNodeKeys"
-          :current-node-key="detail.instance?.currentNodeKey"
-        />
-        <p v-if="detail.instance?.errorReason" class="wf-error">
-          {{ detail.instance.errorReason }}
-        </p>
-        <WorkflowProgressList :progress="progress" />
-        <FormFillGrid
-          v-if="!detail.recordMissing"
-          ref="gridRef"
-          :app-id="appId"
-          :fields="detail.form?.fields || []"
-          :values="values"
-          :dict-items-by-code="dictItemsByCode"
-          :disabled="formDisabled"
-          :updating="true"
-          :user-names="detail.names || {}"
-          :record-id="detail.record?.id || ''"
-          :field-access="detail.fieldAccess || {}"
-          :data-source="inboxSource"
-          :lock-subform="kind === 'todo'"
-        />
+        <el-tabs v-model="activeTab" class="wf-tabs" @tab-change="onTabChange">
+          <el-tab-pane label="表单" name="form" class="wf-pane-form">
+            <FormFillGrid
+              v-if="!detail.recordMissing"
+              ref="gridRef"
+              :app-id="appId"
+              :fields="detail.form?.fields || []"
+              :values="values"
+              :dict-items-by-code="dictItemsByCode"
+              :disabled="formDisabled"
+              :updating="true"
+              :user-names="detail.names || {}"
+              :record-id="detail.record?.id || ''"
+              :field-access="detail.fieldAccess || {}"
+              :data-source="inboxSource"
+              :lock-subform="kind === 'todo'"
+            />
+          </el-tab-pane>
+          <el-tab-pane label="流程" name="progress" lazy class="wf-pane-process">
+            <div class="wf-process">
+              <WorkflowMiniGraph
+                ref="graphRef"
+                :graph="detail.instance?.graph"
+                :visited-node-keys="detail.instance?.visitedNodeKeys"
+                :current-node-key="detail.instance?.currentNodeKey"
+              />
+              <p v-if="detail.instance?.errorReason" class="wf-error">
+                {{ detail.instance.errorReason }}
+              </p>
+              <div class="wf-process-list">
+                <WorkflowProgressList :progress="progress" />
+              </div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </template>
     </div>
     <template #footer>
@@ -108,7 +119,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   cancelWorkflowInstanceApi,
@@ -142,7 +153,9 @@ const acting = ref(false)
 const detail = ref(null)
 const values = reactive({})
 const comment = ref('')
+const activeTab = ref('form')
 const gridRef = ref(null)
+const graphRef = ref(null)
 
 const title = computed(() => {
   if (props.kind === 'todo') return '我的待办'
@@ -187,9 +200,19 @@ function closeDrawer() {
 function reset() {
   detail.value = null
   comment.value = ''
+  activeTab.value = 'form'
   for (const key of Object.keys(values)) {
     delete values[key]
   }
+}
+
+function onTabChange(name) {
+  if (name !== 'progress') return
+  nextTick(() => {
+    nextTick(() => {
+      graphRef.value?.resizeCanvas?.()
+    })
+  })
 }
 
 async function loadDetail() {
@@ -303,13 +326,77 @@ function onRetry() {
 watch(
   () => [props.modelValue, props.kind, props.itemId],
   () => {
-    if (props.modelValue) loadDetail()
+    if (props.modelValue) {
+      activeTab.value = 'form'
+      loadDetail()
+    }
   },
 )
 </script>
 
 <style scoped lang="less">
 @import '../form-fill/fillLayout.less';
+
+:deep(.el-drawer__body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wf-drawer-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.wf-tabs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.wf-tabs :deep(.el-tabs__header) {
+  flex: none;
+  margin-bottom: 8px;
+}
+
+.wf-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wf-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  overflow: auto;
+}
+
+.wf-tabs :deep(.wf-pane-process) {
+  overflow: hidden;
+}
+
+.wf-process {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.wf-process :deep(.wf-mini-graph) {
+  flex: 1 1 0;
+  min-height: 280px;
+  height: auto;
+  margin-bottom: 0;
+}
+
+.wf-process-list {
+  flex: 0 1 auto;
+  max-height: 45%;
+  overflow: auto;
+}
 
 .wf-missing,
 .wf-error {
@@ -319,6 +406,7 @@ watch(
 }
 
 .wf-error {
+  flex: none;
   color: var(--el-color-danger);
 }
 

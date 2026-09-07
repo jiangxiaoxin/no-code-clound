@@ -8,6 +8,9 @@
         <el-radio v-if="options.includes(mode)" :value="mode" />
       </div>
     </el-radio-group>
+    <div class="wf-access-brief">
+      <el-checkbox :model-value="brief" @change="onBriefChange" />
+    </div>
   </div>
 </template>
 
@@ -17,12 +20,17 @@ const allModes = ['editable', 'readonly', 'hidden']
 const props = defineProps({
   field: { type: Object, required: true },
   modelValue: { type: String, default: 'readonly' },
+  brief: { type: Boolean, default: false },
   options: { type: Array, default: () => ['readonly'] },
 })
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'brief'])
 
 function onChange(value) {
   emit('change', props.field.key, value)
+}
+
+function onBriefChange(checked) {
+  emit('brief', props.field.key, checked)
 }
 </script>
 
@@ -52,5 +60,17 @@ function onChange(value) {
   flex: 1;
   justify-content: center;
   min-width: 0;
+}
+
+.wf-access-brief {
+  display: flex;
+  flex: 0 0 64px;
+  justify-content: center;
+  min-width: 0;
+}
+
+.wf-access-brief :deep(.el-checkbox) {
+  height: auto;
+  margin: 0;
 }
 </style>

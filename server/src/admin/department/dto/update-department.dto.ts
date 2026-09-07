@@ -30,4 +30,15 @@ export class UpdateDepartmentDto {
   @IsOptional()
   @IsIn(['active', 'disabled'])
   status?: 'active' | 'disabled';
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined) return undefined;
+    if (value === null) return null;
+    return Number(value);
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsInt()
+  @Min(1)
+  leaderUserId?: number | null;
 }

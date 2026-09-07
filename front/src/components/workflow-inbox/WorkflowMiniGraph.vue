@@ -3,7 +3,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import LogicFlow, { RectNode, RectNodeModel } from '@logicflow/core'
 import '@logicflow/core/es/index.css'
 import { toLogicflowGraph } from '../workflow-design/workflowGraph.js'
@@ -41,7 +41,13 @@ function paint() {
   }
 }
 
-onMounted(() => {
+function resizeCanvas() {
+  if (!lf || !canvasRef.value) return
+  lf.resize()
+  paint()
+}
+
+onMounted(async () => {
   if (!canvasRef.value) return
   lf = new LogicFlow({
     container: canvasRef.value,
@@ -55,8 +61,11 @@ onMounted(() => {
   lf.register({ type: 'approve', view: RectNode, model: MiniNodeModel })
   lf.register({ type: 'branch', view: RectNode, model: MiniNodeModel })
   lf.register({ type: 'end', view: RectNode, model: MiniNodeModel })
-  paint()
+  await nextTick()
+  resizeCanvas()
 })
+
+defineExpose({ resizeCanvas })
 
 watch(
   () => [props.graph, props.visitedNodeKeys, props.currentNodeKey],

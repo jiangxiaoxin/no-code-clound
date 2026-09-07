@@ -46,9 +46,22 @@ test('产品图进出 LogicFlow 后关键字段不丢', () => {
   assert.equal(back.nodes[1].x, 30)
   assert.equal(back.nodes[1].signMode, 'any')
   assert.deepEqual(back.nodes[1].fieldAccess, { field_reason: 'editable' })
+  assert.equal(back.nodes[1].briefFieldKeys, undefined)
   assert.deepEqual(back.nodes[1].approver, product.nodes[1].approver)
   assert.equal(back.edges[0].from, 'start')
   assert.deepEqual(back.edges[0].when, product.edges[0].when)
+})
+
+test('简报字段进出 LogicFlow 后不丢', () => {
+  const withBrief = {
+    ...product,
+    nodes: [
+      product.nodes[0],
+      { ...product.nodes[1], briefFieldKeys: ['field_reason', 'field_days'] },
+    ],
+  }
+  const back = toProductGraph(toLogicflowGraph(withBrief))
+  assert.deepEqual(back.nodes[1].briefFieldKeys, ['field_reason', 'field_days'])
 })
 
 test('LogicFlow 锚点样式不进产品图', () => {

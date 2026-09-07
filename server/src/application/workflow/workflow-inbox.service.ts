@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { Department } from '../../admin/department/department.entity';
 import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
 import { Application } from '../application.entity';
@@ -13,6 +14,15 @@ import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
 import { InstanceStatus, WorkflowNode } from './workflow.types';
+
+const DEFAULT_BRIEF_FIELD_TYPES = new Set([
+  'input',
+  'textarea',
+  'number',
+  'time',
+  'date',
+  'datetime',
+]);
 
 const STATUS_TEXT: Record<InstanceStatus, string> = {
   draft: '草稿',
@@ -35,6 +45,8 @@ export class WorkflowInboxService {
     private readonly appRepo: Repository<Application>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(Department)
+    private readonly departmentRepo: Repository<Department>,
     private readonly store: FormRecordStore,
     private readonly dictionary: DictionaryService,
     private readonly engine: WorkflowEngine,
@@ -252,30 +264,49 @@ export class WorkflowInboxService {
 
   private async toMineCards(instances: WorkflowInstance[]) {
     const ctx = await this.loadCardContext(instances);
-    return Promise.all(
+    const packed = await Promise.all(
       instances.map(async (instance) => {
         const record = await this.store.findById(instance.formId, instance.recordId);
-        const form = ctx.forms.get(instance.formId);
-        const missing = !record;
         return {
-          id: instance.id,
-          kind: 'mine' as const,
-          appId: instance.appId,
-          appName: ctx.apps.get(instance.appId)?.name || '',
-          formId: instance.formId,
-          formName: form?.name || '',
-          summary: missing
-            ? '数据已删除'
-            : this.summaryOf(form?.fields, record?.data, instance.recordId),
-          status: instance.status,
-          statusText: STATUS_TEXT[instance.status],
-          currentNodeTitle: titleOf(instance.graph.nodes, instance.currentNodeKey),
-          initiatorName: ctx.users.get(instance.initiatorId) || '',
-          time: instance.updatedAt,
-          recordMissing: missing,
+          instance,
+          record,
+          form: ctx.forms.get(instance.formId),
         };
       }),
     );
+    const names = await this.loadBriefNames(
+      packed.map((row) => ({
+        fields: row.form?.fields,
+        data: row.record?.data,
+        briefKeys: briefKeysOf(row.instance.graph?.nodes, row.instance.currentNodeKey),
+      })),
+    );
+    return packed.map(({ instance, record, form }) => {
+      const missing = !record;
+      return {
+        id: instance.id,
+        kind: 'mine' as const,
+        appId: instance.appId,
+        appName: ctx.apps.get(instance.appId)?.name || '',
+        formId: instance.formId,
+        formName: form?.name || '',
+        summary: missing
+          ? '数据已删除'
+          : this.summaryOf(
+              form?.fields,
+              record?.data,
+              instance.recordId,
+              briefKeysOf(instance.graph?.nodes, instance.currentNodeKey),
+              names,
+            ),
+        status: instance.status,
+        statusText: STATUS_TEXT[instance.status],
+        currentNodeTitle: titleOf(instance.graph.nodes, instance.currentNodeKey),
+        initiatorName: ctx.users.get(instance.initiatorId) || '',
+        time: instance.updatedAt,
+        recordMissing: missing,
+      };
+    });
   }
 
   private async toTaskCards(tasks: WorkflowTask[], kind: 'todo' | 'done') {
@@ -285,39 +316,59 @@ export class WorkflowInboxService {
       : [];
     const byId = new Map(instances.map((row) => [row.id, row]));
     const ctx = await this.loadCardContext(instances);
-    return Promise.all(
+    const packed = await Promise.all(
       tasks.map(async (task) => {
         const instance = byId.get(task.instanceId);
         const record = instance
           ? await this.store.findById(instance.formId, instance.recordId)
           : null;
-        const form = instance ? ctx.forms.get(instance.formId) : undefined;
-        const missing = !record;
         return {
-          id: task.id,
-          kind,
-          appId: instance?.appId,
-          appName: instance ? ctx.apps.get(instance.appId)?.name || '' : '',
-          formId: instance?.formId,
-          formName: form?.name || '',
-          summary: missing
-            ? '数据已删除'
-            : this.summaryOf(form?.fields, record?.data, instance?.recordId),
-          status: instance?.status,
-          statusText:
-            kind === 'done'
-              ? task.action === 'reject'
-                ? '已驳回'
-                : '已通过'
-              : titleOf(instance?.graph.nodes, task.nodeKey) ||
-                STATUS_TEXT[instance?.status || 'running'],
-          currentNodeTitle: titleOf(instance?.graph.nodes, instance?.currentNodeKey),
-          initiatorName: instance ? ctx.users.get(instance.initiatorId) || '' : '',
-          time: kind === 'done' ? task.finishedAt : task.createdAt,
-          recordMissing: missing,
+          task,
+          instance,
+          record,
+          form: instance ? ctx.forms.get(instance.formId) : undefined,
         };
       }),
     );
+    const names = await this.loadBriefNames(
+      packed.map((row) => ({
+        fields: row.form?.fields,
+        data: row.record?.data,
+        briefKeys: briefKeysOf(row.instance?.graph?.nodes, row.task.nodeKey),
+      })),
+    );
+    return packed.map(({ task, instance, record, form }) => {
+      const missing = !record;
+      return {
+        id: task.id,
+        kind,
+        appId: instance?.appId,
+        appName: instance ? ctx.apps.get(instance.appId)?.name || '' : '',
+        formId: instance?.formId,
+        formName: form?.name || '',
+        summary: missing
+          ? '数据已删除'
+          : this.summaryOf(
+              form?.fields,
+              record?.data,
+              instance?.recordId,
+              briefKeysOf(instance?.graph?.nodes, task.nodeKey),
+              names,
+            ),
+        status: instance?.status,
+        statusText:
+          kind === 'done'
+            ? task.action === 'reject'
+              ? '已驳回'
+              : '已通过'
+            : titleOf(instance?.graph.nodes, task.nodeKey) ||
+              STATUS_TEXT[instance?.status || 'running'],
+        currentNodeTitle: titleOf(instance?.graph.nodes, instance?.currentNodeKey),
+        initiatorName: instance ? ctx.users.get(instance.initiatorId) || '' : '',
+        time: kind === 'done' ? task.finishedAt : task.createdAt,
+        recordMissing: missing,
+      };
+    });
   }
 
   private async loadCardContext(instances: WorkflowInstance[]) {
@@ -336,29 +387,68 @@ export class WorkflowInboxService {
     };
   }
 
+  private async loadBriefNames(
+    rows: {
+      fields: AppForm['fields'] | FormField[] | null | undefined;
+      data: Record<string, unknown> | undefined;
+      briefKeys?: string[];
+    }[],
+  ) {
+    const userIds = new Set<number>();
+    const deptIds = new Set<number>();
+    for (const row of rows) {
+      collectBriefOrgIds(row.fields, row.data, row.briefKeys, userIds, deptIds);
+    }
+    const [users, depts] = await Promise.all([
+      userIds.size
+        ? this.userRepo.find({
+            where: { id: In([...userIds]) },
+            select: { id: true, displayName: true },
+          })
+        : [],
+      deptIds.size
+        ? this.departmentRepo.find({
+            where: { id: In([...deptIds]) },
+            select: { id: true, name: true },
+          })
+        : [],
+    ]);
+    return {
+      users: new Map(users.map((user) => [user.id, user.displayName])),
+      depts: new Map(depts.map((dept) => [dept.id, dept.name])),
+    };
+  }
+
   private summaryOf(
     fields: AppForm['fields'] | FormField[] | null | undefined,
     data: Record<string, unknown> | undefined,
-    recordId?: string,
+    recordId: string | undefined,
+    briefFieldKeys: string[] | undefined,
+    names: { users: Map<number, string>; depts: Map<number, string> },
   ) {
     const parsed = Array.isArray(fields)
       ? (fields as FormField[])
       : parseFormSchema(fields).fields;
+    const flat = flattenFields(parsed).filter(
+      (field) =>
+        field.type !== 'subform' &&
+        field.type !== 'divider' &&
+        field.type !== 'tabs' &&
+        field.type !== 'relate-subform',
+    );
+    const allowed = new Set(
+      Array.isArray(briefFieldKeys)
+        ? briefFieldKeys
+        : flat
+            .filter((field) => DEFAULT_BRIEF_FIELD_TYPES.has(field.type))
+            .map((field) => field.key),
+    );
     const parts: string[] = [];
-    for (const field of flattenFields(parsed)) {
-      if (
-        field.type === 'subform' ||
-        field.type === 'divider' ||
-        field.type === 'tabs' ||
-        field.type === 'relate-subform'
-      ) {
-        continue;
-      }
-      const value = data?.[field.key];
-      if (value == null || value === '') continue;
-      if (Array.isArray(value) && !value.length) continue;
-      parts.push(String(value));
-      if (parts.length >= 2) break;
+    for (const field of flat) {
+      if (!allowed.has(field.key)) continue;
+      const text = briefValueText(field, data?.[field.key], names);
+      if (!text) continue;
+      parts.push(`${field.title || field.key}：${text}`);
     }
     return parts.join(' / ') || recordId || '';
   }
@@ -370,4 +460,95 @@ function titleOf(
 ) {
   if (!key || !nodes) return '';
   return nodes.find((node) => node.key === key)?.title || '';
+}
+
+function briefKeysOf(
+  nodes: WorkflowNode[] | undefined,
+  nodeKey: string | null | undefined,
+) {
+  const list = nodes || [];
+  const current = list.find((node) => node.key === nodeKey);
+  if (current?.type === 'approve') return current.briefFieldKeys;
+  const approve = list.find((node) => node.type === 'approve');
+  return approve?.type === 'approve' ? approve.briefFieldKeys : undefined;
+}
+
+function collectBriefOrgIds(
+  fields: AppForm['fields'] | FormField[] | null | undefined,
+  data: Record<string, unknown> | undefined,
+  briefFieldKeys: string[] | undefined,
+  userIds: Set<number>,
+  deptIds: Set<number>,
+) {
+  const parsed = Array.isArray(fields)
+    ? (fields as FormField[])
+    : parseFormSchema(fields).fields;
+  const flat = flattenFields(parsed);
+  const allowed = new Set(
+    Array.isArray(briefFieldKeys)
+      ? briefFieldKeys
+      : flat
+          .filter((field) => DEFAULT_BRIEF_FIELD_TYPES.has(field.type))
+          .map((field) => field.key),
+  );
+  for (const field of flat) {
+    if (!allowed.has(field.key)) continue;
+    if (field.type === 'member' || field.type === 'member-multiple') {
+      collectPositiveIds(data?.[field.key], userIds);
+    }
+    if (field.type === 'dept' || field.type === 'dept-multiple') {
+      collectPositiveIds(data?.[field.key], deptIds);
+    }
+  }
+}
+
+function collectPositiveIds(value: unknown, ids: Set<number>) {
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    ids.add(value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectPositiveIds(item, ids);
+  }
+}
+
+function briefValueText(
+  field: FormField,
+  value: unknown,
+  names: { users: Map<number, string>; depts: Map<number, string> },
+): string {
+  if (field.type === 'member' || field.type === 'member-multiple') {
+    return namedIdsText(value, names.users);
+  }
+  if (field.type === 'dept' || field.type === 'dept-multiple') {
+    return namedIdsText(value, names.depts);
+  }
+  if (value == null || value === '') return '';
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => primitiveBriefText(item))
+      .filter(Boolean)
+      .join('、');
+  }
+  return primitiveBriefText(value);
+}
+
+function namedIdsText(value: unknown, names: Map<number, string>): string {
+  const ids: number[] = [];
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) {
+    ids.push(value);
+  } else if (Array.isArray(value)) {
+    for (const item of value) {
+      if (typeof item === 'number' && Number.isInteger(item) && item > 0) {
+        ids.push(item);
+      }
+    }
+  }
+  return ids.map((id) => names.get(id) || '已删除').join('、');
+}
+
+function primitiveBriefText(value: unknown): string {
+  if (value == null || value === '') return '';
+  if (typeof value === 'object') return '';
+  return String(value);
 }

@@ -70,8 +70,8 @@
           </template>
         </el-tree>
       </div>
-      <div class="aside-footer">
-        <el-button v-if="canConfigure" class="aside-backend" text :icon="Setting" @click="goBackend">
+      <div class="aside-footer"  v-if="canConfigure">
+        <el-button class="aside-backend" text :icon="Setting" @click="goBackend">
           应用后台
         </el-button>
       </div>

@@ -24,6 +24,7 @@ export type WorkflowNode =
       commentRequiredOnApprove: boolean;
       commentRequiredOnReject?: boolean;
       fieldAccess: Record<string, FieldAccess>;
+      briefFieldKeys?: string[];
     });
 
 export type WorkflowEdgeCondition = {

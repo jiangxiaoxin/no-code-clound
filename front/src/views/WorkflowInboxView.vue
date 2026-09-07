@@ -39,6 +39,7 @@ function onChanged() {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background-color: white;
 }
 
 .inbox-title {

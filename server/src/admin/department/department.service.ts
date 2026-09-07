@@ -28,6 +28,7 @@ export type DepartmentItem = {
   childCount: number;
   leader: DepartmentLeader | null;
   children: DepartmentItem[];
+  leaderReplaceHint?: string;
 };
 
 @Injectable()
@@ -104,6 +105,9 @@ export class DepartmentService {
     const parentId = dto.parentId ?? null;
     await this.assertParentAssignable(parentId);
     await this.assertSiblingNameUnique(parentId, name);
+    if (dto.leaderUserId != null) {
+      await this.requireUser(dto.leaderUserId);
+    }
 
     const saved = await this.departmentRepo.save(
       this.departmentRepo.create({
@@ -113,7 +117,7 @@ export class DepartmentService {
         sortOrder: dto.sortOrder ?? 0,
       }),
     );
-    return this.toItem(saved, 0, 0, null);
+    return this.toItemAfterLeader(saved, dto.leaderUserId, 0);
   }
 
   async update(id: number, dto: UpdateDepartmentDto): Promise<DepartmentItem> {
@@ -138,12 +142,10 @@ export class DepartmentService {
     department.status = status;
     department.sortOrder = sortOrder;
     const saved = await this.departmentRepo.save(department);
-    const [memberCount, childCount, leader] = await Promise.all([
-      this.userDepartmentRepo.count({ where: { departmentId: id } }),
-      this.departmentRepo.count({ where: { parentId: id } }),
-      this.loadLeader(saved.leaderUserId),
-    ]);
-    return this.toItem(saved, memberCount, childCount, leader);
+    const childCount = await this.departmentRepo.count({
+      where: { parentId: id },
+    });
+    return this.toItemAfterLeader(saved, dto.leaderUserId, childCount);
   }
 
   async delete(id: number): Promise<void> {
@@ -178,6 +180,73 @@ export class DepartmentService {
       throw new BadRequestException('不能分配已停用的部门');
     }
     return departments;
+  }
+
+  private async requireUser(id: number): Promise<User> {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) {
+      throw new NotFoundException('人员不存在');
+    }
+    return user;
+  }
+
+  private async toItemAfterLeader(
+    department: Department,
+    leaderUserId: number | null | undefined,
+    childCount: number,
+  ): Promise<DepartmentItem> {
+    const hint = await this.applyLeader(department, leaderUserId);
+    const [memberCount, leader] = await Promise.all([
+      this.userDepartmentRepo.count({ where: { departmentId: department.id } }),
+      this.loadLeader(department.leaderUserId),
+    ]);
+    const item = this.toItem(department, memberCount, childCount, leader);
+    return hint ? { ...item, leaderReplaceHint: hint } : item;
+  }
+
+  private async applyLeader(
+    department: Department,
+    leaderUserId: number | null | undefined,
+  ): Promise<string | undefined> {
+    if (leaderUserId === undefined) return undefined;
+    if (leaderUserId == null) {
+      department.leaderUserId = null;
+      await this.departmentRepo.save(department);
+      return undefined;
+    }
+    const user = await this.requireUser(leaderUserId);
+    const links = await this.userDepartmentRepo.find({
+      where: { userId: user.id },
+    });
+    if (!links.some((link) => link.departmentId === department.id)) {
+      await this.userDepartmentRepo.delete({ userId: user.id });
+      await this.userDepartmentRepo.save(
+        this.userDepartmentRepo.create({
+          userId: user.id,
+          departmentId: department.id,
+        }),
+      );
+    }
+    const owned = await this.departmentRepo.find({
+      where: { leaderUserId: user.id },
+    });
+    for (const other of owned) {
+      if (other.id === department.id) continue;
+      await this.departmentRepo.update(
+        { id: other.id },
+        { leaderUserId: null },
+      );
+    }
+    let hint: string | undefined;
+    if (department.leaderUserId && department.leaderUserId !== user.id) {
+      const previous = await this.userRepo.findOne({
+        where: { id: department.leaderUserId },
+      });
+      hint = `已将${department.name}原负责人${previous?.displayName || ''}替换为${user.displayName}`;
+    }
+    department.leaderUserId = user.id;
+    await this.departmentRepo.save(department);
+    return hint;
   }
 
   private async requireOne(id: number): Promise<Department> {

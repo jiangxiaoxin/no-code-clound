@@ -597,6 +597,7 @@ watch(
   padding: 0 6px;
   background: var(--el-fill-color);
   border-radius: 4px;
+  line-height: 24px;
 }
 
 .member-select-tag-close {

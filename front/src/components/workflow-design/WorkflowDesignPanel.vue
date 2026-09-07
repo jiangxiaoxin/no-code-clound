@@ -407,7 +407,7 @@ watch(
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
-  width: 300px;
+  width: 320px;
   min-height: 0;
   overflow: hidden;
 

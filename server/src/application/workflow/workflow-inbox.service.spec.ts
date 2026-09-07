@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { Application } from '../application.entity';
 import { AppForm } from '../app-form.entity';
+import { Department } from '../../admin/department/department.entity';
 import { DictionaryService } from '../dictionary/dictionary.service';
 import { FormRecordStore } from '../form-record/form-record.store';
 import { User } from '../../user/user.entity';
@@ -28,6 +29,7 @@ describe('WorkflowInboxService', () => {
   const formRepo = { find: jest.fn(), findOne: jest.fn() };
   const appRepo = { find: jest.fn(), findOne: jest.fn() };
   const userRepo = { find: jest.fn() };
+  const departmentRepo = { find: jest.fn() };
   const store = { findById: jest.fn() };
   const dictionary = { listEnabledItemsByApp: jest.fn() };
   const engine = { markStuckByDisabledApprovers: jest.fn() };
@@ -46,6 +48,38 @@ describe('WorkflowInboxService', () => {
     return chain;
   }
 
+  async function stubTodo(input: {
+    fields: { key: string; type: string; title: string }[];
+    data: Record<string, unknown>;
+    node: Record<string, unknown>;
+  }) {
+    const task = {
+      id: 3,
+      instanceId: 1,
+      assigneeId: 21,
+      status: 'pending',
+      nodeKey: 'n1',
+      createdAt: new Date(),
+    };
+    taskRepo.createQueryBuilder.mockReturnValue(qb({ items: [task], total: 1 }));
+    instanceRepo.find.mockResolvedValue([
+      {
+        id: 1,
+        appId: 8,
+        formId: 12,
+        recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+        initiatorId: 5,
+        status: 'running',
+        currentNodeKey: 'n1',
+        graph: { nodes: [input.node] },
+      },
+    ]);
+    formRepo.find.mockResolvedValue([{ id: 12, name: '请假单', fields: input.fields }]);
+    appRepo.find.mockResolvedValue([{ id: 8, name: '人事' }]);
+    userRepo.find.mockResolvedValue([{ id: 5, displayName: '张三' }]);
+    store.findById.mockResolvedValue({ data: input.data });
+  }
+
   beforeEach(async () => {
     jest.resetAllMocks();
     taskRepo.createQueryBuilder.mockReturnValue(qb({ items: [], total: 0 }));
@@ -53,6 +87,7 @@ describe('WorkflowInboxService', () => {
     formRepo.find.mockResolvedValue([]);
     appRepo.find.mockResolvedValue([]);
     userRepo.find.mockResolvedValue([]);
+    departmentRepo.find.mockResolvedValue([]);
     dictionary.listEnabledItemsByApp.mockResolvedValue([]);
     const module = await Test.createTestingModule({
       providers: [
@@ -62,6 +97,7 @@ describe('WorkflowInboxService', () => {
         { provide: getRepositoryToken(AppForm), useValue: formRepo },
         { provide: getRepositoryToken(Application), useValue: appRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: getRepositoryToken(Department), useValue: departmentRepo },
         { provide: FormRecordStore, useValue: store },
         { provide: DictionaryService, useValue: dictionary },
         { provide: WorkflowEngine, useValue: engine },
@@ -102,6 +138,62 @@ describe('WorkflowInboxService', () => {
     const result = await service.query(21, { kind: 'todo', page: 1, pageSize: 20 });
     expect(result.total).toBe(1);
     expect(result.items[0].formName).toBe('请假单');
+  });
+
+  it('未配简报时卡片默认带出文本数字日期时间，不带下拉', async () => {
+    await stubTodo({
+      fields: [
+        { key: 'field_reason', type: 'textarea', title: '事由' },
+        { key: 'field_type', type: 'select', title: '请假类型' },
+        { key: 'field_days', type: 'number', title: '天数' },
+      ],
+      data: { field_reason: '回家', field_type: '事假', field_days: 3 },
+      node: { key: 'n1', type: 'approve', title: '部门审批' },
+    });
+    const result = await service.query(21, { kind: 'todo', page: 1, pageSize: 20 });
+    expect(result.items[0].summary).toBe('事由：回家 / 天数：3');
+  });
+
+  it('勾了简报的字段才出现在卡片上', async () => {
+    await stubTodo({
+      fields: [
+        { key: 'field_reason', type: 'textarea', title: '事由' },
+        { key: 'field_type', type: 'select', title: '请假类型' },
+      ],
+      data: { field_reason: '回家', field_type: '事假' },
+      node: {
+        key: 'n1',
+        type: 'approve',
+        title: '部门审批',
+        briefFieldKeys: ['field_type'],
+      },
+    });
+    const result = await service.query(21, { kind: 'todo', page: 1, pageSize: 20 });
+    expect(result.items[0].summary).toBe('请假类型：事假');
+  });
+
+  it('简报里人员单选和部门单选显示姓名、部门名', async () => {
+    await stubTodo({
+      fields: [
+        { key: 'field_dept', type: 'dept', title: '部门单选' },
+        { key: 'field_leader', type: 'member', title: '直接领导单选' },
+      ],
+      data: { field_dept: 4, field_leader: 4 },
+      node: {
+        key: 'n1',
+        type: 'approve',
+        title: '直接领导审批',
+        briefFieldKeys: ['field_dept', 'field_leader'],
+      },
+    });
+    userRepo.find.mockResolvedValue([
+      { id: 5, displayName: '张三' },
+      { id: 4, displayName: '李四' },
+    ]);
+    departmentRepo.find.mockResolvedValue([{ id: 4, name: '研发部' }]);
+
+    const result = await service.query(21, { kind: 'todo', page: 1, pageSize: 20 });
+    expect(result.items[0].summary).toBe('部门单选：研发部 / 直接领导单选：李四');
   });
 
   it('带 appId 不串出别的应用', async () => {
