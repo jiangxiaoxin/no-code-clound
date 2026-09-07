@@ -75,6 +75,7 @@ async function load() {
       page: page.value,
       pageSize,
     })
+
     items.value = result?.items || []
     total.value = result?.total || 0
   } catch {

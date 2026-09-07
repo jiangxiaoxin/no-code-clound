@@ -98,6 +98,7 @@ import { ElMessageBox } from 'element-plus'
 import { listOrgRolesApi } from '../../api/org'
 import FormMemberSelect from '../form-fill/FormMemberSelect.vue'
 import { flattenFields } from '../form-design/tabsField.js'
+import { resolveFieldAccess } from './fieldAccess.js'
 import RolePicker from './RolePicker.vue'
 import WorkflowFieldAccessRow from './WorkflowFieldAccessRow.vue'
 
@@ -187,7 +188,7 @@ function onCommentRequiredOnReject(commentRequiredOnReject) {
 }
 
 function accessOf(field) {
-  return props.node?.fieldAccess?.[field.key] || 'readonly'
+  return resolveFieldAccess(props.node?.fieldAccess, field.key)
 }
 
 function accessOptions(field) {

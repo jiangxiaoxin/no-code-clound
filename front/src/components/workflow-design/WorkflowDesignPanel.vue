@@ -79,6 +79,7 @@ import {
   saveWorkflowDraftApi,
 } from '../../api/workflow'
 import { validatePublishedGraph } from './workflowValidate.js'
+import { applyDefaultFieldAccessToGraph, withDefaultFieldAccess } from './fieldAccess.js'
 import { emptyDraftGraph, toLogicflowGraph, toProductGraph } from './workflowGraph.js'
 import WorkflowEdgeProps from './WorkflowEdgeProps.vue'
 import WorkflowNodePalette from './WorkflowNodePalette.vue'
@@ -114,7 +115,10 @@ const edgeFromBranch = computed(() => {
 
 function currentProduct() {
   if (!lf) return emptyDraftGraph()
-  return toProductGraph(lf.getGraphRawData())
+  return applyDefaultFieldAccessToGraph(
+    toProductGraph(lf.getGraphRawData()),
+    props.formFields,
+  )
 }
 
 function nextKey(prefix) {
@@ -144,7 +148,7 @@ function createNodeConfig(type) {
     properties.signMode = 'any'
     properties.commentRequiredOnApprove = false
     properties.commentRequiredOnReject = true
-    properties.fieldAccess = {}
+    properties.fieldAccess = withDefaultFieldAccess({}, props.formFields)
   }
   return {
     id: properties.key,

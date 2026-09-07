@@ -70,6 +70,7 @@ import {
   isTabsField,
   paneIdOfField,
 } from '../form-design/tabsField.js'
+import { resolveFieldAccess } from '../workflow-design/fieldAccess.js'
 import FormFillField from './FormFillField.vue'
 import { emptyValue } from './fillValues'
 import {
@@ -300,7 +301,9 @@ function hasFieldFilterRefs() {
 }
 
 function accessOf(field) {
-  return props.fieldAccess?.[field?.key] || ''
+  const map = props.fieldAccess
+  if (!map || !Object.keys(map).length) return ''
+  return resolveFieldAccess(map, field?.key)
 }
 
 function isFieldDisabled(field) {

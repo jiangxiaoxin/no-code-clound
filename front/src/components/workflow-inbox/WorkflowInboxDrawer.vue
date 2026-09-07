@@ -25,7 +25,7 @@
               :updating="true"
               :user-names="detail.names || {}"
               :record-id="detail.record?.id || ''"
-              :field-access="detail.fieldAccess || {}"
+              :field-access="gridFieldAccess"
               :data-source="inboxSource"
               :lock-subform="kind === 'todo'"
             />
@@ -136,6 +136,7 @@ import {
   inboxActionsVisible,
   submitSuccessText,
 } from './workflowStatus.js'
+import { withDefaultFieldAccess } from '../workflow-design/fieldAccess.js'
 import WorkflowMiniGraph from './WorkflowMiniGraph.vue'
 import WorkflowProgressList from './WorkflowProgressList.vue'
 
@@ -172,6 +173,13 @@ const dictItemsByCode = computed(() =>
     (detail.value?.dictionaries || []).map((row) => [row.code, row.items || []]),
   ),
 )
+const gridFieldAccess = computed(() => {
+  if (props.kind !== 'todo' || !detail.value) return {}
+  return withDefaultFieldAccess(
+    detail.value.fieldAccess,
+    detail.value.form?.fields || [],
+  )
+})
 const formDisabled = computed(() => {
   if (!detail.value || detail.value.recordMissing) return true
   if (detail.value.actions?.readOnly) return true
