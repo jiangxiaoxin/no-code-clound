@@ -17,7 +17,7 @@
       <div v-for="(item, index) in publishErrors" :key="index">{{ item }}</div>
     </div>
     <div class="wf-body">
-      <WorkflowNodePalette @add="onAddNode" />
+      <WorkflowNodePalette @add="onAddNode" @drag-start="onStartDragNode" />
       <div ref="canvasRef" class="wf-canvas" />
       <WorkflowNodeProps
         v-if="selectedNode"
@@ -106,8 +106,7 @@ function applyGraph(product) {
   lf.render(toLogicflowGraph(product?.nodes?.length ? product : emptyDraftGraph()))
 }
 
-function onAddNode(type) {
-  if (!lf) return
+function createNodeConfig(type) {
   const titles = { approve: '审批', branch: '分支', end: '结束' }
   const properties = {
     key: nextKey(type),
@@ -125,14 +124,27 @@ function onAddNode(type) {
     properties.commentRequiredOnApprove = false
     properties.fieldAccess = {}
   }
-  lf.addNode({
+  return {
     id: properties.key,
     type,
-    x: 240,
-    y: 180 + Math.random() * 80,
+    x: 0,
+    y: 0,
     text: titles[type],
     properties,
-  })
+  }
+}
+
+function onAddNode(type) {
+  if (!lf) return
+  const config = createNodeConfig(type)
+  config.x = 240
+  config.y = 180 + Math.random() * 80
+  lf.addNode(config)
+}
+
+function onStartDragNode(type) {
+  if (!lf) return
+  lf.dnd.startDrag(createNodeConfig(type))
 }
 
 function onNodeChange(node) {

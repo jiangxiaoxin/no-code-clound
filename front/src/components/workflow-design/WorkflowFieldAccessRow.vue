@@ -1,15 +1,19 @@
 <template>
   <div class="wf-access-row">
-    <span>{{ field.title || field.key }}</span>
-    <el-radio-group :model-value="modelValue" @change="onChange">
-      <el-radio v-for="opt in options" :key="opt" :value="opt">
-        {{ labelOf(opt) }}
-      </el-radio>
+    <span class="wf-access-name" :title="field.title || field.key">
+      {{ field.title || field.key }}
+    </span>
+    <el-radio-group :model-value="modelValue" class="wf-access-options" @change="onChange">
+      <div v-for="mode in allModes" :key="mode" class="wf-access-opt">
+        <el-radio v-if="options.includes(mode)" :value="mode" />
+      </div>
     </el-radio-group>
   </div>
 </template>
 
 <script setup>
+const allModes = ['editable', 'readonly', 'hidden']
+
 const props = defineProps({
   field: { type: Object, required: true },
   modelValue: { type: String, default: 'readonly' },
@@ -20,18 +24,33 @@ const emit = defineEmits(['change'])
 function onChange(value) {
   emit('change', props.field.key, value)
 }
-
-function labelOf(value) {
-  if (value === 'editable') return '可编辑'
-  if (value === 'hidden') return '隐藏'
-  return '只读'
-}
 </script>
 
 <style scoped lang="less">
 .wf-access-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
+}
+
+.wf-access-name {
+  flex: 0 0 72px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-access-options {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.wf-access-opt {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
 }
 </style>

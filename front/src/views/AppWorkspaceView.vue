@@ -2,49 +2,28 @@
   <el-container class="workspace">
     <el-aside class="workspace-aside" width="280px" v-loading="loading">
       <div class="aside-head">
-        <el-button
-          :icon="ArrowLeft"
-          text
-          @click="router.push('/')"
-        />
+        <el-button :icon="ArrowLeft" text @click="router.push('/')" />
         <el-text truncated>{{ app?.name || ' ' }}</el-text>
       </div>
 
       <div class="aside-inbox">
-        <button
-          type="button"
-          class="aside-inbox-item"
-          :class="{ 'is-active': inboxKind === 'todo' }"
-          @click="openInbox('todo')"
-        >
+        <button type="button" class="aside-inbox-item" :class="{ 'is-active': inboxKind === 'todo' }"
+          @click="openInbox('todo')">
           我的待办
           <span v-if="appTodoCount" class="aside-inbox-count">{{ appTodoCount }}</span>
         </button>
-        <button
-          type="button"
-          class="aside-inbox-item"
-          :class="{ 'is-active': inboxKind === 'mine' }"
-          @click="openInbox('mine')"
-        >
+        <button type="button" class="aside-inbox-item" :class="{ 'is-active': inboxKind === 'mine' }"
+          @click="openInbox('mine')">
           我发起的
         </button>
-        <button
-          type="button"
-          class="aside-inbox-item"
-          :class="{ 'is-active': inboxKind === 'done' }"
-          @click="openInbox('done')"
-        >
+        <button type="button" class="aside-inbox-item" :class="{ 'is-active': inboxKind === 'done' }"
+          @click="openInbox('done')">
           我处理的
         </button>
       </div>
 
       <div class="aside-toolbar">
-        <el-input
-          v-model="keyword"
-          clearable
-          placeholder="搜索分组或表单"
-          :prefix-icon="Search"
-        />
+        <el-input v-model="keyword" clearable placeholder="搜索分组或表单" :prefix-icon="Search" />
         <el-dropdown v-if="canConfigure" trigger="click" @command="onCreateCommand">
           <el-button :icon="Plus" circle />
           <template #dropdown>
@@ -57,120 +36,70 @@
       </div>
 
       <div class="aside-body">
-        <el-empty
-          v-if="!loading && treeData.length === 0"
-          :description="keyword.trim() ? '没有匹配的分组或表单' : '还没有分组和表单'"
-        />
-        <el-tree
-          v-else
-          ref="treeRef"
-          class="aside-tree"
-          :data="treeData"
-          node-key="key"
-          highlight-current
-          :default-expand-all="true"
-          :expand-on-click-node="true"
-          :current-node-key="currentForm?.key"
-          :props="{ label: 'name', children: 'children' }"
-          @node-click="onNodeClick"
-        >
-        <template #default="{ data }">
-          <div class="tree-node">
-            <el-icon>
-              <Folder v-if="data.nodeType === 'group'" />
-              <Document v-else />
-            </el-icon>
-            <el-text truncated>{{ data.name }}</el-text>
-            <el-dropdown
-              v-if="canConfigure"
-              trigger="click"
-              popper-class="tree-node-menu"
-              @command="(cmd) => onNodeCommand(cmd, data)"
-            >
-              <el-button text :icon="MoreFilled" @click.stop />
-              <template #dropdown>
-                <el-dropdown-menu v-if="data.nodeType === 'group'">
-                  <el-dropdown-item command="create-form">新建表单</el-dropdown-item>
-                  <el-dropdown-item command="rename">修改名称</el-dropdown-item>
-                  <el-dropdown-item command="delete">删除分组</el-dropdown-item>
-                </el-dropdown-menu>
-                <el-dropdown-menu v-else>
-                  <el-dropdown-item command="edit">编辑表单</el-dropdown-item>
-                  <el-dropdown-item
-                    v-if="data.formKind !== 'workflow'"
-                    command="convert-workflow"
-                  >
-                    转为流程表单
-                  </el-dropdown-item>
-                  <el-dropdown-item command="rename">修改名称</el-dropdown-item>
-                  <el-dropdown-item command="delete">删除表单</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-          </div>
-        </template>
-      </el-tree>
+        <el-empty v-if="!loading && treeData.length === 0" :description="keyword.trim() ? '没有匹配的分组或表单' : '还没有分组和表单'" />
+        <el-tree v-else ref="treeRef" class="aside-tree" :data="treeData" node-key="key" highlight-current
+          :default-expand-all="true" :expand-on-click-node="true" :current-node-key="currentForm?.key"
+          :props="{ label: 'name', children: 'children' }" @node-click="onNodeClick">
+          <template #default="{ data }">
+            <div class="tree-node">
+              <el-icon>
+                <Folder v-if="data.nodeType === 'group'" />
+                <Document v-else />
+              </el-icon>
+              <el-text truncated>{{ data.name }}</el-text>
+              <el-dropdown v-if="canConfigure" trigger="click" popper-class="tree-node-menu"
+                @command="(cmd) => onNodeCommand(cmd, data)">
+                <el-button text :icon="MoreFilled" @click.stop />
+                <template #dropdown>
+                  <el-dropdown-menu v-if="data.nodeType === 'group'">
+                    <el-dropdown-item command="create-form">新建表单</el-dropdown-item>
+                    <el-dropdown-item command="rename">修改名称</el-dropdown-item>
+                    <el-dropdown-item command="delete">删除分组</el-dropdown-item>
+                  </el-dropdown-menu>
+                  <el-dropdown-menu v-else>
+                    <el-dropdown-item command="edit">编辑表单</el-dropdown-item>
+                    <el-dropdown-item v-if="data.formKind !== 'workflow'" command="convert-workflow">
+                      转为流程表单
+                    </el-dropdown-item>
+                    <el-dropdown-item command="rename">修改名称</el-dropdown-item>
+                    <el-dropdown-item command="delete">删除表单</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </template>
+        </el-tree>
       </div>
       <div class="aside-footer">
-        <el-button
-          v-if="canConfigure"
-          class="aside-backend"
-          text
-          :icon="Setting"
-          @click="goBackend"
-        >
+        <el-button v-if="canConfigure" class="aside-backend" text :icon="Setting" @click="goBackend">
           应用后台
         </el-button>
       </div>
     </el-aside>
-    <WorkflowInboxList
-      v-if="inboxKind"
-      class="workspace-inbox"
-      :kind="inboxKind"
-      :app-id="appId"
-      @changed="loadAppTodoCount"
-    />
-    <AppWorkspaceMain
-      v-else
-      :app-id="appId"
-      :form="currentForm"
-      :can-configure="canConfigure"
-    />
+    <WorkflowInboxList v-if="inboxKind" class="workspace-inbox" :kind="inboxKind" :app-id="appId"
+      @changed="loadAppTodoCount" />
+    <AppWorkspaceMain v-else :app-id="appId" :form="currentForm" :can-configure="canConfigure" />
   </el-container>
 
   <router-view />
 
-  <el-dialog
-    v-model="nameVisible"
-    :title="nameDialogTitle"
-    width="420px"
-    align-center
-    draggable
-    @closed="resetNameDialog"
-  >
-    <el-form
-      ref="nameFormRef"
-      :model="nameForm"
-      :rules="nameRules"
-      label-position="top"
-      @submit.prevent="submitNameDialog"
-    >
+  <el-dialog v-model="nameVisible" :title="nameDialogTitle" width="420px" align-center draggable
+    @closed="resetNameDialog">
+    <el-form ref="nameFormRef" :model="nameForm" :rules="nameRules" label-position="top"
+      @submit.prevent="submitNameDialog">
       <el-form-item label="名称" prop="name">
-        <el-input
-          v-model="nameForm.name"
-          maxlength="32"
-          show-word-limit
-          placeholder="请输入名称"
-        />
+        <el-input v-model="nameForm.name" maxlength="32" show-word-limit placeholder="请输入名称" />
       </el-form-item>
       <el-form-item v-if="nameMode === 'create-form'" label="表单类型">
-        <el-radio-group v-model="nameForm.formKind">
-          <el-radio value="normal">普通表单</el-radio>
-          <el-radio value="workflow">流程表单</el-radio>
-        </el-radio-group>
-        <p class="form-kind-hint">
-          {{ formKindHint }}
-        </p>
+        <div>
+          <el-radio-group v-model="nameForm.formKind">
+            <el-radio value="normal">普通表单</el-radio>
+            <el-radio value="workflow">流程表单</el-radio>
+          </el-radio-group>
+          <p class="form-kind-hint">
+            {{ formKindHint }}
+          </p>
+        </div>
       </el-form-item>
     </el-form>
     <template #footer>
@@ -280,8 +209,8 @@ const filteredDirectory = computed(() => {
     const forms = groupHit
       ? group.forms || []
       : (group.forms || []).filter((form) =>
-          String(form.name || '').toLowerCase().includes(q),
-        )
+        String(form.name || '').toLowerCase().includes(q),
+      )
     if (groupHit || forms.length) {
       nextGroups.push({ ...group, forms })
     }
@@ -724,7 +653,7 @@ watch([formId, inboxKind], () => {
   min-width: 0;
   padding: 4px 4px 4px 0;
 
-  > .el-icon {
+  >.el-icon {
     color: var(--el-text-color-secondary);
   }
 

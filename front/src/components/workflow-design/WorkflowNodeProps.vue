@@ -43,14 +43,39 @@
         通过时意见必填
       </el-checkbox>
       <div class="wf-label">字段权限</div>
-      <WorkflowFieldAccessRow
-        v-for="field in accessFields"
-        :key="field.key"
-        :field="field"
-        :model-value="accessOf(field)"
-        :options="accessOptions(field)"
-        @change="onAccess"
-      />
+      <div class="wf-access-table">
+        <div class="wf-access-header">
+          <span class="wf-access-name" />
+          <div class="wf-access-options">
+            <div class="wf-access-opt">
+              <span class="wf-access-col-title">可编辑</span>
+              <el-link type="primary" underline="never" @click="onToggleAccessAllEditable">
+                {{ bulkLabel('editable') }}
+              </el-link>
+            </div>
+            <div class="wf-access-opt">
+              <span class="wf-access-col-title">只读</span>
+              <el-link type="primary" underline="never" @click="onToggleAccessAllReadonly">
+                {{ bulkLabel('readonly') }}
+              </el-link>
+            </div>
+            <div class="wf-access-opt">
+              <span class="wf-access-col-title">不可见</span>
+              <el-link type="primary" underline="never" @click="onToggleAccessAllHidden">
+                {{ bulkLabel('hidden') }}
+              </el-link>
+            </div>
+          </div>
+        </div>
+        <WorkflowFieldAccessRow
+          v-for="field in accessFields"
+          :key="field.key"
+          :field="field"
+          :model-value="accessOf(field)"
+          :options="accessOptions(field)"
+          @change="onAccess"
+        />
+      </div>
     </template>
     <template v-else-if="node?.type === 'branch'">
       <label class="wf-label">分支名称</label>
@@ -169,6 +194,48 @@ function onAccess(key, value) {
   })
 }
 
+function fieldsForMode(mode) {
+  return accessFields.value.filter((field) => accessOptions(field).includes(mode))
+}
+
+function allSetTo(mode) {
+  const eligible = fieldsForMode(mode)
+  return eligible.length > 0 && eligible.every((field) => accessOf(field) === mode)
+}
+
+function bulkLabel(mode) {
+  return allSetTo(mode) ? '全不选' : '全选'
+}
+
+function toggleAccessAll(mode) {
+  const eligible = fieldsForMode(mode)
+  const next = { ...(props.node.fieldAccess || {}) }
+  if (allSetTo(mode)) {
+    for (const field of eligible) {
+      if (accessOf(field) === mode) {
+        next[field.key] = 'readonly'
+      }
+    }
+  } else {
+    for (const field of eligible) {
+      next[field.key] = mode
+    }
+  }
+  patch({ fieldAccess: next })
+}
+
+function onToggleAccessAllEditable() {
+  toggleAccessAll('editable')
+}
+
+function onToggleAccessAllReadonly() {
+  toggleAccessAll('readonly')
+}
+
+function onToggleAccessAllHidden() {
+  toggleAccessAll('hidden')
+}
+
 function openRoles() {
   roleVisible.value = true
 }
@@ -199,9 +266,39 @@ const roleNames = computed(() => {
   color: var(--el-text-color-secondary);
 }
 
-.wf-access-row {
+.wf-access-table {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.wf-access-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.wf-access-name {
+  flex: 0 0 72px;
+}
+
+.wf-access-options {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.wf-access-opt {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  gap: 2px;
+}
+
+.wf-access-col-title {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>
