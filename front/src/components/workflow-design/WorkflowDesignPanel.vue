@@ -176,13 +176,13 @@ function markDirty() {
 }
 
 function createNodeConfig(type) {
-  const titles = { approve: '审批', branch: '分支', end: '结束' }
+  const titles = { approve: '审批', branch: '分支', end: '结束', cc: '抄送' }
   const properties = {
     key: nextKey(type),
     title: titles[type],
     type,
   }
-  if (type === 'approve') {
+  if (type === 'approve' || type === 'cc') {
     properties.approver = {
       userIds: [],
       roleIds: [],
@@ -190,9 +190,11 @@ function createNodeConfig(type) {
       sameDeptAsInitiator: true,
       deptLeaderOfInitiator: false,
     }
+    properties.fieldAccess = withDefaultFieldAccess({}, props.formFields)
+  }
+  if (type === 'approve') {
     properties.signMode = 'any'
     properties.commentRequiredOnApprove = false
-    properties.fieldAccess = withDefaultFieldAccess({}, props.formFields)
   }
   return {
     id: properties.key,
@@ -296,7 +298,17 @@ function bindEvents() {
     markDirty()
   })
   lf.on('node:dnd-add', markDirty)
-  lf.on('edge:add', markDirty)
+  lf.on('edge:add', onEdgeAdded)
+}
+
+function onEdgeAdded({ data }) {
+  const sourceType = lf.getNodeModelById(data.sourceNodeId)?.type
+  if (sourceType === 'cc' || sourceType === 'end') {
+    lf.deleteEdge(data.id)
+    ElMessage.warning('抄送和结束不能再连出线')
+    return
+  }
+  markDirty()
 }
 
 function restoreStart(data) {
@@ -328,7 +340,7 @@ function createLf(silent) {
     isSilentMode: silent,
     textEdit: false,
   })
-  ;['start', 'approve', 'branch', 'end'].forEach((type) => {
+  ;['start', 'approve', 'branch', 'end', 'cc'].forEach((type) => {
     lf.register({ type, view: RectNode, model: WorkflowNodeModel })
   })
   lf.setTheme({

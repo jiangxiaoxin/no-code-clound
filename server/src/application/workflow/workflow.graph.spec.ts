@@ -167,3 +167,57 @@ describe('workflow.graph', () => {
     expect(validatePublishedGraph(leaveGraph, fields)).toEqual([]);
   });
 });
+
+const ccHang: WorkflowGraph = {
+  nodes: [
+    ...leaveGraph.nodes,
+    {
+      key: 'cc1',
+      type: 'cc',
+      title: '抄送经理',
+      x: 400,
+      y: 280,
+      approver: { userIds: [9], roleIds: [], memberFieldKeys: [] },
+      fieldAccess: { field_reason: 'hidden' },
+    },
+  ],
+  edges: [
+    ...leaveGraph.edges,
+    { key: 'e_cc', from: 'n1', to: 'cc1' },
+  ],
+};
+
+describe('workflow.graph 抄送', () => {
+  it('审批多一条连到抄送的线仍能启用', () => {
+    expect(validatePublishedGraph(ccHang, fields)).toEqual([]);
+  });
+
+  it('抄送可以不配人', () => {
+    const graph = structuredClone(ccHang);
+    const cc = graph.nodes.find((node) => node.key === 'cc1');
+    if (cc && cc.type === 'cc') {
+      cc.approver = { userIds: [], roleIds: [], memberFieldKeys: [] };
+    }
+    expect(validatePublishedGraph(graph, fields)).toEqual([]);
+  });
+
+  it('抄送有出线不能启用', () => {
+    const graph = structuredClone(ccHang);
+    graph.edges.push({ key: 'bad', from: 'cc1', to: 'end' });
+    expect(validatePublishedGraph(graph, fields).join('')).toMatch(/抄送不能有出线/);
+  });
+
+  it('开始两条主出线不能启用', () => {
+    const graph = structuredClone(leaveGraph);
+    graph.edges.push({ key: 'extra', from: 'start', to: 'n2' });
+    expect(validatePublishedGraph(graph, fields).join('')).toMatch(/主出线/);
+  });
+
+  it('通过部门审批时带上挂着的抄送，主路仍去人事备案', () => {
+    const stay = nextStay(ccHang, 'n1', { field_leave_type: '事假' });
+    expect(stay.kind).toBe('approve');
+    if (stay.kind !== 'approve') return;
+    expect(stay.nodeKey).toBe('n2');
+    expect(stay.ccNodeKeys).toEqual(['cc1']);
+  });
+});

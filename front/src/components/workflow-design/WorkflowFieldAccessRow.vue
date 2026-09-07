@@ -3,11 +3,26 @@
     <span class="wf-access-name" :title="field.title || field.key">
       {{ field.title || field.key }}
     </span>
-    <el-radio-group :model-value="modelValue" class="wf-access-options" :disabled="disabled" @change="onChange">
+    <el-radio-group
+      v-if="!hiddenOnly"
+      :model-value="modelValue"
+      class="wf-access-options"
+      :disabled="disabled"
+      @change="onChange"
+    >
       <div v-for="mode in allModes" :key="mode" class="wf-access-opt">
         <el-radio v-if="options.includes(mode)" :value="mode" />
       </div>
     </el-radio-group>
+    <div v-else class="wf-access-options">
+      <div class="wf-access-opt">
+        <el-checkbox
+          :model-value="modelValue === 'hidden'"
+          :disabled="disabled"
+          @change="onHiddenChange"
+        />
+      </div>
+    </div>
     <div class="wf-access-brief">
       <el-checkbox :model-value="brief" :disabled="disabled" @change="onBriefChange" />
     </div>
@@ -15,6 +30,8 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
+
 const allModes = ['editable', 'readonly', 'hidden']
 
 const props = defineProps({
@@ -26,8 +43,16 @@ const props = defineProps({
 })
 const emit = defineEmits(['change', 'brief'])
 
+const hiddenOnly = computed(
+  () => props.options.length === 1 && props.options[0] === 'hidden',
+)
+
 function onChange(value) {
   emit('change', props.field.key, value)
+}
+
+function onHiddenChange(checked) {
+  emit('change', props.field.key, checked ? 'hidden' : 'readonly')
 }
 
 function onBriefChange(checked) {

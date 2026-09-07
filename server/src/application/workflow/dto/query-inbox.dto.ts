@@ -2,8 +2,8 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
 export class QueryInboxDto {
-  @IsIn(['todo', 'mine', 'done'])
-  kind: 'todo' | 'mine' | 'done';
+  @IsIn(['todo', 'mine', 'done', 'cc'])
+  kind: 'todo' | 'mine' | 'done' | 'cc';
 
   @IsOptional()
   @Type(() => Number)

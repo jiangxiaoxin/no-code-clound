@@ -230,11 +230,13 @@ export class WorkflowDefinitionService {
     const errors: string[] = [];
     const userIds = new Set<number>();
     const roleIds = new Set<number>();
-    const approves = graph.nodes.filter(
-      (node): node is Extract<WorkflowNode, { type: 'approve' }> =>
-        node.type === 'approve',
+    const targets = graph.nodes.filter(
+      (
+        node,
+      ): node is Extract<WorkflowNode, { type: 'approve' | 'cc' }> =>
+        node.type === 'approve' || node.type === 'cc',
     );
-    for (const node of approves) {
+    for (const node of targets) {
       for (const id of node.approver?.userIds || []) userIds.add(id);
       for (const id of node.approver?.roleIds || []) roleIds.add(id);
     }
@@ -246,7 +248,7 @@ export class WorkflowDefinitionService {
       : [];
     const userMap = new Map(users.map((row) => [row.id, row]));
     const roleMap = new Map(roles.map((row) => [row.id, row]));
-    for (const node of approves) {
+    for (const node of targets) {
       for (const id of node.approver?.userIds || []) {
         const user = userMap.get(id);
         if (!user || user.status !== 'active') {

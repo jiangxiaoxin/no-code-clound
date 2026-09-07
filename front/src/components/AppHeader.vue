@@ -40,6 +40,15 @@
           <el-icon><Finished /></el-icon>
           <span>我处理的</span>
         </button>
+        <button
+          type="button"
+          class="header-nav-item"
+          :class="{ 'is-active': nav === 'cc' }"
+          @click="goInbox('cc')"
+        >
+          <el-icon><ChatDotRound /></el-icon>
+          <span>抄送我的</span>
+        </button>
       </nav>
     </div>
     <el-dropdown
@@ -74,6 +83,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
 import {
+  ChatDotRound,
   EditPen,
   Finished,
   Grid,
@@ -95,7 +105,7 @@ const todoCount = ref(0)
 const nav = computed(() => {
   if (route.name === 'workflow-inbox') {
     const kind = route.params.kind
-    return kind === 'mine' || kind === 'done' ? kind : 'todo'
+    return kind === 'mine' || kind === 'done' || kind === 'cc' ? kind : 'todo'
   }
   if (route.name === 'home') return 'apps'
   return ''

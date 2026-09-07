@@ -38,11 +38,12 @@ test('补全时不覆盖已配置的可编辑', () => {
   })
 })
 
-test('保存前给审批节点补上缺省只读，其它节点不动', () => {
+test('保存前给审批和抄送节点补上缺省只读，其它节点不动', () => {
   const graph = {
     nodes: [
       { key: 'start', type: 'start' },
       { key: 'n1', type: 'approve', fieldAccess: {} },
+      { key: 'cc1', type: 'cc', fieldAccess: {} },
       { key: 'end', type: 'end' },
     ],
     edges: [],
@@ -50,6 +51,11 @@ test('保存前给审批节点补上缺省只读，其它节点不动', () => {
   const next = applyDefaultFieldAccessToGraph(graph, fields)
   assert.equal(next.nodes[0].fieldAccess, undefined)
   assert.deepEqual(next.nodes[1].fieldAccess, {
+    field_reason: 'readonly',
+    field_days: 'readonly',
+    field_note: 'readonly',
+  })
+  assert.deepEqual(next.nodes[2].fieldAccess, {
     field_reason: 'readonly',
     field_days: 'readonly',
     field_note: 'readonly',

@@ -82,3 +82,10 @@ test('待办底部显示通过驳回', () => {
     { approve: true, reject: true },
   )
 })
+
+test('抄送抽屉没有通过驳回', () => {
+  assert.deepEqual(
+    inboxActionsVisible('cc', { canApprove: true, canReject: true }),
+    {},
+  )
+})

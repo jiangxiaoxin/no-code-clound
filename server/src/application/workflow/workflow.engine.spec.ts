@@ -470,3 +470,202 @@ describe('WorkflowEngine', () => {
     );
   });
 });
+
+const ccGraph: WorkflowGraph = {
+  nodes: [
+    ...leaveGraph.nodes,
+    {
+      key: 'cc1',
+      type: 'cc',
+      title: '抄送经理',
+      x: 400,
+      y: 2,
+      approver: { userIds: [9], roleIds: [], memberFieldKeys: [] },
+      fieldAccess: {},
+    },
+  ],
+  edges: [...leaveGraph.edges, { key: 'e_cc', from: 'n1', to: 'cc1' }],
+};
+
+describe('WorkflowEngine 抄送', () => {
+  let engine: WorkflowEngine;
+  const instanceRepo = {
+    findOne: jest.fn(),
+    create: jest.fn((row) => ({ id: 1, ...row })),
+    save: jest.fn(async (row) => ({ id: row.id ?? 1, ...row })),
+    update: jest.fn(async () => ({ affected: 1 })),
+    delete: jest.fn(),
+  };
+  const taskRepo = {
+    findOne: jest.fn(),
+    find: jest.fn(),
+    insert: jest.fn(),
+    update: jest.fn(async () => ({ affected: 1 })),
+    count: jest.fn(),
+    delete: jest.fn(),
+  };
+  const persist = { persist: jest.fn() };
+  const approver = { resolve: jest.fn() };
+  const definition = { getRuntime: jest.fn() };
+  const store = { findById: jest.fn(), setWorkflowMeta: jest.fn() };
+  const formRepo = { findOne: jest.fn() };
+  const userRepo = { find: jest.fn() };
+
+  beforeEach(async () => {
+    jest.resetAllMocks();
+    instanceRepo.create.mockImplementation((row) => ({ id: 1, ...row }));
+    instanceRepo.save.mockImplementation(async (row) => ({ id: row.id ?? 1, ...row }));
+    instanceRepo.update.mockResolvedValue({ affected: 1 });
+    taskRepo.update.mockResolvedValue({ affected: 1 });
+    taskRepo.find.mockResolvedValue([]);
+    definition.getRuntime.mockResolvedValue({
+      hasBeenEnabled: true,
+      enabled: true,
+      graph: ccGraph,
+      version: 1,
+    });
+    store.findById.mockResolvedValue({
+      data: { field_leave_type: '事假' },
+    });
+    formRepo.findOne.mockResolvedValue(form);
+    persist.persist.mockResolvedValue({});
+    approver.resolve.mockImplementation(async (input: { nodeTitle?: string }) => {
+      if (input.nodeTitle === '抄送经理') return { userIds: [9] };
+      return { userIds: [21, 22] };
+    });
+    const module = await Test.createTestingModule({
+      providers: [
+        WorkflowEngine,
+        { provide: getRepositoryToken(WorkflowInstance), useValue: instanceRepo },
+        { provide: getRepositoryToken(WorkflowTask), useValue: taskRepo },
+        { provide: getRepositoryToken(AppForm), useValue: formRepo },
+        { provide: getRepositoryToken(User), useValue: userRepo },
+        { provide: FormRecordPersistService, useValue: persist },
+        { provide: WorkflowApproverService, useValue: approver },
+        { provide: WorkflowDefinitionService, useValue: definition },
+        { provide: FormRecordStore, useValue: store },
+      ],
+    }).compile();
+    engine = module.get(WorkflowEngine);
+  });
+
+  function ccInserts() {
+    return taskRepo.insert.mock.calls
+      .flatMap((call) => {
+        const rows = call[0];
+        return Array.isArray(rows) ? rows : [rows];
+      })
+      .filter((row) => row?.action === 'cc');
+  }
+
+  it('提交时不发挂在审批上的抄送', async () => {
+    instanceRepo.findOne.mockResolvedValue(null);
+    await engine.submit({ form, recordId, actorId: 5 });
+    expect(ccInserts()).toEqual([]);
+  });
+
+  it('审批通过后写下抄送任务并继续主路', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance({ graph: ccGraph }));
+    await engine.completeTask({
+      taskId: 1,
+      actorId: 21,
+      action: 'approve',
+      comment: '',
+      dataPatch: {},
+    });
+    expect(ccInserts()).toEqual([
+      expect.objectContaining({
+        nodeKey: 'cc1',
+        assigneeId: 9,
+        status: 'done',
+        action: 'cc',
+      }),
+    ]);
+  });
+
+  it('驳回不发抄送', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance({ graph: ccGraph }));
+    await engine.completeTask({
+      taskId: 1,
+      actorId: 21,
+      action: 'reject',
+      comment: '不批',
+      dataPatch: {},
+    });
+    expect(ccInserts()).toEqual([]);
+  });
+
+  it('抄送解析不到人则记进度不插任务', async () => {
+    approver.resolve.mockImplementation(async (input: { nodeTitle?: string }) => {
+      if (input.nodeTitle === '抄送经理') return { userIds: [] };
+      return { userIds: [21, 22] };
+    });
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance({ graph: ccGraph }));
+    await engine.completeTask({
+      taskId: 1,
+      actorId: 21,
+      action: 'approve',
+      comment: '',
+      dataPatch: {},
+    });
+    expect(ccInserts()).toEqual([]);
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1 },
+      expect.objectContaining({
+        notes: expect.arrayContaining([
+          expect.objectContaining({ text: '节点「抄送经理」没有可抄送的人' }),
+        ]),
+      }),
+    );
+  });
+
+  it('已有抄送行则不再插入', async () => {
+    taskRepo.find.mockImplementation(async (opts: { where?: { nodeKey?: string } }) => {
+      if (opts?.where?.nodeKey === 'cc1') {
+        return [{ nodeKey: 'cc1', assigneeId: 9, round: 1, action: 'cc' }];
+      }
+      return [];
+    });
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance({ graph: ccGraph }));
+    await engine.completeTask({
+      taskId: 1,
+      actorId: 21,
+      action: 'approve',
+      comment: '',
+      dataPatch: {},
+    });
+    expect(ccInserts()).toEqual([]);
+  });
+});

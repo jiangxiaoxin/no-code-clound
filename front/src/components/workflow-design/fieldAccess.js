@@ -26,7 +26,7 @@ export function applyDefaultFieldAccessToGraph(graph, fields) {
   return {
     ...graph,
     nodes: (graph.nodes || []).map((node) => {
-      if (node.type !== 'approve') return node
+      if (node.type !== 'approve' && node.type !== 'cc') return node
       return {
         ...node,
         fieldAccess: withDefaultFieldAccess(node.fieldAccess, fields),

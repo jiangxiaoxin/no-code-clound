@@ -73,7 +73,7 @@ export class WorkflowController {
   @Get('inbox/:kind/:id')
   openInbox(
     @Req() req: { user: { id: number } },
-    @Param('kind') kind: 'todo' | 'mine' | 'done',
+    @Param('kind') kind: 'todo' | 'mine' | 'done' | 'cc',
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.inbox.open(req.user.id, kind, id);

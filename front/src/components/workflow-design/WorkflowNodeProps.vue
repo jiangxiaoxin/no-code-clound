@@ -1,7 +1,7 @@
 <template>
   <div class="wf-props">
     <div class="wf-props-body">
-      <template v-if="node?.type === 'approve'">
+      <template v-if="node?.type === 'approve' || node?.type === 'cc'">
         <label class="wf-label">节点名称</label>
         <el-input :model-value="node.title" :disabled="disabled" @update:model-value="onTitle" />
         <label class="wf-label">指定人员</label>
@@ -30,21 +30,40 @@
         <el-checkbox :model-value="Boolean(node.approver?.deptLeaderOfInitiator)" :disabled="disabled" @change="onDeptLeader">
           发起人所属部门的负责人
         </el-checkbox>
-        <label class="wf-label">多人时</label>
-        <el-radio-group :model-value="node.signMode || 'any'" :disabled="disabled" @change="onSignMode">
-          <el-radio value="any">或签（一人即可）</el-radio>
-          <el-radio value="all">会签（全部通过）</el-radio>
-        </el-radio-group>
-        <label class="wf-label wf-label-break">意见是否必填</label>
-        <el-checkbox :model-value="Boolean(node.commentRequiredOnApprove)" :disabled="disabled" @change="onCommentRequiredOnApprove" class="same-as-radio">
-          通过时意见必填
-        </el-checkbox>
-        <el-checkbox :model-value="node.commentRequiredOnReject !== false" :disabled="disabled" @change="onCommentRequiredOnReject" class="same-as-radio">
-          拒绝时意见必填
-        </el-checkbox>
+        <template v-if="node?.type === 'approve'">
+          <label class="wf-label">多人时</label>
+          <el-radio-group :model-value="node.signMode || 'any'" :disabled="disabled" @change="onSignMode">
+            <el-radio value="any">或签（一人即可）</el-radio>
+            <el-radio value="all">会签（全部通过）</el-radio>
+          </el-radio-group>
+          <label class="wf-label wf-label-break">意见是否必填</label>
+          <el-checkbox :model-value="Boolean(node.commentRequiredOnApprove)" :disabled="disabled" @change="onCommentRequiredOnApprove" class="same-as-radio">
+            通过时意见必填
+          </el-checkbox>
+          <el-checkbox :model-value="node.commentRequiredOnReject !== false" :disabled="disabled" @change="onCommentRequiredOnReject" class="same-as-radio">
+            拒绝时意见必填
+          </el-checkbox>
+        </template>
         <div class="wf-label">字段权限</div>
         <div class="wf-access-table">
-          <div class="wf-access-header">
+          <div v-if="node?.type === 'cc'" class="wf-access-header wf-access-header-cc">
+            <span class="wf-access-name" />
+            <div class="wf-access-options">
+              <div class="wf-access-opt">
+                <span class="wf-access-col-title">不可见</span>
+                <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleAccessAllHidden">
+                  {{ bulkLabel('hidden') }}
+                </el-link>
+              </div>
+            </div>
+            <div class="wf-access-brief">
+              <span class="wf-access-col-title">简报</span>
+              <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleBriefAll">
+                {{ briefBulkLabel }}
+              </el-link>
+            </div>
+          </div>
+          <div v-else class="wf-access-header">
             <span class="wf-access-name" />
             <div class="wf-access-options">
               <div class="wf-access-opt">
@@ -197,6 +216,7 @@ function accessOf(field) {
 }
 
 function accessOptions(field) {
+  if (props.node?.type === 'cc') return ['hidden']
   if (
     field.type === 'subform' ||
     field.type === 'currentUser' ||

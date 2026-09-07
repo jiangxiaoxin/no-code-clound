@@ -61,6 +61,7 @@ onMounted(async () => {
   lf.register({ type: 'approve', view: RectNode, model: MiniNodeModel })
   lf.register({ type: 'branch', view: RectNode, model: MiniNodeModel })
   lf.register({ type: 'end', view: RectNode, model: MiniNodeModel })
+  lf.register({ type: 'cc', view: RectNode, model: MiniNodeModel })
   await nextTick()
   resizeCanvas()
 })

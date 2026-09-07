@@ -8,9 +8,9 @@ import {
 } from './workflow.types';
 
 export type NextStay =
-  | { kind: 'approve'; nodeKey: string; visited: string[] }
-  | { kind: 'end'; visited: string[]; passedApprove: boolean }
-  | { kind: 'error'; visited: string[]; reason: string };
+  | { kind: 'approve'; nodeKey: string; visited: string[]; ccNodeKeys: string[] }
+  | { kind: 'end'; visited: string[]; passedApprove: boolean; ccNodeKeys: string[] }
+  | { kind: 'error'; visited: string[]; reason: string; ccNodeKeys: string[] };
 
 function nodeByKey(graph: WorkflowGraph, key: string): WorkflowNode | undefined {
   return graph.nodes.find((node) => node.key === key);
@@ -21,6 +21,19 @@ function outgoing(graph: WorkflowGraph, from: string): WorkflowEdge[] {
     .filter((edge) => edge.from === from)
     .slice()
     .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0));
+}
+
+function mainOutgoing(graph: WorkflowGraph, from: string): WorkflowEdge[] {
+  return outgoing(graph, from).filter((edge) => {
+    const to = nodeByKey(graph, edge.to);
+    return to?.type !== 'cc';
+  });
+}
+
+function ccOutgoingKeys(graph: WorkflowGraph, from: string): string[] {
+  return outgoing(graph, from)
+    .filter((edge) => nodeByKey(graph, edge.to)?.type === 'cc')
+    .map((edge) => edge.to);
 }
 
 function fieldKeys(fields: FormField[] | null): Set<string> {
@@ -179,11 +192,8 @@ export function validatePublishedGraph(
   const approves = nodes.filter((node) => node.type === 'approve');
   if (starts.length !== 1) {
     errors.push('必须恰好有一个开始节点');
-  } else {
-    const outs = outgoing(graph, starts[0].key);
-    if (outs.length !== 1) {
-      errors.push('开始必须有且仅有一条出线');
-    }
+  } else if (mainOutgoing(graph, starts[0].key).length !== 1) {
+    errors.push('开始必须有且仅有一条主出线');
   }
   if (!approves.length) errors.push('至少需要一个审批节点');
   if (!ends.length) errors.push('至少需要一个结束节点');
@@ -192,8 +202,8 @@ export function validatePublishedGraph(
     if (!node.title?.trim()) {
       errors.push('审批节点需要名称');
     }
-    if (outgoing(graph, node.key).length !== 1) {
-      errors.push(`审批「${node.title || node.key}」必须有且仅有一条出线`);
+    if (mainOutgoing(graph, node.key).length !== 1) {
+      errors.push(`审批「${node.title || node.key}」必须有且仅有一条主出线`);
     }
     const rule = node.approver;
     const hasPeople =
@@ -215,7 +225,7 @@ export function validatePublishedGraph(
   }
 
   for (const node of nodes.filter((item) => item.type === 'branch')) {
-    const outs = outgoing(graph, node.key);
+    const outs = mainOutgoing(graph, node.key);
     const defaults = outs.filter((edge) => edge.isDefault);
     if (outs.length < 2 || defaults.length !== 1) {
       errors.push(`分支「${node.title || node.key}」需要至少两条出线且恰好一条「其他情况」`);
@@ -223,6 +233,20 @@ export function validatePublishedGraph(
     for (const edge of outs) {
       if (!edge.isDefault && !edge.when?.items?.length) {
         errors.push(`分支「${node.title || node.key}」的连线没有条件`);
+      }
+    }
+  }
+
+  for (const node of nodes.filter((item) => item.type === 'cc')) {
+    if (outgoing(graph, node.key).length) {
+      errors.push('抄送不能有出线');
+    }
+    const members = memberFieldKeys(formFields);
+    for (const key of node.approver?.memberFieldKeys ?? []) {
+      if (!members.has(key)) {
+        errors.push(
+          `节点「${node.title || node.key}」选的人员字段已从表单删除`,
+        );
       }
     }
   }
@@ -245,7 +269,9 @@ export function validatePublishedGraph(
     }
   }
   for (const node of nodes) {
-    if (node.type === 'end' || node.type === 'start') continue;
+    if (node.type === 'end' || node.type === 'start' || node.type === 'cc') {
+      continue;
+    }
     if (reachable.has(node.key) && !canReachEnd(graph, node.key)) {
       errors.push(`节点「${node.title || node.key}」走不到结束`);
     }
@@ -272,24 +298,42 @@ export function nextStay(
 ): NextStay {
   const from = nodeByKey(graph, fromNodeKey);
   if (!from) {
-    return { kind: 'error', visited: [], reason: '流程图缺少当前节点' };
+    return {
+      kind: 'error',
+      visited: [],
+      reason: '流程图缺少当前节点',
+      ccNodeKeys: [],
+    };
   }
   const visited: string[] = [];
   const seen = new Set<string>([fromNodeKey]);
+  const ccNodeKeys: string[] = [];
   let current = fromNodeKey;
   let passedApprove = from.type === 'approve';
+
+  const collectCc = (fromKey: string) => {
+    for (const key of ccOutgoingKeys(graph, fromKey)) {
+      if (!ccNodeKeys.includes(key)) ccNodeKeys.push(key);
+    }
+  };
 
   for (;;) {
     const node = nodeByKey(graph, current);
     if (!node) {
-      return { kind: 'error', visited, reason: '流程图缺少节点' };
+      return {
+        kind: 'error',
+        visited,
+        reason: '流程图缺少节点',
+        ccNodeKeys: [],
+      };
     }
-    let edges = outgoing(graph, current);
+    collectCc(current);
+    const edges = mainOutgoing(graph, current);
     let edge: WorkflowEdge | undefined;
     if (node.type === 'branch') {
       edge = pickBranchEdge(edges, data);
     } else if (node.type === 'end') {
-      return { kind: 'end', visited, passedApprove };
+      return { kind: 'end', visited, passedApprove, ccNodeKeys };
     } else {
       edge = edges[0];
     }
@@ -298,6 +342,7 @@ export function nextStay(
         kind: 'error',
         visited,
         reason: `节点「${node.title || node.key}」没有可走的连线`,
+        ccNodeKeys: [],
       };
     }
     if (seen.has(edge.to)) {
@@ -305,12 +350,18 @@ export function nextStay(
         kind: 'error',
         visited,
         reason: '流程不能绕回已经走过的节点',
+        ccNodeKeys: [],
       };
     }
     seen.add(edge.to);
     const next = nodeByKey(graph, edge.to);
     if (!next) {
-      return { kind: 'error', visited, reason: '连线指向了不存在的节点' };
+      return {
+        kind: 'error',
+        visited,
+        reason: '连线指向了不存在的节点',
+        ccNodeKeys: [],
+      };
     }
     if (next.type === 'branch') {
       visited.push(next.key);
@@ -319,10 +370,10 @@ export function nextStay(
     }
     if (next.type === 'approve') {
       visited.push(next.key);
-      return { kind: 'approve', nodeKey: next.key, visited };
+      return { kind: 'approve', nodeKey: next.key, visited, ccNodeKeys };
     }
     if (next.type === 'end') {
-      return { kind: 'end', visited, passedApprove };
+      return { kind: 'end', visited, passedApprove, ccNodeKeys };
     }
     current = next.key;
   }

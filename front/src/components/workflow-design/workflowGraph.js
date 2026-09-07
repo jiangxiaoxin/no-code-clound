@@ -1,4 +1,4 @@
-const NODE_TYPES = new Set(['start', 'approve', 'branch', 'end'])
+const NODE_TYPES = new Set(['start', 'approve', 'branch', 'end', 'cc'])
 
 function asNumber(value, fallback = 0) {
   const n = Number(value)
@@ -61,8 +61,8 @@ export function toProductGraph(raw) {
         x: asNumber(node.x),
         y: asNumber(node.y),
       }
-      if (type === 'approve') {
-        return {
+      if (type === 'approve' || type === 'cc') {
+        const packed = {
           ...base,
           approver: {
             userIds: props.approver?.userIds || [],
@@ -71,14 +71,17 @@ export function toProductGraph(raw) {
             sameDeptAsInitiator: props.approver?.sameDeptAsInitiator !== false,
             deptLeaderOfInitiator: Boolean(props.approver?.deptLeaderOfInitiator),
           },
-          signMode: props.signMode === 'all' ? 'all' : 'any',
-          commentRequiredOnApprove: Boolean(props.commentRequiredOnApprove),
-          commentRequiredOnReject: props.commentRequiredOnReject !== false,
           fieldAccess: props.fieldAccess || {},
           briefFieldKeys: Array.isArray(props.briefFieldKeys)
             ? props.briefFieldKeys.filter((key) => typeof key === 'string' && key)
             : undefined,
         }
+        if (type === 'approve') {
+          packed.signMode = props.signMode === 'all' ? 'all' : 'any'
+          packed.commentRequiredOnApprove = Boolean(props.commentRequiredOnApprove)
+          packed.commentRequiredOnReject = props.commentRequiredOnReject !== false
+        }
+        return packed
       }
       return base
     })

@@ -19,6 +19,14 @@ function outgoing(graph, from) {
     .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
 }
 
+function nodeByKey(graph, key) {
+  return (graph.nodes || []).find((node) => node.key === key)
+}
+
+function mainOutgoing(graph, from) {
+  return outgoing(graph, from).filter((edge) => nodeByKey(graph, edge.to)?.type !== 'cc')
+}
+
 function fieldKeys(fields) {
   return new Set(flattenFields(fields).map((field) => field.key).filter(Boolean))
 }
@@ -86,16 +94,16 @@ export function validatePublishedGraph(graph, formFields) {
   const approves = nodes.filter((node) => node.type === 'approve')
   if (starts.length !== 1) {
     errors.push('必须恰好有一个开始节点')
-  } else if (outgoing(graph, starts[0].key).length !== 1) {
-    errors.push('开始必须有且仅有一条出线')
+  } else if (mainOutgoing(graph, starts[0].key).length !== 1) {
+    errors.push('开始必须有且仅有一条主出线')
   }
   if (!approves.length) errors.push('至少需要一个审批节点')
   if (!ends.length) errors.push('至少需要一个结束节点')
 
   for (const node of approves) {
     if (!String(node.title || '').trim()) errors.push('审批节点需要名称')
-    if (outgoing(graph, node.key).length !== 1) {
-      errors.push(`审批「${node.title || node.key}」必须有且仅有一条出线`)
+    if (mainOutgoing(graph, node.key).length !== 1) {
+      errors.push(`审批「${node.title || node.key}」必须有且仅有一条主出线`)
     }
     const rule = node.approver || {}
     const hasPeople =
@@ -113,7 +121,7 @@ export function validatePublishedGraph(graph, formFields) {
   }
 
   for (const node of nodes.filter((item) => item.type === 'branch')) {
-    const outs = outgoing(graph, node.key)
+    const outs = mainOutgoing(graph, node.key)
     const defaults = outs.filter((edge) => edge.isDefault)
     if (outs.length < 2 || defaults.length !== 1) {
       errors.push(`分支「${node.title || node.key}」需要至少两条出线且恰好一条「其他情况」`)
@@ -121,6 +129,16 @@ export function validatePublishedGraph(graph, formFields) {
     for (const edge of outs) {
       if (!edge.isDefault && !edge.when?.items?.length) {
         errors.push(`分支「${node.title || node.key}」的连线没有条件`)
+      }
+    }
+  }
+
+  for (const node of nodes.filter((item) => item.type === 'cc')) {
+    if (outgoing(graph, node.key).length) errors.push('抄送不能有出线')
+    const members = memberFieldKeys(formFields)
+    for (const key of node.approver?.memberFieldKeys || []) {
+      if (!members.has(key)) {
+        errors.push(`节点「${node.title || node.key}」选的人员字段已从表单删除`)
       }
     }
   }
@@ -138,7 +156,7 @@ export function validatePublishedGraph(graph, formFields) {
     }
   }
   for (const node of nodes) {
-    if (node.type === 'end' || node.type === 'start') continue
+    if (node.type === 'end' || node.type === 'start' || node.type === 'cc') continue
     if (reachable.has(node.key) && !canReachEnd(graph, node.key)) {
       errors.push(`节点「${node.title || node.key}」走不到结束`)
     }

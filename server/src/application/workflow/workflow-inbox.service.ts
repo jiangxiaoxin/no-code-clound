@@ -54,11 +54,12 @@ export class WorkflowInboxService {
 
   async query(
     userId: number,
-    body: { kind: 'todo' | 'mine' | 'done'; appId?: number; page?: number; pageSize?: number },
+    body: { kind: 'todo' | 'mine' | 'done' | 'cc'; appId?: number; page?: number; pageSize?: number },
   ) {
     const page = body.page ?? 1;
     const pageSize = body.pageSize ?? 20;
-    if (body.kind === 'mine') {
+    const kind = body.kind;
+    if (kind === 'mine') {
       const qb = this.instanceRepo
         .createQueryBuilder('instance')
         .where('instance.initiatorId = :userId', { userId })
@@ -78,19 +79,26 @@ export class WorkflowInboxService {
       .createQueryBuilder('task')
       .innerJoin(WorkflowInstance, 'instance', 'instance.id = task.instanceId')
       .where('task.assigneeId = :userId', { userId })
-      .orderBy(body.kind === 'done' ? 'task.finishedAt' : 'task.createdAt', 'DESC')
+      .orderBy(
+        kind === 'done' || kind === 'cc' ? 'task.finishedAt' : 'task.createdAt',
+        'DESC',
+      )
       .skip((page - 1) * pageSize)
       .take(pageSize);
-    if (body.kind === 'todo') {
+    if (kind === 'todo') {
       qb.andWhere('task.status = :status', { status: 'pending' });
+    } else if (kind === 'cc') {
+      qb.andWhere('task.action = :action', { action: 'cc' });
     } else {
       qb.andWhere('task.status = :status', { status: 'done' });
-      qb.andWhere('task.action IS NOT NULL');
+      qb.andWhere('task.action IN (:...actions)', {
+        actions: ['approve', 'reject'],
+      });
     }
     if (body.appId) qb.andWhere('instance.appId = :appId', { appId: body.appId });
     const [items, total] = await qb.getManyAndCount();
     return {
-      items: await this.toTaskCards(items, body.kind),
+      items: await this.toTaskCards(items, kind),
       total,
       page,
       pageSize,
@@ -107,7 +115,7 @@ export class WorkflowInboxService {
     return { todo: await qb.getCount() };
   }
 
-  async open(userId: number, kind: 'todo' | 'mine' | 'done', id: number) {
+  async open(userId: number, kind: 'todo' | 'mine' | 'done' | 'cc', id: number) {
     let task: WorkflowTask | null = null;
     let instance: WorkflowInstance | null = null;
     if (kind === 'mine') {
@@ -124,6 +132,9 @@ export class WorkflowInboxService {
         throw new NotFoundException('待办不存在');
       }
       if (kind === 'done' && task.status !== 'done') {
+        throw new NotFoundException('待办不存在');
+      }
+      if (kind === 'cc' && task.action !== 'cc') {
         throw new NotFoundException('待办不存在');
       }
       instance = await this.instanceRepo.findOne({ where: { id: task.instanceId } });
@@ -160,6 +171,10 @@ export class WorkflowInboxService {
       ? instance.graph.nodes.find((item) => item.key === instance.currentNodeKey)
       : undefined;
     const approve = node?.type === 'approve' ? node : undefined;
+    const ccNode =
+      kind === 'cc' && task
+        ? instance.graph.nodes.find((item) => item.key === task.nodeKey)
+        : undefined;
     return {
       kind,
       form: {
@@ -199,14 +214,19 @@ export class WorkflowInboxService {
       })),
       names,
       actions: this.actionsOf(kind, instance, task),
-      fieldAccess: kind === 'todo' ? approve?.fieldAccess || {} : {},
+      fieldAccess:
+        kind === 'todo'
+          ? approve?.fieldAccess || {}
+          : kind === 'cc' && ccNode?.type === 'cc'
+            ? ccNode.fieldAccess || {}
+            : {},
       commentRequiredOnApprove: Boolean(approve?.commentRequiredOnApprove),
       commentRequiredOnReject: approve?.commentRequiredOnReject !== false,
     };
   }
 
   private actionsOf(
-    kind: 'todo' | 'mine' | 'done',
+    kind: 'todo' | 'mine' | 'done' | 'cc',
     instance: WorkflowInstance,
     task: WorkflowTask | null,
   ) {
@@ -221,7 +241,7 @@ export class WorkflowInboxService {
         readOnly: false,
       };
     }
-    if (kind === 'done') {
+    if (kind === 'done' || kind === 'cc') {
       return {
         canApprove: false,
         canReject: false,
@@ -309,7 +329,10 @@ export class WorkflowInboxService {
     });
   }
 
-  private async toTaskCards(tasks: WorkflowTask[], kind: 'todo' | 'done') {
+  private async toTaskCards(
+    tasks: WorkflowTask[],
+    kind: 'todo' | 'done' | 'cc',
+  ) {
     const instanceIds = [...new Set(tasks.map((row) => row.instanceId))];
     const instances = instanceIds.length
       ? await this.instanceRepo.find({ where: { id: In(instanceIds) } })
@@ -357,7 +380,9 @@ export class WorkflowInboxService {
             ),
         status: instance?.status,
         statusText:
-          kind === 'done'
+          kind === 'cc'
+            ? '已抄送'
+            : kind === 'done'
             ? task.action === 'reject'
               ? '已驳回'
               : '已通过'
@@ -365,7 +390,8 @@ export class WorkflowInboxService {
               STATUS_TEXT[instance?.status || 'running'],
         currentNodeTitle: titleOf(instance?.graph.nodes, instance?.currentNodeKey),
         initiatorName: instance ? ctx.users.get(instance.initiatorId) || '' : '',
-        time: kind === 'done' ? task.finishedAt : task.createdAt,
+        time:
+          kind === 'done' || kind === 'cc' ? task.finishedAt : task.createdAt,
         recordMissing: missing,
       };
     });
@@ -468,7 +494,9 @@ function briefKeysOf(
 ) {
   const list = nodes || [];
   const current = list.find((node) => node.key === nodeKey);
-  if (current?.type === 'approve') return current.briefFieldKeys;
+  if (current?.type === 'approve' || current?.type === 'cc') {
+    return current.briefFieldKeys;
+  }
   const approve = list.find((node) => node.type === 'approve');
   return approve?.type === 'approve' ? approve.briefFieldKeys : undefined;
 }

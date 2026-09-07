@@ -161,6 +161,7 @@ const graphRef = ref(null)
 const title = computed(() => {
   if (props.kind === 'todo') return '我的待办'
   if (props.kind === 'mine') return '我发起的'
+  if (props.kind === 'cc') return '抄送我的'
   return '我处理的'
 })
 const inboxSource = computed(() =>
@@ -174,7 +175,7 @@ const dictItemsByCode = computed(() =>
   ),
 )
 const gridFieldAccess = computed(() => {
-  if (props.kind !== 'todo' || !detail.value) return {}
+  if ((props.kind !== 'todo' && props.kind !== 'cc') || !detail.value) return {}
   return withDefaultFieldAccess(
     detail.value.fieldAccess,
     detail.value.form?.fields || [],
@@ -183,7 +184,7 @@ const gridFieldAccess = computed(() => {
 const formDisabled = computed(() => {
   if (!detail.value || detail.value.recordMissing) return true
   if (detail.value.actions?.readOnly) return true
-  if (props.kind === 'done') return true
+  if (props.kind === 'done' || props.kind === 'cc') return true
   if (props.kind === 'todo') return false
   return !detail.value.actions?.canDraft
 })

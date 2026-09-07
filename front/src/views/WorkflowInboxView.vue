@@ -17,11 +17,12 @@ import WorkflowInboxList from '../components/workflow-inbox/WorkflowInboxList.vu
 const route = useRoute()
 const kind = computed(() => {
   const value = route.params.kind
-  return value === 'mine' || value === 'done' ? value : 'todo'
+  return value === 'mine' || value === 'done' || value === 'cc' ? value : 'todo'
 })
 const title = computed(() => {
   if (kind.value === 'todo') return '我的待办'
   if (kind.value === 'mine') return '我发起的'
+  if (kind.value === 'cc') return '抄送我的'
   return '我处理的'
 })
 

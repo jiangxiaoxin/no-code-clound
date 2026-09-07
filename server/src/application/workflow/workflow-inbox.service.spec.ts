@@ -272,4 +272,112 @@ describe('WorkflowInboxService', () => {
       NotFoundException,
     );
   });
+
+  it('抄送列表按 action=cc 过滤', async () => {
+    const chain = qb({ items: [], total: 0 });
+    taskRepo.createQueryBuilder.mockReturnValue(chain);
+    await service.query(21, { kind: 'cc', page: 1, pageSize: 20 });
+    expect(chain.andWhere).toHaveBeenCalledWith('task.action = :action', {
+      action: 'cc',
+    });
+  });
+
+  it('已处理列表排除抄送', async () => {
+    const chain = qb({ items: [], total: 0 });
+    taskRepo.createQueryBuilder.mockReturnValue(chain);
+    await service.query(21, { kind: 'done', page: 1, pageSize: 20 });
+    expect(chain.andWhere).toHaveBeenCalledWith('task.action IN (:...actions)', {
+      actions: ['approve', 'reject'],
+    });
+  });
+
+  it('打开抄送抽屉只读且用抄送节点字段权限', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 8,
+      assigneeId: 9,
+      status: 'done',
+      action: 'cc',
+      instanceId: 1,
+      nodeKey: 'cc1',
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'running',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: {
+        nodes: [
+          {
+            key: 'cc1',
+            type: 'cc',
+            title: '抄送经理',
+            fieldAccess: { field_reason: 'hidden' },
+          },
+        ],
+      },
+      currentNodeKey: 'n1',
+      visitedNodeKeys: ['n1'],
+      round: 1,
+      errorReason: null,
+      notes: [],
+      hasApproved: true,
+    });
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    taskRepo.find.mockResolvedValue([
+      {
+        id: 8,
+        assigneeId: 9,
+        nodeKey: 'cc1',
+        status: 'done',
+        action: 'cc',
+        comment: null,
+        createdAt: new Date(),
+      },
+    ]);
+    userRepo.find.mockResolvedValue([
+      { id: 5, displayName: '张三', status: 'active' },
+      { id: 9, displayName: '李四', status: 'active' },
+    ]);
+
+    const detail = await service.open(9, 'cc', 8);
+    expect(detail.actions.readOnly).toBe(true);
+    expect(detail.actions.canApprove).toBe(false);
+    expect(detail.fieldAccess).toEqual({ field_reason: 'hidden' });
+  });
+
+  it('把通过任务当抄送打开是 404', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 3,
+      assigneeId: 9,
+      status: 'done',
+      action: 'approve',
+      instanceId: 1,
+      nodeKey: 'n1',
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'running',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: { nodes: [] },
+      currentNodeKey: 'n1',
+      visitedNodeKeys: [],
+      round: 1,
+      errorReason: null,
+      notes: [],
+      hasApproved: true,
+    });
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    taskRepo.find.mockResolvedValue([]);
+    userRepo.find.mockResolvedValue([{ id: 5, displayName: '张三', status: 'active' }]);
+    await expect(service.open(9, 'cc', 3)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
 });

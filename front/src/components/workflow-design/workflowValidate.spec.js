@@ -103,6 +103,35 @@ test('只勾发起人部门负责人也可以发布', () => {
   assert.equal(errors.some((item) => item.includes('没有审批人')), false)
 })
 
+const ccHang = {
+  nodes: [
+    ...leaveGraph.nodes,
+    {
+      key: 'cc1',
+      type: 'cc',
+      title: '抄送经理',
+      approver: { userIds: [9], roleIds: [], memberFieldKeys: [] },
+      fieldAccess: { field_reason: 'hidden' },
+    },
+  ],
+  edges: [
+    ...leaveGraph.edges,
+    { key: 'e_cc', from: 'n1', to: 'cc1' },
+  ],
+}
+
+test('审批多一条连到抄送的线仍能启用', () => {
+  assert.deepEqual(validatePublishedGraph(ccHang, fields), [])
+})
+
+test('抄送有出线不能启用', () => {
+  const graph = {
+    ...ccHang,
+    edges: [...ccHang.edges, { key: 'bad', from: 'cc1', to: 'end' }],
+  }
+  assert.match(validatePublishedGraph(graph, fields).join(''), /抄送不能有出线/)
+})
+
 test('四个来源都空不能发布', () => {
   const graph = {
     nodes: [

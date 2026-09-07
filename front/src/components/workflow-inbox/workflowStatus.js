@@ -60,5 +60,6 @@ export function inboxActionsVisible(kind, actions = {}) {
       retry: Boolean(actions.canRetry),
     }
   }
+  if (kind === 'cc') return {}
   return {}
 }

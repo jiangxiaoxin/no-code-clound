@@ -25,6 +25,12 @@ export type WorkflowNode =
       commentRequiredOnReject?: boolean;
       fieldAccess: Record<string, FieldAccess>;
       briefFieldKeys?: string[];
+    })
+  | (WorkflowNodeBase & {
+      type: 'cc';
+      approver: ApproverRule;
+      fieldAccess: Record<string, FieldAccess>;
+      briefFieldKeys?: string[];
     });
 
 export type WorkflowEdgeCondition = {
@@ -63,6 +69,6 @@ export interface RetryPatch {
 
 export type TaskStatus = 'pending' | 'done' | 'cancelled';
 
-export type TaskAction = 'approve' | 'reject';
+export type TaskAction = 'approve' | 'reject' | 'cc';
 
 export type InstanceNote = { at: string; text: string };

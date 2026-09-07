@@ -464,6 +464,11 @@ export class WorkflowEngine {
       await this.markError(instance, stay.reason, stay.visited);
       return { ...instance, status: 'error', errorReason: stay.reason };
     }
+    await this.dispatchCarbonCopies(
+      instance,
+      stay.ccNodeKeys,
+      record?.data ?? {},
+    );
     if (stay.kind === 'end') {
       const notes = stay.passedApprove
         ? instance.notes
@@ -516,6 +521,59 @@ export class WorkflowEngine {
       stay.visited,
       record?.data ?? {},
     );
+  }
+
+  private async dispatchCarbonCopies(
+    instance: WorkflowInstance,
+    ccNodeKeys: string[],
+    data: Record<string, unknown>,
+  ) {
+    const unique = [...new Set(ccNodeKeys)];
+    let notes = instance.notes;
+    for (const nodeKey of unique) {
+      const node = nodeOf(instance.graph, nodeKey);
+      if (!node || node.type !== 'cc') continue;
+      const resolved = await this.approver.resolve({
+        nodeTitle: node.title,
+        approver: node.approver || {
+          userIds: [],
+          roleIds: [],
+          memberFieldKeys: [],
+        },
+        initiatorId: instance.initiatorId,
+        recordData: data,
+      });
+      if (!resolved.userIds.length) {
+        const text = `节点「${node.title || node.key}」没有可抄送的人`;
+        if (!(notes || []).some((row) => row.text === text)) {
+          notes = appendNote(notes, text);
+        }
+        continue;
+      }
+      const existing = await this.taskRepo.find({
+        where: { instanceId: instance.id, nodeKey, round: instance.round },
+      });
+      const have = new Set(existing.map((row) => row.assigneeId));
+      const toInsert = resolved.userIds.filter((id) => !have.has(id));
+      if (toInsert.length) {
+        await this.taskRepo.insert(
+          toInsert.map((assigneeId) => ({
+            instanceId: instance.id,
+            nodeKey,
+            round: instance.round,
+            assigneeId,
+            status: 'done' as const,
+            action: 'cc' as const,
+            comment: null,
+            finishedAt: new Date(),
+          })),
+        );
+      }
+    }
+    if (notes !== instance.notes) {
+      await this.instanceRepo.update({ id: instance.id }, { notes });
+      instance.notes = notes;
+    }
   }
 
   // 解析审批人并派待办。派不出去一律进异常并记 retryStep='dispatch'，

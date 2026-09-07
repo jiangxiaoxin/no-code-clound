@@ -25,6 +25,16 @@
       plain
       class="wf-palette-item"
       :disabled="disabled"
+      @click="addCc"
+      @mousedown="onDragStartCc"
+    >
+      <el-icon><ChatDotRound /></el-icon>
+      <span>抄送节点</span>
+    </el-button>
+    <el-button
+      plain
+      class="wf-palette-item"
+      :disabled="disabled"
       @click="addEnd"
       @mousedown="onDragStartEnd"
     >
@@ -35,7 +45,7 @@
 </template>
 
 <script setup>
-import { CircleCheck, Finished, Share } from '@element-plus/icons-vue'
+import { ChatDotRound, CircleCheck, Finished, Share } from '@element-plus/icons-vue'
 
 const props = defineProps({
   disabled: { type: Boolean, default: false },
@@ -52,6 +62,11 @@ function addBranch() {
   emit('add', 'branch')
 }
 
+function addCc() {
+  if (props.disabled) return
+  emit('add', 'cc')
+}
+
 function addEnd() {
   if (props.disabled) return
   emit('add', 'end')
@@ -63,6 +78,10 @@ function onDragStartApprove(event) {
 
 function onDragStartBranch(event) {
   onDragStart('branch', event)
+}
+
+function onDragStartCc(event) {
+  onDragStart('cc', event)
 }
 
 function onDragStartEnd(event) {

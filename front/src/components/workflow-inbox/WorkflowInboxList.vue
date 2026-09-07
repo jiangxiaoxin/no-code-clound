@@ -59,10 +59,12 @@ const emptyDescription = computed(() => {
   if (props.appId) {
     if (props.kind === 'todo') return '本应用还没有待办'
     if (props.kind === 'mine') return '本应用还没有发起过'
+    if (props.kind === 'cc') return '本应用还没有抄送'
     return '本应用还没有处理过'
   }
   if (props.kind === 'todo') return '还没有待办'
   if (props.kind === 'mine') return '还没有发起过'
+  if (props.kind === 'cc') return '还没有抄送'
   return '还没有处理过'
 })
 

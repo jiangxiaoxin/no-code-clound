@@ -37,11 +37,13 @@ const rows = computed(() => {
       parts.push('通过')
     } else if (task.action === 'reject') {
       parts.push('驳回')
+    } else if (task.action === 'cc') {
+      parts.push('已抄送')
     } else if (task.status === 'pending') {
       parts.push('待处理')
     }
     if (task.assigneeDisabled) parts.push('审批人已停用')
-    if (task.comment) parts.push(task.comment)
+    if (task.comment && task.action !== 'cc') parts.push(task.comment)
     list.push({
       time: formatDateTime(task.finishedAt || task.createdAt),
       sort: task.finishedAt || task.createdAt || '',

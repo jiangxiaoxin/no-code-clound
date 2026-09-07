@@ -20,6 +20,10 @@
           @click="openInbox('done')">
           我处理的
         </button>
+        <button type="button" class="aside-inbox-item" :class="{ 'is-active': inboxKind === 'cc' }"
+          @click="openInbox('cc')">
+          抄送我的
+        </button>
       </div>
 
       <div class="aside-toolbar">
@@ -150,7 +154,7 @@ const app = ref(null)
 const directory = ref({ groups: [], forms: [] })
 const currentForm = ref(null)
 const appTodoCount = ref(0)
-const INBOX_KINDS = new Set(['todo', 'mine', 'done'])
+const INBOX_KINDS = new Set(['todo', 'mine', 'done', 'cc'])
 const inboxKind = computed(() => {
   const value = route.query.inbox
   return typeof value === 'string' && INBOX_KINDS.has(value) ? value : ''
