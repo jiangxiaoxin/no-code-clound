@@ -3,12 +3,24 @@
     <div class="wf-toolbar">
       <span class="wf-version">{{ versionText }}</span>
       <div class="wf-toolbar-actions">
+        <el-tooltip placement="bottom-end" :show-after="200" popper-class="wf-save-publish-tip">
+          <template #content>
+            <div class="wf-save-publish-tip">
+              <p>保存：只存流程草稿，不启用；正在审批的单据仍按提交时的版本走。</p>
+              <p>发布：校验通过后更新已发布版本并自动启用；之后新提交走新版本。</p>
+            </div>
+          </template>
+          <el-icon class="wf-toolbar-tip">
+            <QuestionFilled />
+          </el-icon>
+        </el-tooltip>
         <el-button :loading="saving" @click="onSave">保存</el-button>
         <el-button type="primary" :loading="publishing" @click="onPublish">发布</el-button>
         <el-switch
           :model-value="enabled"
           :disabled="!publishedVersion"
           @change="onToggleEnabled"
+          style="margin-left: 12px;"
         />
         <span>启用流程</span>
       </div>
@@ -19,21 +31,28 @@
     <div class="wf-body">
       <WorkflowNodePalette @add="onAddNode" @drag-start="onStartDragNode" />
       <div ref="canvasRef" class="wf-canvas" />
-      <WorkflowNodeProps
-        v-if="selectedNode"
-        :node="selectedNode"
-        :form-fields="formFields"
-        @change="onNodeChange"
-      />
-      <WorkflowEdgeProps
-        v-else-if="selectedEdge"
-        :edge="selectedEdge"
-        :from-branch="edgeFromBranch"
-        :app-id="appId"
-        :form-fields="formFields"
-        @change="onEdgeChange"
-        @move="onEdgeMove"
-      />
+      <div class="wf-props-sidebar">
+        <WorkflowNodeProps
+          v-if="selectedNode"
+          :node="selectedNode"
+          :form-fields="formFields"
+          @change="onNodeChange"
+          @delete="onDeleteSelectedNode"
+        />
+        <WorkflowEdgeProps
+          v-else-if="selectedEdge"
+          :edge="selectedEdge"
+          :from-branch="edgeFromBranch"
+          :app-id="appId"
+          :form-fields="formFields"
+          @change="onEdgeChange"
+          @move="onEdgeMove"
+          @delete="onDeleteSelectedEdge"
+        />
+        <div v-else class="wf-props wf-props-empty">
+          <el-empty description="请点击画布中的节点或连线" />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -41,6 +60,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import LogicFlow, { RectNode, RectNodeModel } from '@logicflow/core'
 import '@logicflow/core/es/index.css'
 
@@ -119,9 +139,11 @@ function createNodeConfig(type) {
       roleIds: [],
       memberFieldKeys: [],
       sameDeptAsInitiator: true,
+      deptLeaderOfInitiator: false,
     }
     properties.signMode = 'any'
     properties.commentRequiredOnApprove = false
+    properties.commentRequiredOnReject = true
     properties.fieldAccess = {}
   }
   return {
@@ -174,6 +196,18 @@ function onEdgeMove(step) {
   const swapSort = edges[next].sort ?? next
   lf.setProperties(edges[index].key, { ...edges[index], sort: swapSort })
   lf.setProperties(edges[next].key, { ...edges[next], sort: currentSort })
+}
+
+function onDeleteSelectedNode() {
+  if (!lf || !selectedNode.value) return
+  lf.deleteNode(selectedNode.value.key)
+  selectedNode.value = null
+}
+
+function onDeleteSelectedEdge() {
+  if (!lf || !selectedEdge.value) return
+  lf.deleteEdge(selectedEdge.value.key)
+  selectedEdge.value = null
 }
 
 function bindEvents() {
@@ -314,15 +348,19 @@ watch(
 </script>
 
 <style scoped lang="less">
+@import './workflowProps.less';
+
 .wf-design {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .wf-toolbar {
   display: flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
   padding: 8px 16px;
@@ -334,11 +372,19 @@ watch(
   align-items: center;
 }
 
+.wf-toolbar-tip {
+  margin-right: 8px;
+  color: var(--el-text-color-secondary);
+  cursor: help;
+  font-size: 16px;
+}
+
 .wf-version {
   color: var(--el-text-color-regular);
 }
 
 .wf-errors {
+  flex-shrink: 0;
   padding: 8px 16px;
   color: var(--el-color-danger);
 }
@@ -347,11 +393,41 @@ watch(
   display: flex;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
 .wf-canvas {
   flex: 1;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
+}
+
+.wf-props-sidebar {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  width: 300px;
+  min-height: 0;
+  overflow: hidden;
+
+  > .wf-props {
+    flex: 1;
+    min-height: 0;
+  }
+}
+</style>
+
+<style lang="less">
+.wf-save-publish-tip {
+  max-width: 280px;
+
+  p {
+    margin: 0;
+
+    + p {
+      margin-top: 6px;
+    }
+  }
 }
 </style>

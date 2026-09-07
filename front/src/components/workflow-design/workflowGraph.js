@@ -26,6 +26,7 @@ export function toLogicflowGraph(product) {
       approver: node.approver,
       signMode: node.signMode,
       commentRequiredOnApprove: node.commentRequiredOnApprove,
+      commentRequiredOnReject: node.commentRequiredOnReject,
       fieldAccess: node.fieldAccess,
     },
   }))
@@ -62,14 +63,16 @@ export function toProductGraph(raw) {
       if (type === 'approve') {
         return {
           ...base,
-          approver: props.approver || {
-            userIds: [],
-            roleIds: [],
-            memberFieldKeys: [],
-            sameDeptAsInitiator: true,
+          approver: {
+            userIds: props.approver?.userIds || [],
+            roleIds: props.approver?.roleIds || [],
+            memberFieldKeys: props.approver?.memberFieldKeys || [],
+            sameDeptAsInitiator: props.approver?.sameDeptAsInitiator !== false,
+            deptLeaderOfInitiator: Boolean(props.approver?.deptLeaderOfInitiator),
           },
           signMode: props.signMode === 'all' ? 'all' : 'any',
           commentRequiredOnApprove: Boolean(props.commentRequiredOnApprove),
+          commentRequiredOnReject: props.commentRequiredOnReject !== false,
           fieldAccess: props.fieldAccess || {},
         }
       }

@@ -73,7 +73,7 @@
               :key="item.id"
               size="small"
             >
-              {{ item.name }}
+              {{ departmentLabel(item) }}
             </el-tag>
             <span v-if="!row.departments?.length">-</span>
           </div>
@@ -315,15 +315,19 @@ function openEdit(row) {
   formVisible.value = true
 }
 
+function departmentLabel(item) {
+  return item.isLeader ? `${item.name}（负责人）` : item.name
+}
+
 async function onSubmit(payload) {
   saving.value = true
   try {
     if (editing.value) {
-      await updateAdminUserApi(editing.value.id, payload)
-      ElMessage.success('已保存人员')
+      const result = await updateAdminUserApi(editing.value.id, payload)
+      ElMessage.success(result?.leaderReplaceHint || '已保存人员')
     } else {
-      await createAdminUserApi(payload)
-      ElMessage.success('已创建人员')
+      const result = await createAdminUserApi(payload)
+      ElMessage.success(result?.leaderReplaceHint || '已创建人员')
     }
     formVisible.value = false
     await loadUsers()

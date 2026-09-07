@@ -1,21 +1,26 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { profileApi } from '../api/auth'
+import {
+  getAccessToken,
+  removeAccessToken,
+  setAccessToken,
+} from '../utils/authToken.js'
 
 export const useUserStore = defineStore('user', () => {
-  const accessToken = ref(localStorage.getItem('accessToken') || '')
+  const accessToken = ref(getAccessToken())
   const user = ref(null)
 
   function setSession(token, userInfo) {
     accessToken.value = token
     user.value = userInfo
-    localStorage.setItem('accessToken', token)
+    setAccessToken(token)
   }
 
   function logout() {
     accessToken.value = ''
     user.value = null
-    localStorage.removeItem('accessToken')
+    removeAccessToken()
   }
 
   async function restore() {

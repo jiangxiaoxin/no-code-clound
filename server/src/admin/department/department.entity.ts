@@ -11,6 +11,7 @@ import {
 @Index('uk_department_parent_name', ['parentId', 'name'], { unique: true })
 @Index('IDX_department_parentId', ['parentId'])
 @Index('IDX_department_status', ['status'])
+@Index('IDX_department_leaderUserId', ['leaderUserId'])
 export class Department {
   @PrimaryGeneratedColumn()
   id: number;
@@ -26,6 +27,9 @@ export class Department {
 
   @Column({ type: 'int', default: 0 })
   sortOrder: number;
+
+  @Column({ type: 'int', nullable: true })
+  leaderUserId: number | null;
 
   @CreateDateColumn()
   createdAt: Date;

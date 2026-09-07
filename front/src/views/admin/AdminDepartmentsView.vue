@@ -24,6 +24,11 @@
     >
       <el-table-column prop="name" label="部门名称" min-width="200" />
       <el-table-column v-if="isDev" prop="id" label="id" width="80" />
+      <el-table-column label="负责人" min-width="140">
+        <template #default="{ row }">
+          <span>{{ leaderText(row) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
@@ -114,6 +119,14 @@ async function loadTree() {
   } finally {
     loading.value = false
   }
+}
+
+function leaderText(row) {
+  if (!row.leader) return '-'
+  if (row.leader.status === 'disabled') {
+    return `${row.leader.displayName}（已停用）`
+  }
+  return row.leader.displayName
 }
 
 function openCreate(parentId) {

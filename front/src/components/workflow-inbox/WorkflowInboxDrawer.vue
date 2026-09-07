@@ -250,7 +250,7 @@ function onApprove() {
 }
 
 function onReject() {
-  if (!comment.value.trim()) {
+  if (detail.value?.commentRequiredOnReject !== false && !comment.value.trim()) {
     ElMessage.warning('请填写驳回意见')
     return
   }

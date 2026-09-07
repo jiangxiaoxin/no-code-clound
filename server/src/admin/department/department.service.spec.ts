@@ -8,6 +8,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Department } from './department.entity';
 import { DepartmentService } from './department.service';
 import { UserDepartment } from './user-department.entity';
+import { User } from '../../user/user.entity';
 
 describe('DepartmentService', () => {
   let service: DepartmentService;
@@ -22,6 +23,10 @@ describe('DepartmentService', () => {
   const userDepartmentRepo = {
     find: jest.fn(),
     count: jest.fn(),
+  };
+  const userRepo = {
+    find: jest.fn(),
+    findOne: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -42,6 +47,7 @@ describe('DepartmentService', () => {
           provide: getRepositoryToken(UserDepartment),
           useValue: userDepartmentRepo,
         },
+        { provide: getRepositoryToken(User), useValue: userRepo },
       ],
     }).compile();
     service = module.get(DepartmentService);
@@ -79,6 +85,7 @@ describe('DepartmentService', () => {
         { departmentId: 3 },
         { departmentId: 3 },
       ]);
+      userRepo.find.mockResolvedValue([]);
 
       const tree = await service.tree();
 
@@ -97,6 +104,7 @@ describe('DepartmentService', () => {
               name: '研发',
               memberCount: 2,
               childCount: 0,
+              leader: null,
               children: [],
             }),
             expect.objectContaining({
@@ -109,6 +117,40 @@ describe('DepartmentService', () => {
           ],
         }),
       ]);
+    });
+
+    it('tree 带出停用的部门负责人', async () => {
+      departmentRepo.find.mockResolvedValue([
+        {
+          id: 1,
+          name: '总部',
+          parentId: null,
+          status: 'active',
+          sortOrder: 0,
+          createdAt: new Date('2026-01-01'),
+          leaderUserId: null,
+        },
+        {
+          id: 3,
+          name: '研发',
+          parentId: 1,
+          status: 'active',
+          sortOrder: 0,
+          createdAt: new Date('2026-01-02'),
+          leaderUserId: 9,
+        },
+      ]);
+      userDepartmentRepo.find.mockResolvedValue([]);
+      userRepo.find.mockResolvedValue([
+        { id: 9, displayName: '张三', status: 'disabled' },
+      ]);
+
+      const tree = await service.tree();
+      expect(tree[0].children[0].leader).toEqual({
+        id: 9,
+        displayName: '张三',
+        status: 'disabled',
+      });
     });
   });
 

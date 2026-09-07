@@ -5,6 +5,7 @@ export type ApproverRule = {
   roleIds: number[];
   memberFieldKeys: string[];
   sameDeptAsInitiator?: boolean;
+  deptLeaderOfInitiator?: boolean;
 };
 
 export type WorkflowNodeBase = {
@@ -21,6 +22,7 @@ export type WorkflowNode =
       approver: ApproverRule;
       signMode: 'any' | 'all';
       commentRequiredOnApprove: boolean;
+      commentRequiredOnReject?: boolean;
       fieldAccess: Record<string, FieldAccess>;
     });
 

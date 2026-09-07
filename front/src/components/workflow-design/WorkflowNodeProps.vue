@@ -1,6 +1,7 @@
 <template>
   <div class="wf-props">
-    <template v-if="node?.type === 'approve'">
+    <div class="wf-props-body">
+      <template v-if="node?.type === 'approve'">
       <label class="wf-label">节点名称</label>
       <el-input :model-value="node.title" @update:model-value="onTitle" />
       <label class="wf-label">指定人员</label>
@@ -31,6 +32,12 @@
           :value="field.key"
         />
       </el-select>
+      <el-checkbox
+        :model-value="Boolean(node.approver?.deptLeaderOfInitiator)"
+        @change="onDeptLeader"
+      >
+        发起人所属部门的负责人
+      </el-checkbox>
       <label class="wf-label">多人时</label>
       <el-radio-group :model-value="node.signMode || 'any'" @change="onSignMode">
         <el-radio value="any">或签（一人即可）</el-radio>
@@ -38,9 +45,15 @@
       </el-radio-group>
       <el-checkbox
         :model-value="Boolean(node.commentRequiredOnApprove)"
-        @change="onCommentRequired"
+        @change="onCommentRequiredOnApprove"
       >
         通过时意见必填
+      </el-checkbox>
+      <el-checkbox
+        :model-value="node.commentRequiredOnReject !== false"
+        @change="onCommentRequiredOnReject"
+      >
+        拒绝时意见必填
       </el-checkbox>
       <div class="wf-label">字段权限</div>
       <div class="wf-access-table">
@@ -87,6 +100,16 @@
       :model-value-ids="node?.approver?.roleIds || []"
       @update:model-value-ids="onRoleIds"
     />
+    <el-button
+      class="wf-props-delete"
+      type="danger"
+      plain
+      :disabled="node?.type === 'start'"
+      @click="onDelete"
+    >
+      删除节点
+    </el-button>
+    </div>
   </div>
 </template>
 
@@ -102,7 +125,7 @@ const props = defineProps({
   node: { type: Object, default: null },
   formFields: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['change'])
+const emit = defineEmits(['change', 'delete'])
 const roleVisible = ref(false)
 const memberField = { type: 'member-multiple', placeholder: '请选择人员' }
 
@@ -164,12 +187,22 @@ function onMemberFields(memberFieldKeys) {
   })
 }
 
+function onDeptLeader(deptLeaderOfInitiator) {
+  patch({
+    approver: { ...(props.node.approver || {}), deptLeaderOfInitiator },
+  })
+}
+
 function onSignMode(signMode) {
   patch({ signMode })
 }
 
-function onCommentRequired(commentRequiredOnApprove) {
+function onCommentRequiredOnApprove(commentRequiredOnApprove) {
   patch({ commentRequiredOnApprove })
+}
+
+function onCommentRequiredOnReject(commentRequiredOnReject) {
+  patch({ commentRequiredOnReject })
 }
 
 function accessOf(field) {
@@ -240,6 +273,25 @@ function openRoles() {
   roleVisible.value = true
 }
 
+async function onDelete() {
+  if (props.node?.type === 'start') return
+  const title = props.node?.title || '该节点'
+  try {
+    await ElMessageBox.confirm(
+      `确定删除「${title}」吗？连到该节点的连线也会一起删除。`,
+      '删除节点',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+  emit('delete')
+}
+
 const roleNames = computed(() => {
   const ids = props.node?.approver?.roleIds || []
   if (!ids.length) return ''
@@ -248,23 +300,7 @@ const roleNames = computed(() => {
 </script>
 
 <style scoped lang="less">
-.wf-props {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: 300px;
-  padding: 12px;
-  overflow: auto;
-  border-left: 1px solid var(--el-border-color);
-}
-
-.wf-label {
-  font-weight: 600;
-}
-
-.wf-hint {
-  color: var(--el-text-color-secondary);
-}
+@import './workflowProps.less';
 
 .wf-access-table {
   display: flex;

@@ -163,6 +163,7 @@ watch([appId, formId], loadForm, { immediate: true })
 <style scoped lang="less">
 .form-design {
   height: 100vh;
+  overflow: hidden;
   background: var(--el-bg-color-page);
 }
 
@@ -211,8 +212,10 @@ watch([appId, formId], loadForm, { immediate: true })
 
 .form-records {
   display: flex;
+  flex: 1;
   min-height: 0;
   padding: 0;
+  overflow: hidden;
   flex-direction: column;
   background: var(--el-bg-color);
 }

@@ -148,4 +148,36 @@ describe('WorkflowInstanceService', () => {
       expect.objectContaining({ dataPatch: { field_reason: 'a' } }),
     );
   });
+
+  it('节点未要求驳回意见时，空意见也能驳回', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 3,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 9,
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      graph: {
+        nodes: [
+          {
+            key: 'n1',
+            type: 'approve',
+            title: '部门审批',
+            fieldAccess: {},
+            commentRequiredOnApprove: false,
+            commentRequiredOnReject: false,
+          },
+        ],
+      },
+    });
+    await service.complete(3, 9, {
+      action: 'reject',
+      comment: '',
+      data: {},
+    });
+    expect(engine.completeTask).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'reject', comment: '' }),
+    );
+  });
 });

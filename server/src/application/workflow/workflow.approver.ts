@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { UserDepartment } from '../../admin/department/user-department.entity';
+import { Department } from '../../admin/department/department.entity';
 import { Role } from '../../admin/role/role.entity';
 import { UserRole } from '../../admin/role/user-role.entity';
 import { User } from '../../user/user.entity';
@@ -24,6 +25,8 @@ export class WorkflowApproverService {
     private readonly userRoleRepo: Repository<UserRole>,
     @InjectRepository(UserDepartment)
     private readonly userDepartmentRepo: Repository<UserDepartment>,
+    @InjectRepository(Department)
+    private readonly departmentRepo: Repository<Department>,
   ) {}
 
   async resolve(input: {
@@ -51,7 +54,22 @@ export class WorkflowApproverService {
     );
     roleResult.userIds.forEach((id) => collected.add(id));
 
+    if (input.approver.deptLeaderOfInitiator) {
+      const leaderIds = await this.resolveInitiatorDeptLeader(input.initiatorId);
+      leaderIds.forEach((id) => collected.add(id));
+    }
+
     if (collected.size === 0) {
+      const othersConfigured =
+        (input.approver.userIds || []).length > 0 ||
+        (input.approver.roleIds || []).length > 0 ||
+        (input.approver.memberFieldKeys || []).length > 0;
+      if (input.approver.deptLeaderOfInitiator && !othersConfigured) {
+        return {
+          userIds: [],
+          emptyReason: `节点「${input.nodeTitle}」没有可用的发起人部门负责人`,
+        };
+      }
       if (roleResult.deptIntersectionEmpty) {
         return {
           userIds: [],
@@ -77,6 +95,18 @@ export class WorkflowApproverService {
       where: { id: In(unique), status: 'active' },
     });
     return rows.map((row) => row.id);
+  }
+
+  private async resolveInitiatorDeptLeader(initiatorId: number): Promise<number[]> {
+    const link = await this.userDepartmentRepo.findOne({
+      where: { userId: initiatorId },
+    });
+    if (!link) return [];
+    const department = await this.departmentRepo.findOne({
+      where: { id: link.departmentId },
+    });
+    if (!department?.leaderUserId) return [];
+    return this.activeUserIds([department.leaderUserId]);
   }
 
   private async resolveRoleUsers(

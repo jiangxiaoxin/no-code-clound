@@ -108,7 +108,7 @@ export class WorkflowInstanceService {
       throw new NotFoundException('审批节点不存在');
     }
     const comment = String(dto.comment || '').trim();
-    if (dto.action === 'reject' && !comment) {
+    if (dto.action === 'reject' && node.commentRequiredOnReject !== false && !comment) {
       throw new BadRequestException('请填写驳回意见');
     }
     if (dto.action === 'approve' && node.commentRequiredOnApprove && !comment) {

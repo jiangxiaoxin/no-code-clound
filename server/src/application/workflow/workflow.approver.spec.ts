@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { In } from 'typeorm';
 import { UserDepartment } from '../../admin/department/user-department.entity';
+import { Department } from '../../admin/department/department.entity';
 import { Role } from '../../admin/role/role.entity';
 import { UserRole } from '../../admin/role/user-role.entity';
 import { User } from '../../user/user.entity';
@@ -20,6 +21,7 @@ describe('WorkflowApproverService', () => {
   const roleRepo = { find: jest.fn() };
   const userRoleRepo = { find: jest.fn() };
   const userDepartmentRepo = { find: jest.fn(), findOne: jest.fn() };
+  const departmentRepo = { findOne: jest.fn() };
 
   const users: Record<number, { id: number; status: string }> = {
     5: { id: 5, status: 'active' },
@@ -46,6 +48,7 @@ describe('WorkflowApproverService', () => {
         { provide: getRepositoryToken(Role), useValue: roleRepo },
         { provide: getRepositoryToken(UserRole), useValue: userRoleRepo },
         { provide: getRepositoryToken(UserDepartment), useValue: userDepartmentRepo },
+        { provide: getRepositoryToken(Department), useValue: departmentRepo },
       ],
     }).compile();
     service = module.get(WorkflowApproverService);
@@ -182,5 +185,100 @@ describe('WorkflowApproverService', () => {
       recordData: {},
     });
     expect(result.emptyReason).toBe('节点「人事备案」没有可用的审批人');
+  });
+
+  it('只勾部门负责人时派给启用中的那个人', async () => {
+    userDepartmentRepo.findOne.mockResolvedValue({ userId: 5, departmentId: 1 });
+    departmentRepo.findOne.mockResolvedValue({ id: 1, leaderUserId: 21 });
+    const result = await service.resolve({
+      nodeTitle: '部门审批',
+      approver: {
+        userIds: [],
+        roleIds: [],
+        memberFieldKeys: [],
+        deptLeaderOfInitiator: true,
+      },
+      initiatorId: 5,
+      recordData: {},
+    });
+    expect(result.userIds).toEqual([21]);
+    expect(result.emptyReason).toBeUndefined();
+  });
+
+  it('负责人已停用且没有其他来源', async () => {
+    userDepartmentRepo.findOne.mockResolvedValue({ userId: 5, departmentId: 1 });
+    departmentRepo.findOne.mockResolvedValue({ id: 1, leaderUserId: 23 });
+    const result = await service.resolve({
+      nodeTitle: '部门审批',
+      approver: {
+        userIds: [],
+        roleIds: [],
+        memberFieldKeys: [],
+        deptLeaderOfInitiator: true,
+      },
+      initiatorId: 5,
+      recordData: {},
+    });
+    expect(result.userIds).toEqual([]);
+    expect(result.emptyReason).toBe(
+      '节点「部门审批」没有可用的发起人部门负责人',
+    );
+    expect(result.unrestrictedByMissingDept).toBeUndefined();
+  });
+
+  it('发起人没有部门且只勾负责人', async () => {
+    userDepartmentRepo.findOne.mockResolvedValue(null);
+    const result = await service.resolve({
+      nodeTitle: '部门审批',
+      approver: {
+        userIds: [],
+        roleIds: [],
+        memberFieldKeys: [],
+        deptLeaderOfInitiator: true,
+      },
+      initiatorId: 5,
+      recordData: {},
+    });
+    expect(result.userIds).toEqual([]);
+    expect(result.emptyReason).toBe(
+      '节点「部门审批」没有可用的发起人部门负责人',
+    );
+    expect(result.unrestrictedByMissingDept).toBeUndefined();
+    expect(departmentRepo.findOne).not.toHaveBeenCalled();
+  });
+
+  it('负责人停用但仍有指定人员', async () => {
+    userDepartmentRepo.findOne.mockResolvedValue({ userId: 5, departmentId: 1 });
+    departmentRepo.findOne.mockResolvedValue({ id: 1, leaderUserId: 23 });
+    const result = await service.resolve({
+      nodeTitle: '部门审批',
+      approver: {
+        userIds: [9],
+        roleIds: [],
+        memberFieldKeys: [],
+        deptLeaderOfInitiator: true,
+      },
+      initiatorId: 5,
+      recordData: {},
+    });
+    expect(result.userIds).toEqual([9]);
+    expect(result.emptyReason).toBeUndefined();
+  });
+
+  it('指定人员和负责人是同一人只出现一次', async () => {
+    userDepartmentRepo.findOne.mockResolvedValue({ userId: 5, departmentId: 1 });
+    departmentRepo.findOne.mockResolvedValue({ id: 1, leaderUserId: 21 });
+    const result = await service.resolve({
+      nodeTitle: '部门审批',
+      approver: {
+        userIds: [21],
+        roleIds: [],
+        memberFieldKeys: [],
+        deptLeaderOfInitiator: true,
+      },
+      initiatorId: 5,
+      recordData: {},
+    });
+    expect(result.userIds).toEqual([21]);
   });
 });

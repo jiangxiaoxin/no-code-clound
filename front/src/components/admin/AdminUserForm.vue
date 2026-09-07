@@ -13,7 +13,7 @@
       :model="form"
       :rules="rules"
       label-position="left"
-      label-width="100px"
+      label-width="120px"
       autocomplete="off"
     >
       <el-form-item label="姓名" prop="displayName">
@@ -55,7 +55,11 @@
           clearable
           :disabled="!canAssignDepartments"
           placeholder="请选择部门"
+          @change="onDepartmentChange"
         />
+      </el-form-item>
+      <el-form-item v-if="form.departmentId" label="是否为部门领导">
+        <el-switch v-model="form.isDeptLeader" :disabled="!canAssignDepartments" />
       </el-form-item>
       <el-form-item label="角色" prop="roleIds">
         <el-select
@@ -108,8 +112,10 @@ const form = reactive({
   email: '',
   password: '',
   departmentId: null,
+  isDeptLeader: false,
   roleIds: [],
 })
+let openedDepartmentId = null
 
 const rules = {
   displayName: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
@@ -147,7 +153,9 @@ watch(
     form.email = props.user?.email || ''
     form.password = ''
     form.departmentId = props.user?.departments?.[0]?.id ?? null
+    form.isDeptLeader = Boolean(props.user?.departments?.[0]?.isLeader)
     form.roleIds = (props.user?.roles || []).map((item) => item.id)
+    openedDepartmentId = form.departmentId
   },
 )
 
@@ -158,6 +166,12 @@ function filterActiveTree(nodes) {
       ...node,
       children: filterActiveTree(node.children),
     }))
+}
+
+function onDepartmentChange(value) {
+  if (value !== openedDepartmentId) {
+    form.isDeptLeader = false
+  }
 }
 
 function onClose() {
@@ -174,10 +188,14 @@ async function onSubmit() {
   if (!props.user) {
     payload.password = form.password
     payload.departmentId = props.canAssignDepartments ? form.departmentId : null
+    payload.isDeptLeader = props.canAssignDepartments
+      ? Boolean(form.departmentId) && form.isDeptLeader
+      : false
     payload.roleIds = props.canAssignRoles ? [...form.roleIds] : []
   } else {
     if (props.canAssignDepartments) {
       payload.departmentId = form.departmentId
+      payload.isDeptLeader = Boolean(form.departmentId) && form.isDeptLeader
     }
     if (props.canAssignRoles) {
       payload.roleIds = [...form.roleIds]

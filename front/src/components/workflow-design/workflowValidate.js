@@ -101,7 +101,8 @@ export function validatePublishedGraph(graph, formFields) {
     const hasPeople =
       (rule.userIds || []).length > 0 ||
       (rule.roleIds || []).length > 0 ||
-      (rule.memberFieldKeys || []).length > 0
+      (rule.memberFieldKeys || []).length > 0 ||
+      Boolean(rule.deptLeaderOfInitiator)
     if (!hasPeople) errors.push(`节点「${node.title || node.key}」没有审批人`)
     const members = memberFieldKeys(formFields)
     for (const key of rule.memberFieldKeys || []) {

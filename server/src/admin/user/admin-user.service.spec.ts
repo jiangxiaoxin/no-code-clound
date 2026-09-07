@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -37,6 +38,7 @@ describe('AdminUserService', () => {
   };
   const departmentRepo = {
     find: jest.fn(),
+    findOne: jest.fn(),
   };
   const userDepartmentRepo = {
     find: jest.fn(),
@@ -59,7 +61,11 @@ describe('AdminUserService', () => {
     save: jest.fn(),
     create: jest.fn(),
     delete: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+    update: jest.fn(),
   };
+  const deptRows: { id: number; name: string; leaderUserId: number | null }[] = [];
   const dataSource = {
     transaction: jest.fn(async (fn: (m: typeof manager) => Promise<unknown>) =>
       fn(manager),
@@ -81,6 +87,39 @@ describe('AdminUserService', () => {
       }
       const row = value as { id?: number };
       return { id: row.id ?? 8, status: 'active', createdAt: new Date(), ...row };
+    });
+    deptRows.length = 0;
+    manager.find.mockImplementation(async (entity: unknown, options: { where?: Record<string, unknown> }) => {
+      const where = options?.where || {};
+      if (entity === Department) {
+        return deptRows.filter((row) => {
+          if (where.id !== undefined && row.id !== where.id) return false;
+          if (where.leaderUserId !== undefined && row.leaderUserId !== where.leaderUserId) {
+            return false;
+          }
+          return true;
+        });
+      }
+      if (entity === UserDepartment) {
+        return userDepartmentRepo.find();
+      }
+      return [];
+    });
+    manager.findOne.mockImplementation(async (entity: unknown, options: { where?: Record<string, unknown> }) => {
+      if (entity === User) {
+        const id = options?.where?.id;
+        if (id === 7) return { id: 7, displayName: '张三' };
+        return null;
+      }
+      const rows = await manager.find(entity, options);
+      return rows[0] ?? null;
+    });
+    manager.update.mockImplementation(async (entity: unknown, criteria: { id?: number }, partial: object) => {
+      if (entity === Department && criteria.id != null) {
+        const row = deptRows.find((item) => item.id === criteria.id);
+        if (row) Object.assign(row, partial);
+      }
+      return { affected: 1 };
     });
     dataSource.transaction.mockImplementation(
       async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager),
@@ -275,6 +314,131 @@ describe('AdminUserService', () => {
     await service.resetPassword(2, 'newpass');
     expect(user.password).not.toBe('newpass');
     expect(await bcrypt.compare('newpass', user.password)).toBe(true);
+  });
+
+  it('新建负责人：部门写入 leaderUserId，不提示替换', async () => {
+    userRepo.findOne.mockResolvedValue(null);
+    deptRows.push({ id: 1, name: '研发部', leaderUserId: null });
+    userDepartmentRepo.find.mockResolvedValue([{ userId: 8, departmentId: 1 }]);
+    departmentRepo.find.mockResolvedValue(deptRows);
+
+    const result = await service.create({
+      username: 'alice',
+      displayName: '李四',
+      email: 'alice@example.com',
+      password: 'secret1',
+      departmentId: 1,
+      roleIds: [],
+      isDeptLeader: true,
+    });
+
+    expect(deptRows[0].leaderUserId).toBe(8);
+    expect(result.leaderReplaceHint).toBeUndefined();
+    expect(result.departments[0].isLeader).toBe(true);
+  });
+
+  it('同一部门后指定的人顶替原负责人', async () => {
+    userRepo.findOne.mockResolvedValue({
+      id: 8,
+      username: 'bob',
+      displayName: '李四',
+      email: 'bob@example.com',
+      status: 'active',
+    });
+    deptRows.push({ id: 1, name: '研发部', leaderUserId: 7 });
+    userDepartmentRepo.find.mockResolvedValue([{ userId: 8, departmentId: 1 }]);
+    departmentRepo.find.mockResolvedValue(deptRows);
+
+    const result = await service.update(
+      1,
+      8,
+      { departmentId: 1, isDeptLeader: true },
+      [PERMISSIONS.USERS_ASSIGN_DEPARTMENTS],
+    );
+
+    expect(deptRows[0].leaderUserId).toBe(8);
+    expect(result.leaderReplaceHint).toBe('已将研发部原负责人张三替换为李四');
+  });
+
+  it('清空部门时去掉原部门负责人', async () => {
+    userRepo.findOne.mockResolvedValue({
+      id: 8,
+      username: 'bob',
+      displayName: '李四',
+      email: 'bob@example.com',
+      status: 'active',
+    });
+    deptRows.push({ id: 1, name: '研发部', leaderUserId: 8 });
+    userDepartmentRepo.find.mockResolvedValue([]);
+    departmentRepo.find.mockResolvedValue([]);
+
+    await service.update(
+      1,
+      8,
+      { departmentId: null, isDeptLeader: false },
+      [PERMISSIONS.USERS_ASSIGN_DEPARTMENTS],
+    );
+
+    expect(deptRows[0].leaderUserId).toBeNull();
+  });
+
+  it('调到新部门且开关关闭：只清旧部门', async () => {
+    userRepo.findOne.mockResolvedValue({
+      id: 8,
+      username: 'bob',
+      displayName: '李四',
+      email: 'bob@example.com',
+      status: 'active',
+    });
+    deptRows.push(
+      { id: 1, name: '研发部', leaderUserId: 8 },
+      { id: 2, name: '销售部', leaderUserId: null },
+    );
+    userDepartmentRepo.find.mockResolvedValue([{ userId: 8, departmentId: 2 }]);
+    departmentRepo.find.mockResolvedValue([deptRows[1]]);
+
+    await service.update(
+      1,
+      8,
+      { departmentId: 2, isDeptLeader: false },
+      [PERMISSIONS.USERS_ASSIGN_DEPARTMENTS],
+    );
+
+    expect(deptRows[0].leaderUserId).toBeNull();
+    expect(deptRows[1].leaderUserId).toBeNull();
+  });
+
+  it('没选部门却打开开关：不当成负责人', async () => {
+    userRepo.findOne.mockResolvedValue(null);
+    deptRows.push({ id: 1, name: '研发部', leaderUserId: null });
+    userDepartmentRepo.find.mockResolvedValue([]);
+    departmentRepo.find.mockResolvedValue([]);
+
+    const result = await service.create({
+      username: 'alice',
+      displayName: '李四',
+      email: 'alice@example.com',
+      password: 'secret1',
+      departmentId: null,
+      roleIds: [],
+      isDeptLeader: true,
+    });
+
+    expect(deptRows[0].leaderUserId).toBeNull();
+    expect(result.departments).toEqual([]);
+  });
+
+  it('没有分配部门权限不能改负责人开关', async () => {
+    userRepo.findOne.mockResolvedValue({
+      id: 8,
+      username: 'bob',
+      displayName: '李四',
+      email: 'bob@example.com',
+      status: 'active',
+    });
+    await expect(
+      service.update(1, 8, { isDeptLeader: true }, []),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects missing user on reset password', async () => {

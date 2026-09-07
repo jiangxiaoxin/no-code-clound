@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsInt,
   IsOptional,
@@ -47,6 +48,20 @@ export class CreateAdminUserDto {
   @IsInt()
   @Min(1)
   departmentId?: number | null;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === '' || value === undefined) return undefined;
+    if (value === true || value === 'true' || value === 1 || value === '1') {
+      return true;
+    }
+    if (value === false || value === 'false' || value === 0 || value === '0') {
+      return false;
+    }
+    return value;
+  })
+  @IsBoolean()
+  isDeptLeader?: boolean;
 
   @IsArray()
   @ArrayUnique()

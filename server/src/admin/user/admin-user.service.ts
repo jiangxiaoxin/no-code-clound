@@ -26,9 +26,23 @@ export type AdminUserItem = {
   displayName: string;
   email: string;
   status: 'active' | 'disabled';
-  departments: { id: number; name: string }[];
+  departments: { id: number; name: string; isLeader: boolean }[];
   roles: { id: number; name: string; code: string }[];
   createdAt: Date;
+  leaderReplaceHint?: string;
+};
+
+type RelationManager = {
+  delete: (entity: unknown, where: object) => Promise<unknown>;
+  create: (entity: unknown, value: object) => object;
+  save: (entity: unknown, value: object | object[]) => Promise<unknown>;
+  find: (entity: unknown, options: object) => Promise<unknown[]>;
+  findOne: (entity: unknown, options: object) => Promise<unknown>;
+  update: (
+    entity: unknown,
+    criteria: object,
+    partial: object,
+  ) => Promise<unknown>;
 };
 
 @Injectable()
@@ -126,9 +140,16 @@ export class AdminUserService {
         }),
       );
       await this.replaceRelations(manager, user.id, departmentId, roleIds);
-      return user;
+      const leaderReplaceHint = await this.applyDeptLeader(
+        manager,
+        user.id,
+        displayName,
+        departmentId,
+        dto.isDeptLeader === true,
+      );
+      return { user, leaderReplaceHint };
     });
-    return this.toItem(saved);
+    return this.toItem(saved.user, saved.leaderReplaceHint);
   }
 
   async update(
@@ -139,7 +160,7 @@ export class AdminUserService {
   ): Promise<AdminUserItem> {
     const user = await this.requireOne(userId);
     if (
-      dto.departmentId !== undefined &&
+      (dto.departmentId !== undefined || dto.isDeptLeader !== undefined) &&
       !actorPermissions.includes(PERMISSIONS.USERS_ASSIGN_DEPARTMENTS)
     ) {
       throw new ForbiddenException();
@@ -192,9 +213,16 @@ export class AdminUserService {
       user.email = email;
       await manager.save(User, user);
       await this.replaceRelations(manager, userId, departmentId, roleIds);
-      return user;
+      const leaderReplaceHint = await this.applyDeptLeader(
+        manager,
+        userId,
+        displayName,
+        departmentId,
+        dto.isDeptLeader,
+      );
+      return { user, leaderReplaceHint };
     });
-    return this.toItem(saved);
+    return this.toItem(saved.user, saved.leaderReplaceHint);
   }
 
   async changeStatus(
@@ -223,11 +251,7 @@ export class AdminUserService {
   }
 
   private async replaceRelations(
-    manager: {
-      delete: (entity: unknown, where: object) => Promise<unknown>;
-      create: (entity: unknown, value: object) => object;
-      save: (entity: unknown, value: object | object[]) => Promise<unknown>;
-    },
+    manager: RelationManager,
     userId: number,
     departmentId?: number | null,
     roleIds?: number[],
@@ -250,6 +274,64 @@ export class AdminUserService {
         );
       }
     }
+  }
+
+  private async applyDeptLeader(
+    manager: RelationManager,
+    userId: number,
+    displayName: string,
+    departmentId: number | null | undefined,
+    isDeptLeader: boolean | undefined,
+  ): Promise<string | undefined> {
+    let targetId = departmentId;
+    if (targetId === undefined) {
+      const links = (await manager.find(UserDepartment, {
+        where: { userId },
+      })) as UserDepartment[];
+      targetId = links[0]?.departmentId ?? null;
+    }
+    const owned = (await manager.find(Department, {
+      where: { leaderUserId: userId },
+    })) as Department[];
+    for (const department of owned) {
+      if (department.id === targetId) continue;
+      await manager.update(
+        Department,
+        { id: department.id },
+        { leaderUserId: null },
+      );
+      department.leaderUserId = null;
+    }
+    if (targetId == null) return undefined;
+    if (isDeptLeader === undefined) return undefined;
+    const department = (await manager.findOne(Department, {
+      where: { id: targetId },
+    })) as Department | null;
+    if (!department) return undefined;
+    if (!isDeptLeader) {
+      if (department.leaderUserId === userId) {
+        await manager.update(
+          Department,
+          { id: department.id },
+          { leaderUserId: null },
+        );
+      }
+      return undefined;
+    }
+    let hint: string | undefined;
+    if (department.leaderUserId && department.leaderUserId !== userId) {
+      const previous = (await manager.findOne(User, {
+        where: { id: department.leaderUserId },
+      })) as User | null;
+      hint = `已将${department.name}原负责人${previous?.displayName || ''}替换为${displayName}`;
+    }
+    await manager.update(
+      Department,
+      { id: department.id },
+      { leaderUserId: userId },
+    );
+    department.leaderUserId = userId;
+    return hint;
   }
 
   private async assertSystemAdminSafe(
@@ -348,7 +430,10 @@ export class AdminUserService {
     return Promise.all(users.map((user) => this.toItem(user)));
   }
 
-  private async toItem(user: User): Promise<AdminUserItem> {
+  private async toItem(
+    user: User,
+    leaderReplaceHint?: string,
+  ): Promise<AdminUserItem> {
     const [deptLinks, roleLinks] = await Promise.all([
       this.userDepartmentRepo.find({ where: { userId: user.id } }),
       this.userRoleRepo.find({ where: { userId: user.id } }),
@@ -373,12 +458,17 @@ export class AdminUserService {
       email: user.email,
       status: user.status,
       departments: departments
-        .map((department) => ({ id: department.id, name: department.name }))
+        .map((department) => ({
+          id: department.id,
+          name: department.name,
+          isLeader: department.leaderUserId === user.id,
+        }))
         .sort((a, b) => a.name.localeCompare(b.name, 'zh')),
       roles: roles
         .map((role) => ({ id: role.id, name: role.name, code: role.code }))
         .sort((a, b) => a.name.localeCompare(b.name, 'zh')),
       createdAt: user.createdAt,
+      ...(leaderReplaceHint ? { leaderReplaceHint } : {}),
     };
   }
 }

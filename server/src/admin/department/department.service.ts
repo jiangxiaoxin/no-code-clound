@@ -6,10 +6,17 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
+import { User } from '../../user/user.entity';
 import { Department } from './department.entity';
 import { UserDepartment } from './user-department.entity';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
+
+export type DepartmentLeader = {
+  id: number;
+  displayName: string;
+  status: 'active' | 'disabled';
+};
 
 export type DepartmentItem = {
   id: number;
@@ -19,6 +26,7 @@ export type DepartmentItem = {
   sortOrder: number;
   memberCount: number;
   childCount: number;
+  leader: DepartmentLeader | null;
   children: DepartmentItem[];
 };
 
@@ -29,6 +37,8 @@ export class DepartmentService {
     private readonly departmentRepo: Repository<Department>,
     @InjectRepository(UserDepartment)
     private readonly userDepartmentRepo: Repository<UserDepartment>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   async tree(): Promise<DepartmentItem[]> {
@@ -44,8 +54,23 @@ export class DepartmentService {
       );
     }
 
+    const leaderIds = [
+      ...new Set(
+        departments
+          .map((department) => department.leaderUserId)
+          .filter((id): id is number => id != null && id > 0),
+      ),
+    ];
+    const leaders = leaderIds.length
+      ? await this.userRepo.find({ where: { id: In(leaderIds) } })
+      : [];
+    const leaderById = new Map(leaders.map((user) => [user.id, user]));
+
     const nodes = new Map<number, DepartmentItem>();
     for (const department of departments) {
+      const leaderUser = department.leaderUserId
+        ? leaderById.get(department.leaderUserId)
+        : undefined;
       nodes.set(department.id, {
         id: department.id,
         name: department.name,
@@ -54,6 +79,7 @@ export class DepartmentService {
         sortOrder: department.sortOrder,
         memberCount: memberCounts.get(department.id) ?? 0,
         childCount: 0,
+        leader: this.leaderOf(leaderUser),
         children: [],
       });
     }
@@ -87,7 +113,7 @@ export class DepartmentService {
         sortOrder: dto.sortOrder ?? 0,
       }),
     );
-    return this.toItem(saved, 0, 0);
+    return this.toItem(saved, 0, 0, null);
   }
 
   async update(id: number, dto: UpdateDepartmentDto): Promise<DepartmentItem> {
@@ -112,11 +138,12 @@ export class DepartmentService {
     department.status = status;
     department.sortOrder = sortOrder;
     const saved = await this.departmentRepo.save(department);
-    const [memberCount, childCount] = await Promise.all([
+    const [memberCount, childCount, leader] = await Promise.all([
       this.userDepartmentRepo.count({ where: { departmentId: id } }),
       this.departmentRepo.count({ where: { parentId: id } }),
+      this.loadLeader(saved.leaderUserId),
     ]);
-    return this.toItem(saved, memberCount, childCount);
+    return this.toItem(saved, memberCount, childCount, leader);
   }
 
   async delete(id: number): Promise<void> {
@@ -215,10 +242,28 @@ export class DepartmentService {
     }
   }
 
+  private async loadLeader(
+    leaderUserId: number | null | undefined,
+  ): Promise<DepartmentLeader | null> {
+    if (!leaderUserId) return null;
+    const user = await this.userRepo.findOne({ where: { id: leaderUserId } });
+    return this.leaderOf(user);
+  }
+
+  private leaderOf(user: User | undefined | null): DepartmentLeader | null {
+    if (!user) return null;
+    return {
+      id: user.id,
+      displayName: user.displayName,
+      status: user.status,
+    };
+  }
+
   private toItem(
     department: Department,
     memberCount: number,
     childCount: number,
+    leader: DepartmentLeader | null,
   ): DepartmentItem {
     return {
       id: department.id,
@@ -228,6 +273,7 @@ export class DepartmentService {
       sortOrder: department.sortOrder,
       memberCount,
       childCount,
+      leader,
       children: [],
     };
   }

@@ -76,3 +76,50 @@ test('环不能发布', () => {
   }
   assert.match(validatePublishedGraph(cycle, fields).join(''), /不能绕回/)
 })
+
+test('只勾发起人部门负责人也可以发布', () => {
+  const graph = {
+    nodes: [
+      { key: 'start', type: 'start', title: '开始' },
+      {
+        key: 'n1',
+        type: 'approve',
+        title: '部门审批',
+        approver: {
+          userIds: [],
+          roleIds: [],
+          memberFieldKeys: [],
+          deptLeaderOfInitiator: true,
+        },
+      },
+      { key: 'end', type: 'end', title: '结束' },
+    ],
+    edges: [
+      { key: 'e1', from: 'start', to: 'n1' },
+      { key: 'e2', from: 'n1', to: 'end' },
+    ],
+  }
+  const errors = validatePublishedGraph(graph, fields)
+  assert.equal(errors.some((item) => item.includes('没有审批人')), false)
+})
+
+test('四个来源都空不能发布', () => {
+  const graph = {
+    nodes: [
+      { key: 'start', type: 'start', title: '开始' },
+      {
+        key: 'n1',
+        type: 'approve',
+        title: '部门审批',
+        approver: { userIds: [], roleIds: [], memberFieldKeys: [] },
+      },
+      { key: 'end', type: 'end', title: '结束' },
+    ],
+    edges: [
+      { key: 'e1', from: 'start', to: 'n1' },
+      { key: 'e2', from: 'n1', to: 'end' },
+    ],
+  }
+  const errors = validatePublishedGraph(graph, fields)
+  assert.equal(errors.some((item) => item.includes('没有审批人')), true)
+})

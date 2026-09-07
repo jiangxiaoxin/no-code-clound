@@ -189,6 +189,7 @@ export class WorkflowInboxService {
       actions: this.actionsOf(kind, instance, task),
       fieldAccess: kind === 'todo' ? approve?.fieldAccess || {} : {},
       commentRequiredOnApprove: Boolean(approve?.commentRequiredOnApprove),
+      commentRequiredOnReject: approve?.commentRequiredOnReject !== false,
     };
   }
 

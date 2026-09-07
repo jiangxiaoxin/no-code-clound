@@ -14,7 +14,13 @@ const product = {
       signMode: 'any',
       commentRequiredOnApprove: false,
       fieldAccess: { field_reason: 'editable' },
-      approver: { userIds: [1], roleIds: [2], memberFieldKeys: [] },
+      approver: {
+        userIds: [1],
+        roleIds: [2],
+        memberFieldKeys: [],
+        sameDeptAsInitiator: true,
+        deptLeaderOfInitiator: false,
+      },
     },
   ],
   edges: [

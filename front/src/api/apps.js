@@ -1,6 +1,7 @@
 import http from './http'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { getAccessToken } from '../utils/authToken.js'
 
 export function listAppsApi() {
   return http.get('/apps')
@@ -167,7 +168,7 @@ export function deleteFormRecordApi(appId, formId, recordId) {
 }
 
 export async function downloadRecordImportTemplateApi(appId, formId) {
-  const token = localStorage.getItem('accessToken')
+  const token = getAccessToken()
   try {
     const response = await axios.get(
       `/api/apps/${appId}/forms/${formId}/records/import-template`,

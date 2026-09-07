@@ -3,15 +3,15 @@
     <div class="wf-palette-title">节点</div>
     <el-button plain class="wf-palette-item" @click="addApprove" @mousedown="onDragStartApprove">
       <el-icon><CircleCheck /></el-icon>
-      <span>审批</span>
+      <span>审批节点</span>
     </el-button>
     <el-button plain class="wf-palette-item" @click="addBranch" @mousedown="onDragStartBranch">
       <el-icon><Share /></el-icon>
-      <span>分支</span>
+      <span>分支节点</span>
     </el-button>
     <el-button plain class="wf-palette-item" @click="addEnd" @mousedown="onDragStartEnd">
       <el-icon><Finished /></el-icon>
-      <span>结束</span>
+      <span>结束节点</span>
     </el-button>
   </div>
 </template>
@@ -55,9 +55,12 @@ function onDragStart(type, event) {
 <style scoped lang="less">
 .wf-palette {
   display: flex;
+  flex-shrink: 0;
   flex-direction: column;
   width: 140px;
+  min-height: 0;
   padding: 12px;
+  overflow: hidden;
   border-right: 1px solid var(--el-border-color);
   background: var(--el-bg-color);
 }
