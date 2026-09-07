@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { WorkflowGraph } from './workflow.types';
+import type { WorkflowGraph } from './workflow.types';
 
 @Entity('workflow_definition')
 @Index('uk_workflow_definition_formId', ['formId'], { unique: true })
@@ -21,7 +21,7 @@ export class WorkflowDefinition {
   @Column({ type: 'int' })
   formId: number;
 
-  @Column({ type: 'tinyint', width: 1, default: 0 })
+  @Column({ type: 'boolean', default: false })
   enabled: boolean;
 
   @Column({ type: 'json', nullable: true })

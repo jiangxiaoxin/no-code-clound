@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, type QueryDeepPartialEntity } from 'typeorm';
 import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
@@ -162,7 +162,7 @@ export class WorkflowEngine {
         retryStep: null,
         startedAt: new Date(),
         endedAt: null,
-      },
+      } as QueryDeepPartialEntity<WorkflowInstance>,
     );
     if (!started.affected) {
       throw new ConflictException('当前状态不能提交');
@@ -658,14 +658,19 @@ export class WorkflowEngine {
     return instance;
   }
 
-  private async requirePublished(formId: number) {
+  private async requirePublished(formId: number): Promise<{
+    published: boolean;
+    enabled: boolean;
+    graph: WorkflowGraph;
+    version: number;
+  }> {
     const runtime = await this.definition.getRuntime(formId);
     if (!runtime.published || !runtime.graph) {
       throw new BadRequestException(
         '这张表单还没有配置流程，发布流程之后才能使用',
       );
     }
-    return runtime;
+    return { ...runtime, graph: runtime.graph };
   }
 }
 

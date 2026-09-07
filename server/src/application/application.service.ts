@@ -115,7 +115,13 @@ export class ApplicationService {
   async create(
     ownerId: number,
     dto: CreateApplicationDto,
-  ): Promise<{ id: number; name: string; icon: string }> {
+  ): Promise<{
+    id: number;
+    name: string;
+    icon: string;
+    isOwner: boolean;
+    canConfigure: boolean;
+  }> {
     const name = dto.name.trim();
     if (!name) {
       throw new BadRequestException('请输入应用名称');
@@ -446,7 +452,7 @@ export class ApplicationService {
   private async deleteWorkflowByForm(formId: number) {
     const instances = await this.workflowInstanceRepo.find({
       where: { formId },
-      select: ['id'],
+      select: { id: true },
     });
     const instanceIds = instances.map((row) => row.id);
     if (instanceIds.length) {
@@ -459,7 +465,7 @@ export class ApplicationService {
   private async deleteWorkflowByApp(appId: number) {
     const instances = await this.workflowInstanceRepo.find({
       where: { appId },
-      select: ['id'],
+      select: { id: true },
     });
     const instanceIds = instances.map((row) => row.id);
     if (instanceIds.length) {

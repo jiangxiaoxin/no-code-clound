@@ -5,7 +5,7 @@ import {
   Index,
   PrimaryGeneratedColumn,
 } from 'typeorm';
-import { TaskAction, TaskStatus } from './workflow.types';
+import type { TaskAction, TaskStatus } from './workflow.types';
 
 @Entity('workflow_task')
 @Index(

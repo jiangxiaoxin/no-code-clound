@@ -1,6 +1,6 @@
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, Min } from 'class-validator';
-import { AppAccessScopeType } from '../app-access-scope.entity';
+import type { AppAccessScopeType } from '../app-access-scope.entity';
 
 export class AddAccessScopeDto {
   @IsIn(['user', 'department', 'role'])

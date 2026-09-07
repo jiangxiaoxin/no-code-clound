@@ -6,7 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import {
+import type {
   InstanceNote,
   InstanceStatus,
   RetryPatch,
@@ -51,7 +51,7 @@ export class WorkflowInstance {
   @Column({ type: 'json', nullable: true })
   visitedNodeKeys: string[] | null;
 
-  @Column({ type: 'tinyint', width: 1, default: 0 })
+  @Column({ type: 'boolean', default: false })
   hasApproved: boolean;
 
   @Column({ type: 'int', default: 1 })

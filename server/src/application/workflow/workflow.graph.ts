@@ -293,9 +293,6 @@ export function nextStay(
       edge = edges[0];
     }
     if (!edge) {
-      if (node.type === 'end') {
-        return { kind: 'end', visited, passedApprove };
-      }
       return {
         kind: 'error',
         visited,
