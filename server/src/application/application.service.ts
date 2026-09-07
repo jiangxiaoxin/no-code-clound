@@ -26,6 +26,7 @@ import { FormSerialSeq } from './form-record/form-serial-seq.entity';
 import { WorkflowDefinition } from './workflow/workflow-definition.entity';
 import { WorkflowInstance } from './workflow/workflow-instance.entity';
 import { WorkflowTask } from './workflow/workflow-task.entity';
+import { WorkflowVersion } from './workflow/workflow-version.entity';
 import { mergeFormConfig, normalizeFormConfig } from './form-config';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
 import { assertSerialSchema } from './form-record/serial-number';
@@ -92,6 +93,8 @@ export class ApplicationService {
     private readonly serialSeqRepo: Repository<FormSerialSeq>,
     @InjectRepository(WorkflowDefinition)
     private readonly workflowDefinitionRepo: Repository<WorkflowDefinition>,
+    @InjectRepository(WorkflowVersion)
+    private readonly workflowVersionRepo: Repository<WorkflowVersion>,
     @InjectRepository(WorkflowInstance)
     private readonly workflowInstanceRepo: Repository<WorkflowInstance>,
     @InjectRepository(WorkflowTask)
@@ -192,6 +195,7 @@ export class ApplicationService {
         await txn.delete(WorkflowTask, { instanceId: In(instanceIds) });
       }
       await txn.delete(WorkflowInstance, { appId: id });
+      await txn.delete(WorkflowVersion, { appId: id });
       await txn.delete(WorkflowDefinition, { appId: id });
       if (formIds.length) {
         await txn.delete(FormSerialSeq, { formId: In(formIds) });
@@ -215,9 +219,12 @@ export class ApplicationService {
     await this.access.requireUse(ownerId, appId);
     const form = await this.requireForm(appId, formId);
     const def = await this.workflowDefinitionRepo.findOne({ where: { formId } });
+    const enabled = await this.workflowVersionRepo.findOne({
+      where: { formId, enabled: true },
+    });
     return {
       ...this.toFormDetail(form),
-      ...this.toWorkflowFlags(def),
+      ...this.toWorkflowFlags(Boolean(def?.hasBeenEnabled), Boolean(enabled)),
     };
   }
 
@@ -323,12 +330,19 @@ export class ApplicationService {
       order: { createdAt: 'DESC' },
     });
 
-    const defs = forms.length
+    const formIds = forms.map((form) => form.id);
+    const defs = formIds.length
       ? await this.workflowDefinitionRepo.find({
-          where: { formId: In(forms.map((form) => form.id)) },
+          where: { formId: In(formIds) },
+        })
+      : [];
+    const enabledRows = formIds.length
+      ? await this.workflowVersionRepo.find({
+          where: { formId: In(formIds), enabled: true },
         })
       : [];
     const defByForm = new Map(defs.map((row) => [row.formId, row]));
+    const enabledFormIds = new Set(enabledRows.map((row) => row.formId));
     const formsByGroup = new Map<
       number,
       ReturnType<ApplicationService['toFormItem']>[]
@@ -337,7 +351,10 @@ export class ApplicationService {
     for (const form of forms) {
       const item = {
         ...this.toFormItem(form),
-        ...this.toWorkflowFlags(defByForm.get(form.id)),
+        ...this.toWorkflowFlags(
+          Boolean(defByForm.get(form.id)?.hasBeenEnabled),
+          enabledFormIds.has(form.id),
+        ),
       };
       if (form.groupId == null) {
         rootForms.push(item);
@@ -476,6 +493,7 @@ export class ApplicationService {
       await this.workflowTaskRepo.delete({ instanceId: In(instanceIds) });
     }
     await this.workflowInstanceRepo.delete({ formId });
+    await this.workflowVersionRepo.delete({ formId });
     await this.workflowDefinitionRepo.delete({ formId });
   }
 
@@ -511,10 +529,10 @@ export class ApplicationService {
     return { id: row.id, name: row.name, icon: row.icon };
   }
 
-  private toWorkflowFlags(def?: WorkflowDefinition | null) {
+  private toWorkflowFlags(hasBeenEnabled: boolean, enabledNow: boolean) {
     return {
-      workflowPublished: Boolean(def?.publishedVersion),
-      workflowEnabled: Boolean(def?.enabled),
+      workflowPublished: Boolean(hasBeenEnabled),
+      workflowEnabled: Boolean(enabledNow),
     };
   }
 

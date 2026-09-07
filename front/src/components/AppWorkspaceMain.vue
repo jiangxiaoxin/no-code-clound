@@ -240,7 +240,7 @@ async function onSubmit() {
 
 async function saveRecord(intent) {
   if (workflowUnpublished.value) {
-    ElMessage.warning('这张表单还没有配置流程，发布流程之后才能使用')
+    ElMessage.warning('这张表单还没有配置流程，暂时不能填报')
     return
   }
   const err = firstRequiredError(fields.value, values)

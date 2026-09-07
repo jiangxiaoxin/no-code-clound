@@ -197,7 +197,7 @@ async function loadDictItems() {
 
 function openCreate() {
   if (workflowUnpublished.value) {
-    ElMessage.warning('这张表单还没有配置流程，发布流程之后才能使用')
+    ElMessage.warning('这张表单还没有配置流程，暂时不能填报')
     return
   }
   resetValues()
@@ -247,7 +247,7 @@ async function onCreateSubmit() {
 
 async function createRecord(intent) {
   if (workflowUnpublished.value) {
-    ElMessage.warning('这张表单还没有配置流程，发布流程之后才能使用')
+    ElMessage.warning('这张表单还没有配置流程，暂时不能填报')
     return
   }
   const err = firstRequiredError(fields.value, values)

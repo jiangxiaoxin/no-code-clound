@@ -771,15 +771,15 @@ export class WorkflowEngine {
   }
 
   private async requirePublished(formId: number): Promise<{
-    published: boolean;
+    hasBeenEnabled: boolean;
     enabled: boolean;
     graph: WorkflowGraph;
     version: number;
   }> {
     const runtime = await this.definition.getRuntime(formId);
-    if (!runtime.published || !runtime.graph) {
+    if (!runtime.hasBeenEnabled || !runtime.graph) {
       throw new BadRequestException(
-        '这张表单还没有配置流程，发布流程之后才能使用',
+        '这张表单还没有配置流程，启用流程之后才能使用',
       );
     }
     return { ...runtime, graph: runtime.graph };

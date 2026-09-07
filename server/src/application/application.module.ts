@@ -38,6 +38,7 @@ import { WorkflowRenderService } from './workflow/workflow-render.service';
 import { WorkflowDefinition } from './workflow/workflow-definition.entity';
 import { WorkflowInstance } from './workflow/workflow-instance.entity';
 import { WorkflowTask } from './workflow/workflow-task.entity';
+import { WorkflowVersion } from './workflow/workflow-version.entity';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { WorkflowTask } from './workflow/workflow-task.entity';
       AppAccessScope,
       FormSerialSeq,
       WorkflowDefinition,
+      WorkflowVersion,
       WorkflowInstance,
       WorkflowTask,
     ]),

@@ -8,34 +8,60 @@ import { User } from '../../user/user.entity';
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowDefinition } from './workflow-definition.entity';
 import { WorkflowInstance } from './workflow-instance.entity';
+import { WorkflowVersion } from './workflow-version.entity';
+import { WorkflowGraph } from './workflow.types';
 
-const leaveGraph = {
+const form = {
+  id: 12,
+  applicationId: 8,
+  name: '请假单',
+  formKind: 'workflow',
+  fields: [
+    { key: 'field_leave_type', type: 'select', title: '请假类型' },
+    { key: 'field_reason', type: 'textarea', title: '事由' },
+  ],
+};
+
+const startGraph = {
+  nodes: [{ key: 'start', type: 'start', title: '开始', x: 240, y: 40 }],
+  edges: [],
+};
+
+const leaveGraph: WorkflowGraph = {
   nodes: [
-    { key: 'start', type: 'start', title: '开始', x: 0, y: 0 },
-    { key: 'br1', type: 'branch', title: '按请假类型', x: 0, y: 1 },
+    { key: 'start', type: 'start', title: '开始', x: 240, y: 40 },
+    { key: 'br1', type: 'branch', title: '按请假类型', x: 240, y: 140 },
     {
       key: 'n1',
       type: 'approve',
       title: '部门审批',
-      x: 0,
-      y: 2,
-      approver: { userIds: [], roleIds: [2], memberFieldKeys: [] },
+      x: 80,
+      y: 280,
+      approver: {
+        userIds: [],
+        roleIds: [2],
+        memberFieldKeys: [],
+        sameDeptAsInitiator: true,
+      },
       signMode: 'any',
       commentRequiredOnApprove: false,
-      fieldAccess: {},
+      fieldAccess: {
+        field_leave_type: 'readonly',
+        field_reason: 'editable',
+      },
     },
     {
       key: 'n2',
       type: 'approve',
       title: '人事备案',
-      x: 0,
-      y: 3,
+      x: 240,
+      y: 420,
       approver: { userIds: [9], roleIds: [], memberFieldKeys: [] },
       signMode: 'all',
       commentRequiredOnApprove: false,
       fieldAccess: {},
     },
-    { key: 'end', type: 'end', title: '结束', x: 0, y: 4 },
+    { key: 'end', type: 'end', title: '结束', x: 240, y: 540 },
   ],
   edges: [
     { key: 'e1', from: 'start', to: 'br1' },
@@ -43,21 +69,37 @@ const leaveGraph = {
       key: 'e2',
       from: 'br1',
       to: 'n1',
+      title: '事假',
       sort: 1,
-      when: { logic: 'all', items: [{ key: 'field_leave_type', op: 'eq', value: '事假' }] },
+      isDefault: false,
+      when: {
+        logic: 'all',
+        items: [{ key: 'field_leave_type', op: 'eq', value: '事假' }],
+      },
     },
-    { key: 'e3', from: 'br1', to: 'n2', sort: 2, isDefault: true },
+    {
+      key: 'e3',
+      from: 'br1',
+      to: 'n2',
+      title: '其他情况',
+      sort: 2,
+      isDefault: true,
+    },
     { key: 'e4', from: 'n1', to: 'n2' },
     { key: 'e5', from: 'n2', to: 'end' },
   ],
 };
 
-const form = {
-  id: 12,
-  applicationId: 8,
-  name: '请假单',
-  formKind: 'workflow',
-  fields: [{ key: 'field_leave_type', type: 'select', title: '请假类型' }],
+const noApproverGraph: WorkflowGraph = {
+  ...leaveGraph,
+  nodes: leaveGraph.nodes.map((node) =>
+    node.type === 'approve'
+      ? {
+          ...node,
+          approver: { userIds: [], roleIds: [], memberFieldKeys: [] },
+        }
+      : node,
+  ),
 };
 
 describe('WorkflowDefinitionService', () => {
@@ -66,6 +108,14 @@ describe('WorkflowDefinitionService', () => {
     findOne: jest.fn(),
     create: jest.fn((row) => row),
     save: jest.fn(async (row) => ({ id: row.id ?? 1, ...row })),
+  };
+  const versionRepo = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn((row) => row),
+    save: jest.fn(async (row) => ({ id: row.id ?? 10, ...row })),
+    update: jest.fn(),
+    delete: jest.fn(),
   };
   const formRepo = { findOne: jest.fn() };
   const instanceRepo = { count: jest.fn() };
@@ -79,15 +129,18 @@ describe('WorkflowDefinitionService', () => {
     jest.resetAllMocks();
     defRepo.create.mockImplementation((row) => row);
     defRepo.save.mockImplementation(async (row) => ({ id: row.id ?? 1, ...row }));
+    versionRepo.create.mockImplementation((row) => row);
+    versionRepo.save.mockImplementation(async (row) => ({ id: row.id ?? 10, ...row }));
     access.requireConfigure.mockResolvedValue({ id: 8, ownerId: 3 });
     formRepo.findOne.mockResolvedValue({ ...form });
-    instanceRepo.count.mockResolvedValue(0);
+    instanceRepo.count.mockResolvedValue(2);
     userRepo.find.mockResolvedValue([{ id: 9, status: 'active' }]);
     roleRepo.find.mockResolvedValue([{ id: 2, status: 'active' }]);
     const module = await Test.createTestingModule({
       providers: [
         WorkflowDefinitionService,
         { provide: getRepositoryToken(WorkflowDefinition), useValue: defRepo },
+        { provide: getRepositoryToken(WorkflowVersion), useValue: versionRepo },
         { provide: getRepositoryToken(AppForm), useValue: formRepo },
         { provide: getRepositoryToken(WorkflowInstance), useValue: instanceRepo },
         { provide: getRepositoryToken(User), useValue: userRepo },
@@ -98,91 +151,176 @@ describe('WorkflowDefinitionService', () => {
     service = module.get(WorkflowDefinitionService);
   });
 
-  it('发布缺审批人时拒绝且不启用', async () => {
-    const emptyApprove = {
-      ...leaveGraph,
-      nodes: leaveGraph.nodes.map((node) =>
-        node.key === 'n1'
-          ? {
-              ...node,
-              approver: { userIds: [], roleIds: [], memberFieldKeys: [] },
-            }
-          : node,
-      ),
-    };
-    const row = {
-      id: 1,
-      formId: 12,
-      appId: 8,
-      draftGraph: emptyApprove,
-      publishedGraph: null,
-      publishedVersion: 0,
-      enabled: false,
-    };
-    defRepo.findOne.mockResolvedValue({ ...row });
-
-    await expect(service.publish(3, 8, 12)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(defRepo.save).not.toHaveBeenCalled();
-  });
-
-  it('发布成功后启用且版本为 1', async () => {
-    const row = {
-      id: 1,
-      formId: 12,
-      appId: 8,
-      draftGraph: leaveGraph,
-      publishedGraph: null,
-      publishedVersion: 0,
-      enabled: false,
-    };
-    defRepo.findOne.mockResolvedValue({ ...row });
-
-    const saved = await service.publish(3, 8, 12);
-    expect(saved.enabled).toBe(true);
-    expect(saved.publishedVersion).toBe(1);
-    expect(defRepo.save).toHaveBeenCalledWith(
-      expect.objectContaining({
-        enabled: true,
-        publishedVersion: 1,
-        publishedGraph: leaveGraph,
-      }),
-    );
-  });
-
-  it('只保存草稿不发布', async () => {
+  it('没有版本时生成 V1 开始节点', async () => {
     defRepo.findOne.mockResolvedValue(null);
-    await service.saveDraft(3, 8, 12, leaveGraph);
-    expect(defRepo.save).toHaveBeenCalledWith(
+    versionRepo.find.mockResolvedValue([]);
+    const detail = await service.get(3, 8, 12);
+    expect(versionRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({
-        draftGraph: leaveGraph,
-        publishedVersion: 0,
+        formId: 12,
+        version: 1,
         enabled: false,
+        graph: startGraph,
       }),
     );
-    defRepo.findOne.mockResolvedValue({
-      publishedVersion: 0,
-      enabled: false,
-      publishedGraph: null,
+    expect(detail.versions).toHaveLength(1);
+    expect(detail.versions[0].title).toBe('流程版本 (V1)');
+    expect(detail.runningCount).toBe(2);
+    expect(detail.hasBeenEnabled).toBe(false);
+  });
+
+  it('getRuntime 读启用中的版本', async () => {
+    defRepo.findOne.mockResolvedValue({ id: 1, formId: 12, hasBeenEnabled: true });
+    versionRepo.findOne.mockResolvedValue({
+      id: 4,
+      version: 2,
+      enabled: true,
+      graph: startGraph,
     });
     await expect(service.getRuntime(12)).resolves.toEqual({
-      published: false,
+      hasBeenEnabled: true,
+      enabled: true,
+      graph: startGraph,
+      version: 2,
+    });
+  });
+
+  it('曾经启用当前全关时 getRuntime.enabled 为假', async () => {
+    defRepo.findOne.mockResolvedValue({ id: 1, formId: 12, hasBeenEnabled: true });
+    versionRepo.findOne.mockResolvedValue(null);
+    await expect(service.getRuntime(12)).resolves.toEqual({
+      hasBeenEnabled: true,
       enabled: false,
       graph: null,
       version: 0,
     });
   });
 
-  it('从未发布时不能打开启用开关', async () => {
+  it('从未启用时 getRuntime.hasBeenEnabled 为假', async () => {
+    defRepo.findOne.mockResolvedValue({ id: 1, formId: 12, hasBeenEnabled: false });
+    versionRepo.findOne.mockResolvedValue(null);
+    await expect(service.getRuntime(12)).resolves.toEqual({
+      hasBeenEnabled: false,
+      enabled: false,
+      graph: null,
+      version: 0,
+    });
+  });
+
+  it('启用缺审批人时拒绝且不改 enabled', async () => {
+    defRepo.findOne.mockResolvedValue({ id: 1, formId: 12, hasBeenEnabled: false });
+    versionRepo.findOne.mockResolvedValue({
+      id: 10,
+      formId: 12,
+      version: 1,
+      enabled: false,
+      graph: noApproverGraph,
+    });
+    await expect(service.enableVersion(3, 8, 12, 10)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(versionRepo.update).not.toHaveBeenCalled();
+    expect(versionRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('启用成功后只有这一版 enabled，hasBeenEnabled 为真', async () => {
     defRepo.findOne.mockResolvedValue({
       id: 1,
-      publishedVersion: 0,
+      appId: 8,
+      formId: 12,
+      hasBeenEnabled: false,
+    });
+    versionRepo.findOne.mockResolvedValue({
+      id: 10,
+      formId: 12,
+      version: 1,
       enabled: false,
-      publishedGraph: null,
+      graph: leaveGraph,
     });
-    await expect(service.setEnabled(3, 8, 12, true)).rejects.toMatchObject({
-      message: '请先发布流程',
+    await service.enableVersion(3, 8, 12, 10);
+    expect(versionRepo.update).toHaveBeenCalledWith(
+      { formId: 12 },
+      { enabled: false },
+    );
+    expect(versionRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 10, enabled: true }),
+    );
+    expect(defRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({ hasBeenEnabled: true }),
+    );
+  });
+
+  it('不能保存启用中的版本', async () => {
+    versionRepo.findOne.mockResolvedValue({
+      id: 10,
+      formId: 12,
+      enabled: true,
+      graph: leaveGraph,
     });
+    await expect(
+      service.saveVersion(3, 8, 12, 10, leaveGraph),
+    ).rejects.toThrow('启用中的版本不能修改');
+  });
+
+  it('不能删除启用中的版本', async () => {
+    versionRepo.findOne.mockResolvedValue({
+      id: 10,
+      formId: 12,
+      enabled: true,
+      graph: leaveGraph,
+    });
+    await expect(service.deleteVersion(3, 8, 12, 10)).rejects.toThrow(
+      '启用中的版本不能删除',
+    );
+    expect(versionRepo.delete).not.toHaveBeenCalled();
+  });
+
+  it('复制当前版得到 version+1 且未启用', async () => {
+    versionRepo.findOne.mockResolvedValue({
+      id: 10,
+      appId: 8,
+      formId: 12,
+      version: 2,
+      enabled: true,
+      graph: leaveGraph,
+    });
+    versionRepo.find.mockResolvedValue([{ version: 1 }, { version: 2 }]);
+    await service.copyVersion(3, 8, 12, 10);
+    expect(versionRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formId: 12,
+        version: 3,
+        enabled: false,
+        graph: leaveGraph,
+      }),
+    );
+  });
+
+  it('删光后自动补 V1', async () => {
+    defRepo.findOne.mockResolvedValue({
+      id: 1,
+      appId: 8,
+      formId: 12,
+      hasBeenEnabled: false,
+    });
+    versionRepo.findOne.mockResolvedValue({
+      id: 10,
+      appId: 8,
+      formId: 12,
+      version: 1,
+      enabled: false,
+      graph: leaveGraph,
+    });
+    versionRepo.find.mockResolvedValue([]);
+    await service.deleteVersion(3, 8, 12, 10);
+    expect(versionRepo.delete).toHaveBeenCalled();
+    expect(versionRepo.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        formId: 12,
+        version: 1,
+        enabled: false,
+        graph: startGraph,
+      }),
+    );
   });
 });

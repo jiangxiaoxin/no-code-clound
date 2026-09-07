@@ -120,9 +120,9 @@ export class FormRecordService {
       return this.toRecordView(doc, form);
     }
     const runtime = await this.definition.getRuntime(formId);
-    if (!runtime.published) {
+    if (!runtime.hasBeenEnabled) {
       throw new BadRequestException(
-        '这张表单还没有配置流程，发布流程之后才能使用',
+        '这张表单还没有配置流程，启用流程之后才能使用',
       );
     }
     if (!runtime.enabled) {
@@ -244,9 +244,9 @@ export class FormRecordService {
       return this.toRecordView(doc, form);
     }
     const runtime = await this.definition.getRuntime(formId);
-    if (!runtime.published) {
+    if (!runtime.hasBeenEnabled) {
       throw new BadRequestException(
-        '这张表单还没有配置流程，发布流程之后才能使用',
+        '这张表单还没有配置流程，启用流程之后才能使用',
       );
     }
     const existing = await this.store.findById(formId, recordId);

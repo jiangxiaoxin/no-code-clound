@@ -12,21 +12,42 @@ import { AppForm } from '../app-form.entity';
 import { parseFormSchema } from '../form-schema';
 import { WorkflowDefinition } from './workflow-definition.entity';
 import { WorkflowInstance } from './workflow-instance.entity';
+import { WorkflowVersion } from './workflow-version.entity';
 import { validatePublishedGraph } from './workflow.graph';
 import { WorkflowGraph, WorkflowNode } from './workflow.types';
 
 export type WorkflowRuntime = {
-  published: boolean;
+  hasBeenEnabled: boolean;
   enabled: boolean;
   graph: WorkflowGraph | null;
   version: number;
 };
+
+function emptyStartGraph(): WorkflowGraph {
+  return {
+    nodes: [{ key: 'start', type: 'start', title: '开始', x: 240, y: 40 }],
+    edges: [],
+  };
+}
+
+function versionTitle(version: number) {
+  return `流程版本 (V${version})`;
+}
+
+function sortVersions<T extends { enabled?: boolean; version: number }>(rows: T[]) {
+  return [...rows].sort((a, b) => {
+    if (Boolean(a.enabled) !== Boolean(b.enabled)) return a.enabled ? -1 : 1;
+    return b.version - a.version;
+  });
+}
 
 @Injectable()
 export class WorkflowDefinitionService {
   constructor(
     @InjectRepository(WorkflowDefinition)
     private readonly defRepo: Repository<WorkflowDefinition>,
+    @InjectRepository(WorkflowVersion)
+    private readonly versionRepo: Repository<WorkflowVersion>,
     @InjectRepository(AppForm)
     private readonly formRepo: Repository<AppForm>,
     @InjectRepository(WorkflowInstance)
@@ -41,94 +62,146 @@ export class WorkflowDefinitionService {
   async get(userId: number, appId: number, formId: number) {
     await this.access.requireConfigure(userId, appId);
     await this.requireWorkflowForm(appId, formId);
-    const def = await this.defRepo.findOne({ where: { formId } });
+    const def = await this.ensureRow(appId, formId);
+    let versions = await this.versionRepo.find({ where: { formId } });
+    if (!versions.length) {
+      const created = this.versionRepo.create({
+        appId,
+        formId,
+        version: 1,
+        graph: emptyStartGraph(),
+        enabled: false,
+      });
+      const saved = await this.versionRepo.save(created);
+      versions = [saved];
+    }
+    const sorted = sortVersions(versions);
+    const enabled = sorted.find((row) => row.enabled);
     const runningCount = await this.instanceRepo.count({
       where: { formId, status: 'running' },
     });
-    if (!def) {
-      return {
-        draftGraph: null,
-        publishedGraph: null,
-        publishedVersion: 0,
-        enabled: false,
-        runningCount,
-      };
-    }
     return {
-      draftGraph: def.draftGraph,
-      publishedGraph: def.publishedGraph,
-      publishedVersion: def.publishedVersion,
-      enabled: Boolean(def.enabled),
+      versions: sorted.map((row) => ({
+        id: row.id,
+        version: row.version,
+        enabled: Boolean(row.enabled),
+        title: versionTitle(row.version),
+        graph: row.graph,
+      })),
+      viewingVersionId: enabled?.id ?? sorted[0].id,
       runningCount,
+      hasBeenEnabled: Boolean(def.hasBeenEnabled),
     };
   }
 
-  async saveDraft(
+  async saveVersion(
     userId: number,
     appId: number,
     formId: number,
-    draftGraph: WorkflowGraph,
+    versionId: number,
+    graph: WorkflowGraph,
   ) {
     await this.access.requireConfigure(userId, appId);
     await this.requireWorkflowForm(appId, formId);
-    const def = await this.ensureRow(appId, formId);
-    def.draftGraph = draftGraph;
-    await this.defRepo.save(def);
+    const row = await this.requireVersion(formId, versionId);
+    if (row.enabled) {
+      throw new BadRequestException('启用中的版本不能修改');
+    }
+    row.graph = graph;
+    await this.versionRepo.save(row);
     return { ok: true };
   }
 
-  async publish(userId: number, appId: number, formId: number) {
+  async copyVersion(
+    userId: number,
+    appId: number,
+    formId: number,
+    fromVersionId: number,
+  ) {
+    await this.access.requireConfigure(userId, appId);
+    await this.requireWorkflowForm(appId, formId);
+    const from = await this.requireVersion(formId, fromVersionId);
+    const rows = await this.versionRepo.find({ where: { formId } });
+    const next = Math.max(0, ...rows.map((row) => row.version)) + 1;
+    const created = this.versionRepo.create({
+      appId,
+      formId,
+      version: next,
+      graph: JSON.parse(JSON.stringify(from.graph)) as WorkflowGraph,
+      enabled: false,
+    });
+    return this.versionRepo.save(created);
+  }
+
+  async enableVersion(
+    userId: number,
+    appId: number,
+    formId: number,
+    versionId: number,
+  ) {
     await this.access.requireConfigure(userId, appId);
     const form = await this.requireWorkflowForm(appId, formId);
     const def = await this.ensureRow(appId, formId);
-    const graph = def.draftGraph;
-    if (!graph) {
-      throw new BadRequestException(['请先保存流程草稿']);
-    }
+    const row = await this.requireVersion(formId, versionId);
     const fields = parseFormSchema(form.fields).fields;
     const errors = [
-      ...validatePublishedGraph(graph, fields),
-      ...(await this.validateApproverTargets(graph)),
+      ...validatePublishedGraph(row.graph, fields),
+      ...(await this.validateApproverTargets(row.graph)),
     ];
     if (errors.length) {
       throw new BadRequestException(errors);
     }
-    def.publishedGraph = graph;
-    def.publishedVersion = (def.publishedVersion || 0) + 1;
-    def.enabled = true;
-    def.publishedAt = new Date();
-    return this.defRepo.save(def);
+    await this.versionRepo.update({ formId }, { enabled: false });
+    row.enabled = true;
+    await this.versionRepo.save(row);
+    def.hasBeenEnabled = true;
+    await this.defRepo.save(def);
+    return { ok: true };
   }
 
-  async setEnabled(
+  async deleteVersion(
     userId: number,
     appId: number,
     formId: number,
-    enabled: boolean,
+    versionId: number,
   ) {
     await this.access.requireConfigure(userId, appId);
     await this.requireWorkflowForm(appId, formId);
-    const def = await this.defRepo.findOne({ where: { formId } });
-    if (!def || def.publishedVersion === 0) {
-      if (enabled) throw new BadRequestException('请先发布流程');
-      return { enabled: false };
+    const row = await this.requireVersion(formId, versionId);
+    if (row.enabled) {
+      throw new BadRequestException('启用中的版本不能删除');
     }
-    def.enabled = enabled;
-    await this.defRepo.save(def);
-    return { enabled: Boolean(def.enabled) };
+    await this.versionRepo.delete(row.id);
+    return this.get(userId, appId, formId);
   }
 
   async getRuntime(formId: number): Promise<WorkflowRuntime> {
     const def = await this.defRepo.findOne({ where: { formId } });
-    if (!def || !def.publishedVersion || !def.publishedGraph) {
-      return { published: false, enabled: false, graph: null, version: 0 };
+    const enabled = await this.versionRepo.findOne({
+      where: { formId, enabled: true },
+    });
+    if (enabled) {
+      return {
+        hasBeenEnabled: true,
+        enabled: true,
+        graph: enabled.graph,
+        version: enabled.version,
+      };
     }
     return {
-      published: true,
-      enabled: Boolean(def.enabled),
-      graph: def.publishedGraph,
-      version: def.publishedVersion,
+      hasBeenEnabled: Boolean(def?.hasBeenEnabled),
+      enabled: false,
+      graph: null,
+      version: 0,
     };
+  }
+
+  private async requireVersion(formId: number, versionId: number) {
+    const row = await this.versionRepo.findOne({
+      where: { id: versionId, formId },
+    });
+    if (!row) throw new NotFoundException('流程版本不存在');
+    return row;
   }
 
   private async requireWorkflowForm(appId: number, formId: number) {
@@ -145,15 +218,12 @@ export class WorkflowDefinitionService {
   private async ensureRow(appId: number, formId: number) {
     const existing = await this.defRepo.findOne({ where: { formId } });
     if (existing) return existing;
-    return this.defRepo.create({
+    const row = this.defRepo.create({
       appId,
       formId,
-      enabled: false,
-      draftGraph: null,
-      publishedGraph: null,
-      publishedVersion: 0,
-      publishedAt: null,
+      hasBeenEnabled: false,
     });
+    return this.defRepo.save(row);
   }
 
   private async validateApproverTargets(graph: WorkflowGraph): Promise<string[]> {

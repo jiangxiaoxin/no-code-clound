@@ -6,11 +6,14 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import type { WorkflowGraph } from './workflow.types';
 
-@Entity('workflow_definition')
-@Index('uk_workflow_definition_formId', ['formId'], { unique: true })
-@Index('IDX_workflow_definition_appId', ['appId'])
-export class WorkflowDefinition {
+@Entity('workflow_version')
+@Index('uk_workflow_version_formId_version', ['formId', 'version'], {
+  unique: true,
+})
+@Index('IDX_workflow_version_formId', ['formId'])
+export class WorkflowVersion {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -20,8 +23,14 @@ export class WorkflowDefinition {
   @Column({ type: 'int' })
   formId: number;
 
+  @Column({ type: 'int' })
+  version: number;
+
+  @Column({ type: 'json' })
+  graph: WorkflowGraph;
+
   @Column({ type: 'boolean', default: false })
-  hasBeenEnabled: boolean;
+  enabled: boolean;
 
   @CreateDateColumn()
   createdAt: Date;

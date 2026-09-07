@@ -1,15 +1,33 @@
 <template>
   <div class="wf-palette">
     <div class="wf-palette-title">节点</div>
-    <el-button plain class="wf-palette-item" @click="addApprove" @mousedown="onDragStartApprove">
+    <el-button
+      plain
+      class="wf-palette-item"
+      :disabled="disabled"
+      @click="addApprove"
+      @mousedown="onDragStartApprove"
+    >
       <el-icon><CircleCheck /></el-icon>
       <span>审批节点</span>
     </el-button>
-    <el-button plain class="wf-palette-item" @click="addBranch" @mousedown="onDragStartBranch">
+    <el-button
+      plain
+      class="wf-palette-item"
+      :disabled="disabled"
+      @click="addBranch"
+      @mousedown="onDragStartBranch"
+    >
       <el-icon><Share /></el-icon>
       <span>分支节点</span>
     </el-button>
-    <el-button plain class="wf-palette-item" @click="addEnd" @mousedown="onDragStartEnd">
+    <el-button
+      plain
+      class="wf-palette-item"
+      :disabled="disabled"
+      @click="addEnd"
+      @mousedown="onDragStartEnd"
+    >
       <el-icon><Finished /></el-icon>
       <span>结束节点</span>
     </el-button>
@@ -19,17 +37,23 @@
 <script setup>
 import { CircleCheck, Finished, Share } from '@element-plus/icons-vue'
 
+const props = defineProps({
+  disabled: { type: Boolean, default: false },
+})
 const emit = defineEmits(['add', 'drag-start'])
 
 function addApprove() {
+  if (props.disabled) return
   emit('add', 'approve')
 }
 
 function addBranch() {
+  if (props.disabled) return
   emit('add', 'branch')
 }
 
 function addEnd() {
+  if (props.disabled) return
   emit('add', 'end')
 }
 
@@ -46,6 +70,7 @@ function onDragStartEnd(event) {
 }
 
 function onDragStart(type, event) {
+  if (props.disabled) return
   if (event.button !== 0) return
   event.preventDefault()
   emit('drag-start', type)

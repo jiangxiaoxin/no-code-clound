@@ -459,7 +459,7 @@ describe('FormRecordService', () => {
   it('未发布流程的流程表单一条数据都不写', async () => {
     formRepo.findOne.mockResolvedValue({ ...form, formKind: 'workflow' });
     definition.getRuntime.mockResolvedValue({
-      published: false,
+      hasBeenEnabled: false,
       enabled: false,
       graph: null,
       version: 0,
@@ -473,7 +473,7 @@ describe('FormRecordService', () => {
   it('关掉启用后保存直接记为已通过且不建实例', async () => {
     formRepo.findOne.mockResolvedValue({ ...form, formKind: 'workflow' });
     definition.getRuntime.mockResolvedValue({
-      published: true,
+      hasBeenEnabled: true,
       enabled: false,
       graph: {},
       version: 2,
@@ -491,7 +491,7 @@ describe('FormRecordService', () => {
   it('已通过只有实例发起人能再提交', async () => {
     formRepo.findOne.mockResolvedValue({ ...form, formKind: 'workflow' });
     definition.getRuntime.mockResolvedValue({
-      published: true,
+      hasBeenEnabled: true,
       enabled: true,
       graph: {},
       version: 1,

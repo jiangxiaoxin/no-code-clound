@@ -117,7 +117,7 @@ describe('WorkflowEngine', () => {
     taskRepo.update.mockResolvedValue({ affected: 1 });
     taskRepo.find.mockResolvedValue([]);
     definition.getRuntime.mockResolvedValue({
-      published: true,
+      hasBeenEnabled: true,
       enabled: true,
       graph: leaveGraph,
       version: 1,

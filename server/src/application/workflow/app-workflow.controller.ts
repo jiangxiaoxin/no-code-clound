@@ -1,18 +1,18 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
-  Patch,
   Post,
   Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
-import { PatchEnabledDto } from './dto/patch-enabled.dto';
-import { SaveDraftDto } from './dto/save-draft.dto';
+import { CopyVersionDto } from './dto/copy-version.dto';
+import { SaveVersionDto } from './dto/save-version.dto';
 import { WorkflowDefinitionService } from './workflow-definition.service';
 
 @Controller('apps/:appId/forms/:formId/workflow')
@@ -29,32 +29,55 @@ export class AppWorkflowController {
     return this.definition.get(req.user.id, appId, formId);
   }
 
-  @Put('draft')
-  saveDraft(
+  @Put('versions/:versionId')
+  saveVersion(
     @Req() req: { user: { id: number } },
     @Param('appId', ParseIntPipe) appId: number,
     @Param('formId', ParseIntPipe) formId: number,
-    @Body() dto: SaveDraftDto,
+    @Param('versionId', ParseIntPipe) versionId: number,
+    @Body() dto: SaveVersionDto,
   ) {
-    return this.definition.saveDraft(req.user.id, appId, formId, dto.draftGraph);
+    return this.definition.saveVersion(
+      req.user.id,
+      appId,
+      formId,
+      versionId,
+      dto.graph,
+    );
   }
 
-  @Post('publish')
-  publish(
+  @Post('versions')
+  copyVersion(
     @Req() req: { user: { id: number } },
     @Param('appId', ParseIntPipe) appId: number,
     @Param('formId', ParseIntPipe) formId: number,
+    @Body() dto: CopyVersionDto,
   ) {
-    return this.definition.publish(req.user.id, appId, formId);
+    return this.definition.copyVersion(
+      req.user.id,
+      appId,
+      formId,
+      dto.fromVersionId,
+    );
   }
 
-  @Patch()
-  setEnabled(
+  @Post('versions/:versionId/enable')
+  enableVersion(
     @Req() req: { user: { id: number } },
     @Param('appId', ParseIntPipe) appId: number,
     @Param('formId', ParseIntPipe) formId: number,
-    @Body() dto: PatchEnabledDto,
+    @Param('versionId', ParseIntPipe) versionId: number,
   ) {
-    return this.definition.setEnabled(req.user.id, appId, formId, dto.enabled);
+    return this.definition.enableVersion(req.user.id, appId, formId, versionId);
+  }
+
+  @Delete('versions/:versionId')
+  deleteVersion(
+    @Req() req: { user: { id: number } },
+    @Param('appId', ParseIntPipe) appId: number,
+    @Param('formId', ParseIntPipe) formId: number,
+    @Param('versionId', ParseIntPipe) versionId: number,
+  ) {
+    return this.definition.deleteVersion(req.user.id, appId, formId, versionId);
   }
 }

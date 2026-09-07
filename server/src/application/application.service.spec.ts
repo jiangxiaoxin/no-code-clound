@@ -18,6 +18,7 @@ import { FormSerialSeq } from './form-record/form-serial-seq.entity';
 import { WorkflowDefinition } from './workflow/workflow-definition.entity';
 import { WorkflowInstance } from './workflow/workflow-instance.entity';
 import { WorkflowTask } from './workflow/workflow-task.entity';
+import { WorkflowVersion } from './workflow/workflow-version.entity';
 
 describe('ApplicationService', () => {
   let service: ApplicationService;
@@ -62,6 +63,11 @@ describe('ApplicationService', () => {
     delete: jest.fn(),
   };
   const workflowDefinitionRepo = {
+    delete: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
+  };
+  const workflowVersionRepo = {
     delete: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
@@ -130,6 +136,8 @@ describe('ApplicationService', () => {
     workflowInstanceRepo.find.mockResolvedValue([]);
     workflowDefinitionRepo.find.mockResolvedValue([]);
     workflowDefinitionRepo.findOne.mockResolvedValue(null);
+    workflowVersionRepo.find.mockResolvedValue([]);
+    workflowVersionRepo.findOne.mockResolvedValue(null);
     const module = await Test.createTestingModule({
       providers: [
         ApplicationService,
@@ -143,6 +151,10 @@ describe('ApplicationService', () => {
         {
           provide: getRepositoryToken(WorkflowDefinition),
           useValue: workflowDefinitionRepo,
+        },
+        {
+          provide: getRepositoryToken(WorkflowVersion),
+          useValue: workflowVersionRepo,
         },
         {
           provide: getRepositoryToken(WorkflowInstance),
@@ -296,6 +308,9 @@ describe('ApplicationService', () => {
       expect(manager.delete).toHaveBeenCalledWith(WorkflowInstance, {
         appId: 8,
       });
+      expect(manager.delete).toHaveBeenCalledWith(WorkflowVersion, {
+        appId: 8,
+      });
       expect(manager.delete).toHaveBeenCalledWith(WorkflowDefinition, {
         appId: 8,
       });
@@ -423,6 +438,31 @@ describe('ApplicationService', () => {
         workflowPublished: false,
         workflowEnabled: false,
       });
+    });
+
+    it('曾经启用且当前有启用中版本时两个 flag 都为真', async () => {
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '请假单',
+        applicationId: 8,
+        groupId: null,
+        formKind: 'workflow',
+      });
+      workflowDefinitionRepo.findOne.mockResolvedValue({
+        formId: 10,
+        hasBeenEnabled: true,
+      });
+      workflowVersionRepo.findOne.mockResolvedValue({
+        formId: 10,
+        enabled: true,
+      });
+
+      await expect(service.getForm(1, 8, 10)).resolves.toEqual(
+        expect.objectContaining({
+          workflowPublished: true,
+          workflowEnabled: true,
+        }),
+      );
     });
 
     it('returns saved fields array', async () => {
@@ -791,6 +831,7 @@ describe('ApplicationService', () => {
       await service.deleteForm(1, 8, 10);
 
       expect(formRepo.remove).toHaveBeenCalled();
+      expect(workflowVersionRepo.delete).toHaveBeenCalledWith({ formId: 10 });
       expect(formRecordStore.dropFormCollection).toHaveBeenCalledWith(10);
       expect(formRepo.remove.mock.invocationCallOrder[0]).toBeLessThan(
         formRecordStore.dropFormCollection.mock.invocationCallOrder[0],

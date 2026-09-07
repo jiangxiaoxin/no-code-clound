@@ -4,16 +4,28 @@ export function getWorkflowApi(appId, formId) {
   return http.get(`/apps/${appId}/forms/${formId}/workflow`)
 }
 
-export function saveWorkflowDraftApi(appId, formId, draftGraph) {
-  return http.put(`/apps/${appId}/forms/${formId}/workflow/draft`, { draftGraph })
+export function saveWorkflowVersionApi(appId, formId, versionId, graph) {
+  return http.put(`/apps/${appId}/forms/${formId}/workflow/versions/${versionId}`, {
+    graph,
+  })
 }
 
-export function publishWorkflowApi(appId, formId) {
-  return http.post(`/apps/${appId}/forms/${formId}/workflow/publish`)
+export function copyWorkflowVersionApi(appId, formId, fromVersionId) {
+  return http.post(`/apps/${appId}/forms/${formId}/workflow/versions`, {
+    fromVersionId,
+  })
 }
 
-export function patchWorkflowEnabledApi(appId, formId, enabled) {
-  return http.patch(`/apps/${appId}/forms/${formId}/workflow`, { enabled })
+export function enableWorkflowVersionApi(appId, formId, versionId) {
+  return http.post(
+    `/apps/${appId}/forms/${formId}/workflow/versions/${versionId}/enable`,
+  )
+}
+
+export function deleteWorkflowVersionApi(appId, formId, versionId) {
+  return http.delete(
+    `/apps/${appId}/forms/${formId}/workflow/versions/${versionId}`,
+  )
 }
 
 export function queryWorkflowInboxApi(payload) {

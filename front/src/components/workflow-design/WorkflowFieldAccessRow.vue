@@ -3,13 +3,13 @@
     <span class="wf-access-name" :title="field.title || field.key">
       {{ field.title || field.key }}
     </span>
-    <el-radio-group :model-value="modelValue" class="wf-access-options" @change="onChange">
+    <el-radio-group :model-value="modelValue" class="wf-access-options" :disabled="disabled" @change="onChange">
       <div v-for="mode in allModes" :key="mode" class="wf-access-opt">
         <el-radio v-if="options.includes(mode)" :value="mode" />
       </div>
     </el-radio-group>
     <div class="wf-access-brief">
-      <el-checkbox :model-value="brief" @change="onBriefChange" />
+      <el-checkbox :model-value="brief" :disabled="disabled" @change="onBriefChange" />
     </div>
   </div>
 </template>
@@ -22,6 +22,7 @@ const props = defineProps({
   modelValue: { type: String, default: 'readonly' },
   brief: { type: Boolean, default: false },
   options: { type: Array, default: () => ['readonly'] },
+  disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['change', 'brief'])
 

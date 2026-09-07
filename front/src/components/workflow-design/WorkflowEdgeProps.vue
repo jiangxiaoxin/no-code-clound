@@ -2,9 +2,9 @@
   <div class="wf-props">
     <div class="wf-props-body">
       <label class="wf-label">连线标题</label>
-      <el-input :model-value="edge.title" @update:model-value="onTitle" />
+      <el-input :model-value="edge.title" :disabled="disabled" @update:model-value="onTitle" />
       <template v-if="fromBranch">
-        <el-checkbox :model-value="Boolean(edge.isDefault)" @change="onDefault">
+        <el-checkbox :model-value="Boolean(edge.isDefault)" :disabled="disabled" @change="onDefault">
           其他情况
         </el-checkbox>
         <div v-if="!edge.isDefault" class="wf-hint">
@@ -12,17 +12,19 @@
         </div>
         <FormFilterConditions
           v-if="!edge.isDefault"
+          class="wf-edge-filters"
+          :class="{ 'is-disabled': disabled }"
           :filters="filterModel"
           :app-id="appId"
           :source-fields="conditionFields"
           :form-fields="conditionFields"
         />
         <div class="wf-sort">
-          <el-button @click="moveUp">上移</el-button>
-          <el-button @click="moveDown">下移</el-button>
+          <el-button :disabled="disabled" @click="moveUp">上移</el-button>
+          <el-button :disabled="disabled" @click="moveDown">下移</el-button>
         </div>
       </template>
-      <el-button class="wf-props-delete" type="danger" plain @click="onDelete">
+      <el-button class="wf-props-delete" type="danger" plain :disabled="disabled" @click="onDelete">
         删除连线
       </el-button>
     </div>
@@ -40,6 +42,7 @@ const props = defineProps({
   fromBranch: { type: Boolean, default: false },
   appId: { type: Number, default: 0 },
   formFields: { type: Array, default: () => [] },
+  disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['change', 'move', 'delete'])
 
@@ -67,7 +70,7 @@ function resetFilterModel() {
 }
 
 function saveFilters(value) {
-  if (!props.edge || props.edge.isDefault) return
+  if (props.disabled || !props.edge || props.edge.isDefault) return
   patch({
     when: {
       logic: value.match === 'any' ? 'any' : 'all',
@@ -77,6 +80,7 @@ function saveFilters(value) {
 }
 
 function patch(next) {
+  if (props.disabled) return
   emit('change', { ...props.edge, ...next })
 }
 
@@ -100,6 +104,7 @@ function moveDown() {
 }
 
 async function onDelete() {
+  if (props.disabled) return
   const title = props.edge?.title?.trim()
   const message = title
     ? `确定删除连线「${title}」吗？`
@@ -122,5 +127,9 @@ async function onDelete() {
 
 .wf-sort {
   display: flex;
+}
+
+.wf-edge-filters.is-disabled {
+  pointer-events: none;
 }
 </style>

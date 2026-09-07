@@ -3,12 +3,12 @@
     <div class="wf-props-body">
       <template v-if="node?.type === 'approve'">
         <label class="wf-label">节点名称</label>
-        <el-input :model-value="node.title" @update:model-value="onTitle" />
+        <el-input :model-value="node.title" :disabled="disabled" @update:model-value="onTitle" />
         <label class="wf-label">指定人员</label>
         <FormMemberSelect :field="memberField" :model-value="node.approver?.userIds || []"
-          @update:model-value="onUserIds" />
+          :disabled="disabled" @update:model-value="onUserIds" />
         <label class="wf-label">指定角色</label>
-        <el-button @click="openRoles">选择角色</el-button>
+        <el-button :disabled="disabled" @click="openRoles">选择角色</el-button>
         <div v-if="selectedRoles.length" class="wf-selected-roles">
           <span
             v-for="role in selectedRoles"
@@ -18,28 +18,28 @@
             {{ role.name }}
           </span>
         </div>
-        <el-checkbox :model-value="node.approver?.sameDeptAsInitiator !== false" @change="onSameDept">
+        <el-checkbox :model-value="node.approver?.sameDeptAsInitiator !== false" :disabled="disabled" @change="onSameDept">
           限定与发起人同部门
         </el-checkbox>
         <label class="wf-label wf-label-break">表单内人员字段</label>
-        <el-select multiple :model-value="node.approver?.memberFieldKeys || []" @update:model-value="onMemberFields">
+        <el-select multiple :disabled="disabled" :model-value="node.approver?.memberFieldKeys || []" @update:model-value="onMemberFields">
           <el-option v-for="field in memberFields" :key="field.key" :label="field.title || field.key"
             :value="field.key" />
         </el-select>
         <label class="wf-label wf-label-break">部门负责人</label>
-        <el-checkbox :model-value="Boolean(node.approver?.deptLeaderOfInitiator)" @change="onDeptLeader">
+        <el-checkbox :model-value="Boolean(node.approver?.deptLeaderOfInitiator)" :disabled="disabled" @change="onDeptLeader">
           发起人所属部门的负责人
         </el-checkbox>
         <label class="wf-label">多人时</label>
-        <el-radio-group :model-value="node.signMode || 'any'" @change="onSignMode">
+        <el-radio-group :model-value="node.signMode || 'any'" :disabled="disabled" @change="onSignMode">
           <el-radio value="any">或签（一人即可）</el-radio>
           <el-radio value="all">会签（全部通过）</el-radio>
         </el-radio-group>
         <label class="wf-label wf-label-break">意见是否必填</label>
-        <el-checkbox :model-value="Boolean(node.commentRequiredOnApprove)" @change="onCommentRequiredOnApprove" class="same-as-radio">
+        <el-checkbox :model-value="Boolean(node.commentRequiredOnApprove)" :disabled="disabled" @change="onCommentRequiredOnApprove" class="same-as-radio">
           通过时意见必填
         </el-checkbox>
-        <el-checkbox :model-value="node.commentRequiredOnReject !== false" @change="onCommentRequiredOnReject" class="same-as-radio">
+        <el-checkbox :model-value="node.commentRequiredOnReject !== false" :disabled="disabled" @change="onCommentRequiredOnReject" class="same-as-radio">
           拒绝时意见必填
         </el-checkbox>
         <div class="wf-label">字段权限</div>
@@ -49,43 +49,46 @@
             <div class="wf-access-options">
               <div class="wf-access-opt">
                 <span class="wf-access-col-title">可编辑</span>
-                <el-link type="primary" underline="never" @click="onToggleAccessAllEditable">
+                <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleAccessAllEditable">
                   {{ bulkLabel('editable') }}
                 </el-link>
               </div>
               <div class="wf-access-opt">
                 <span class="wf-access-col-title">只读</span>
-                <el-link type="primary" underline="never" @click="onToggleAccessAllReadonly">
+                <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleAccessAllReadonly">
                   {{ bulkLabel('readonly') }}
                 </el-link>
               </div>
               <div class="wf-access-opt">
                 <span class="wf-access-col-title">不可见</span>
-                <el-link type="primary" underline="never" @click="onToggleAccessAllHidden">
+                <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleAccessAllHidden">
                   {{ bulkLabel('hidden') }}
                 </el-link>
               </div>
             </div>
             <div class="wf-access-brief">
               <span class="wf-access-col-title">简报</span>
-              <el-link type="primary" underline="never" @click="onToggleBriefAll">
+              <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleBriefAll">
                 {{ briefBulkLabel }}
               </el-link>
             </div>
           </div>
           <WorkflowFieldAccessRow v-for="field in accessFields" :key="field.key" :field="field"
-            :model-value="accessOf(field)" :brief="briefOf(field)" :options="accessOptions(field)" @change="onAccess"
-            @brief="onBrief" />
+            :model-value="accessOf(field)" :brief="briefOf(field)" :options="accessOptions(field)"
+            :disabled="disabled" @change="onAccess" @brief="onBrief" />
         </div>
       </template>
       <template v-else-if="node?.type === 'branch'">
         <label class="wf-label">分支名称</label>
-        <el-input :model-value="node.title" @update:model-value="onTitle" />
+        <el-input :model-value="node.title" :disabled="disabled" @update:model-value="onTitle" />
       </template>
-      <div v-else class="wf-hint">开始和结束节点不用改属性</div>
+      <template v-else-if="node?.type === 'start' || node?.type === 'end'">
+        <label class="wf-label">节点名称</label>
+        <el-input :model-value="node.title" :disabled="disabled" @update:model-value="onTitle" />
+      </template>
       <RolePicker v-model="roleVisible" :model-value-ids="node?.approver?.roleIds || []"
         @update:model-value-ids="onRoleIds" />
-      <el-button class="wf-props-delete" type="danger" plain :disabled="node?.type === 'start'" @click="onDelete">
+      <el-button class="wf-props-delete" type="danger" plain :disabled="disabled || node?.type === 'start'" @click="onDelete">
         删除节点
       </el-button>
     </div>
@@ -105,6 +108,7 @@ import WorkflowFieldAccessRow from './WorkflowFieldAccessRow.vue'
 const props = defineProps({
   node: { type: Object, default: null },
   formFields: { type: Array, default: () => [] },
+  disabled: { type: Boolean, default: false },
 })
 const emit = defineEmits(['change', 'delete'])
 const roleVisible = ref(false)
@@ -127,6 +131,7 @@ const accessFields = computed(() =>
 )
 
 function patch(next) {
+  if (props.disabled) return
   emit('change', { ...props.node, ...next })
 }
 
@@ -301,6 +306,7 @@ function onToggleAccessAllHidden() {
 }
 
 function openRoles() {
+  if (props.disabled) return
   roleVisible.value = true
 }
 
@@ -313,7 +319,7 @@ async function loadRoles() {
 }
 
 async function onDelete() {
-  if (props.node?.type === 'start') return
+  if (props.disabled || props.node?.type === 'start') return
   const title = props.node?.title || '该节点'
   try {
     await ElMessageBox.confirm(
