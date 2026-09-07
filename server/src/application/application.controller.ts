@@ -22,6 +22,7 @@ import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
 import { join, relative, sep } from 'path';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AppUploadGuard } from './access/app-upload.guard';
 import { ApplicationService } from './application.service';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { ConvertFormKindDto } from './dto/convert-form-kind.dto';
@@ -301,6 +302,7 @@ export class ApplicationController {
   }
 
   @Post(':id/uploads')
+  @UseGuards(AppUploadGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -323,11 +325,8 @@ export class ApplicationController {
     }),
   )
   async uploadImage(
-    @Req() req: { user: { id: number } },
-    @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file?: { filename: string; path: string },
   ) {
-    await this.applicationService.getOne(req.user.id, id);
     if (!file?.filename || !file.path) {
       throw new BadRequestException('请选择图片');
     }
@@ -335,6 +334,7 @@ export class ApplicationController {
   }
 
   @Post(':id/file-uploads')
+  @UseGuards(AppUploadGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -357,12 +357,9 @@ export class ApplicationController {
     }),
   )
   async uploadFile(
-    @Req() req: { user: { id: number } },
-    @Param('id', ParseIntPipe) id: number,
     @UploadedFile()
     file?: { filename: string; path: string; originalname?: string },
   ) {
-    await this.applicationService.getOne(req.user.id, id);
     if (!file?.filename || !file.path) {
       throw new BadRequestException('请选择文件');
     }

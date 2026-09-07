@@ -46,6 +46,9 @@ export class WorkflowRenderService {
     }
     const sourceForm = await this.formRepo.findOne({ where: { id: sourceFormId } });
     if (!sourceForm) throw new NotFoundException('源表不存在');
+    if (sourceForm.applicationId !== instance.appId) {
+      throw new BadRequestException('该字段的数据源不属于本应用，请联系应用配置者检查');
+    }
     const fields = parseFormSchema(sourceForm.fields).fields;
     const filters = [...(body.filters || [])];
     if (body.keyword && fields?.[0]?.key) {
@@ -58,7 +61,6 @@ export class WorkflowRenderService {
       pickApproved: sourceForm.formKind === 'workflow',
       formKind: sourceForm.formKind,
     });
-    void instance;
     return this.store.query(sourceFormId, built);
   }
 
@@ -85,6 +87,9 @@ export class WorkflowRenderService {
     }
     const sourceForm = await this.formRepo.findOne({ where: { id: sourceFormId } });
     if (!sourceForm) return { data: {} };
+    if (sourceForm.applicationId !== instance.appId) {
+      throw new BadRequestException('该字段的数据源不属于本应用，请联系应用配置者检查');
+    }
     const fields = parseFormSchema(sourceForm.fields).fields;
     const built = buildRecordQuery(fields, {
       filters: body.conditions || [],

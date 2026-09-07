@@ -51,6 +51,26 @@ test('审批中不能删', () => {
   )
 })
 
+test('草稿、已驳回、异常只有发起人且发布页删除开着能删', () => {
+  const base = { formKind: 'workflow', initiatorId: 5, actorId: 5 }
+  assert.equal(
+    canDeleteWorkflowRecord({ ...base, status: 'draft', publishDelete: false }),
+    false,
+  )
+  assert.equal(
+    canDeleteWorkflowRecord({ ...base, status: 'draft', publishDelete: true }),
+    true,
+  )
+  assert.equal(
+    canDeleteWorkflowRecord({ ...base, status: 'rejected', publishDelete: false }),
+    false,
+  )
+  assert.equal(
+    canDeleteWorkflowRecord({ ...base, status: 'error', publishDelete: true }),
+    true,
+  )
+})
+
 test('提交成功提示用节点标题', () => {
   assert.equal(submitSuccessText('部门审批'), '已提交，等待「部门审批」')
   assert.equal(submitSuccessText(''), '已提交并通过')

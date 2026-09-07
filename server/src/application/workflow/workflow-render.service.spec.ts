@@ -64,7 +64,12 @@ describe('WorkflowRenderService', () => {
           ],
         };
       }
-      return { id: 20, formKind: 'workflow', fields: [{ key: 'name', type: 'input' }] };
+      return {
+        id: 20,
+        applicationId: 8,
+        formKind: 'workflow',
+        fields: [{ key: 'name', type: 'input' }],
+      };
     });
     store.query.mockResolvedValue({
       items: [{ data: { name: '设备A' }, workflowStatus: 'approved' }],

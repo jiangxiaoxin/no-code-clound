@@ -108,19 +108,25 @@ const memberField = {
   placeholder: '选择人员',
 }
 
+// 换应用很快时旧请求可能比新请求后回来：只认最后一次 load 的响应，旧的直接扔掉
+let loadSeq = 0
+
 async function load() {
+  const seq = ++loadSeq
+  const id = appId.value
   loading.value = true
   try {
     const [list, app] = await Promise.all([
-      listConfiguratorsApi(appId.value),
-      getAppApi(appId.value),
+      listConfiguratorsApi(id),
+      getAppApi(id),
     ])
+    if (seq !== loadSeq) return
     items.value = Array.isArray(list) ? list : []
     isOwner.value = Boolean(app?.isOwner)
   } catch {
     // 错误已由 http 拦截器提示
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 

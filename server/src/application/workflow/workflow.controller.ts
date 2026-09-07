@@ -22,6 +22,7 @@ import { originalUploadName } from '../upload-filename';
 import { CompleteTaskDto } from './dto/complete-task.dto';
 import { InstanceDataDto } from './dto/instance-data.dto';
 import { QueryInboxDto } from './dto/query-inbox.dto';
+import { RenderUploadGuard } from './render-upload.guard';
 import { WorkflowInboxService } from './workflow-inbox.service';
 import { WorkflowInstanceService } from './workflow-instance.service';
 import { WorkflowRenderService } from './workflow-render.service';
@@ -147,6 +148,7 @@ export class WorkflowController {
   }
 
   @Post('render/:instanceId/files')
+  @UseGuards(RenderUploadGuard)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: diskStorage({
@@ -166,14 +168,9 @@ export class WorkflowController {
     }),
   )
   async uploadFile(
-    @Req() req: { user: { id: number } },
-    @Param('instanceId', ParseIntPipe) instanceId: number,
-    @Body('fieldKey') fieldKey: string,
     @UploadedFile()
     file?: { filename: string; path: string; originalname?: string },
   ) {
-    if (!fieldKey) throw new BadRequestException('请指定字段');
-    await this.render.assertWritable(instanceId, req.user.id, fieldKey);
     if (!file?.filename || !file.path) {
       throw new BadRequestException('请选择文件');
     }

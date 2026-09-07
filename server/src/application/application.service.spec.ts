@@ -1,11 +1,14 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { DataSource, In } from 'typeorm';
 import { AppForm } from './app-form.entity';
 import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
 import { ApplicationService } from './application.service';
+import { AppConfigurator } from './access/app-configurator.entity';
+import { AppAccessScope } from './access/app-access-scope.entity';
 import { Dictionary } from './dictionary/dictionary.entity';
 import { DictionaryItem } from './dictionary/dictionary-item.entity';
 import { AppAccessAdminService } from './access/app-access-admin.service';
@@ -87,6 +90,18 @@ describe('ApplicationService', () => {
   const accessAdmin = {
     deleteForApp: jest.fn(),
   };
+  const manager = {
+    delete: jest.fn(),
+    remove: jest.fn(),
+    save: jest.fn(),
+    findOne: jest.fn(),
+    create: jest.fn((_entity: unknown, value: unknown) => value),
+  };
+  const dataSource = {
+    transaction: jest.fn(async (fn: (m: typeof manager) => Promise<unknown>) =>
+      fn(manager),
+    ),
+  };
 
   const ownedApp = {
     id: 8,
@@ -97,6 +112,11 @@ describe('ApplicationService', () => {
 
   beforeEach(async () => {
     jest.resetAllMocks();
+    dataSource.transaction.mockImplementation(
+      async (fn: (m: typeof manager) => Promise<unknown>) => fn(manager),
+    );
+    manager.delete.mockResolvedValue({ affected: 1 });
+    manager.remove.mockResolvedValue(undefined);
     access.requireUse.mockImplementation(async () => ({ ...ownedApp }));
     access.requireConfigure.mockImplementation(async () => ({ ...ownedApp }));
     access.requireOwner.mockImplementation(async () => ({ ...ownedApp }));
@@ -135,6 +155,7 @@ describe('ApplicationService', () => {
         { provide: FormRecordStore, useValue: formRecordStore },
         { provide: AppAccessService, useValue: access },
         { provide: AppAccessAdminService, useValue: accessAdmin },
+        { provide: DataSource, useValue: dataSource },
       ],
     }).compile();
     service = module.get(ApplicationService);
@@ -258,51 +279,95 @@ describe('ApplicationService', () => {
   });
 
   describe('deleteApp', () => {
-    it('removes mysql rows and mongo collections for the app', async () => {
-      repo.findOne.mockResolvedValue(ownedApp);
+    it('删应用：MySQL 全部进一个事务，Mongo 集合放最后', async () => {
       formRepo.find.mockResolvedValue([
         { id: 10, applicationId: 8 },
         { id: 11, applicationId: 8 },
       ]);
       dictRepo.find.mockResolvedValue([{ id: 3, applicationId: 8 }]);
+      workflowInstanceRepo.find.mockResolvedValue([{ id: 30 }]);
 
       await service.deleteApp(1, 8);
 
-      expect(accessAdmin.deleteForApp).toHaveBeenCalledWith(8);
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(manager.delete).toHaveBeenCalledWith(WorkflowTask, {
+        instanceId: In([30]),
+      });
+      expect(manager.delete).toHaveBeenCalledWith(WorkflowInstance, {
+        appId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(WorkflowDefinition, {
+        appId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(FormSerialSeq, {
+        formId: In([10, 11]),
+      });
+      expect(manager.delete).toHaveBeenCalledWith(AppFormConfig, {
+        formId: In([10, 11]),
+      });
+      expect(manager.delete).toHaveBeenCalledWith(DictionaryItem, {
+        dictionaryId: In([3]),
+      });
+      expect(manager.delete).toHaveBeenCalledWith(Dictionary, {
+        applicationId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(AppForm, {
+        applicationId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(AppGroup, {
+        applicationId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(AppConfigurator, {
+        appId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(AppAccessScope, { appId: 8 });
+      expect(manager.remove).toHaveBeenCalledWith(
+        Application,
+        expect.objectContaining({ id: 8 }),
+      );
       expect(formRecordStore.dropAppCollections).toHaveBeenCalledWith(8, [
         10, 11,
       ]);
-      expect(formRecordStore.dropAppCollections.mock.invocationCallOrder[0]).toBeLessThan(
-        serialSeqRepo.delete.mock.invocationCallOrder[0],
+      expect(dataSource.transaction.mock.invocationCallOrder[0]).toBeLessThan(
+        formRecordStore.dropAppCollections.mock.invocationCallOrder[0],
       );
-      expect(serialSeqRepo.delete).toHaveBeenCalled();
-      expect(formConfigRepo.delete).toHaveBeenCalled();
-      expect(itemRepo.delete).toHaveBeenCalled();
-      expect(dictRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
-      expect(formRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
-      expect(groupRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
-      expect(repo.remove).toHaveBeenCalledWith(ownedApp);
     });
 
-    it('still drops leftover mongo collections when the app has no forms', async () => {
-      repo.findOne.mockResolvedValue(ownedApp);
+    it('删应用：没有表单时不删表单相关表，仍清 Mongo', async () => {
       formRepo.find.mockResolvedValue([]);
       dictRepo.find.mockResolvedValue([]);
 
       await service.deleteApp(1, 8);
 
+      expect(manager.delete).not.toHaveBeenCalledWith(
+        FormSerialSeq,
+        expect.anything(),
+      );
+      expect(manager.delete).not.toHaveBeenCalledWith(
+        AppFormConfig,
+        expect.anything(),
+      );
+      expect(manager.delete).not.toHaveBeenCalledWith(
+        DictionaryItem,
+        expect.anything(),
+      );
+      expect(manager.delete).toHaveBeenCalledWith(Dictionary, {
+        applicationId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(AppForm, {
+        applicationId: 8,
+      });
+      expect(manager.delete).toHaveBeenCalledWith(AppGroup, {
+        applicationId: 8,
+      });
+      expect(manager.remove).toHaveBeenCalledWith(
+        Application,
+        expect.objectContaining({ id: 8 }),
+      );
       expect(formRecordStore.dropAppCollections).toHaveBeenCalledWith(8, []);
-      expect(serialSeqRepo.delete).not.toHaveBeenCalled();
-      expect(formConfigRepo.delete).not.toHaveBeenCalled();
-      expect(itemRepo.delete).not.toHaveBeenCalled();
-      expect(dictRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
-      expect(formRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
-      expect(groupRepo.delete).toHaveBeenCalledWith({ applicationId: 8 });
-      expect(repo.remove).toHaveBeenCalledWith(ownedApp);
     });
 
-    it('does not delete mysql when mongo drop fails', async () => {
-      repo.findOne.mockResolvedValue(ownedApp);
+    it('删应用：MySQL 事务先整体删除，Mongo 失败只留孤儿集合不留空壳', async () => {
       formRepo.find.mockResolvedValue([{ id: 10, applicationId: 8 }]);
       dictRepo.find.mockResolvedValue([]);
       formRecordStore.dropAppCollections.mockRejectedValue(
@@ -310,9 +375,20 @@ describe('ApplicationService', () => {
       );
 
       await expect(service.deleteApp(1, 8)).rejects.toThrow('mongo down');
-      expect(repo.remove).not.toHaveBeenCalled();
-      expect(formRepo.delete).not.toHaveBeenCalled();
-      expect(accessAdmin.deleteForApp).not.toHaveBeenCalled();
+      expect(manager.remove).toHaveBeenCalledWith(
+        Application,
+        expect.objectContaining({ id: 8 }),
+      );
+      expect(formRecordStore.dropAppCollections).toHaveBeenCalledWith(8, [10]);
+    });
+
+    it('MySQL 事务失败时不碰 Mongo', async () => {
+      formRepo.find.mockResolvedValue([{ id: 10, applicationId: 8 }]);
+      dictRepo.find.mockResolvedValue([]);
+      manager.delete.mockRejectedValue(new Error('db down'));
+
+      await expect(service.deleteApp(1, 8)).rejects.toThrow('db down');
+      expect(formRecordStore.dropAppCollections).not.toHaveBeenCalled();
     });
 
     it('throws 404 when missing or not owner', async () => {
@@ -323,7 +399,7 @@ describe('ApplicationService', () => {
       );
       expect(formRepo.find).not.toHaveBeenCalled();
       expect(formRecordStore.dropAppCollections).not.toHaveBeenCalled();
-      expect(repo.remove).not.toHaveBeenCalled();
+      expect(manager.remove).not.toHaveBeenCalled();
     });
   });
 
@@ -1105,5 +1181,57 @@ describe('ApplicationService', () => {
         },
       ]);
     });
+  });
+
+  it('saveFields：选择数据指向其他应用的表时拒绝保存', async () => {
+    formRepo.findOne.mockResolvedValue({
+      id: 12,
+      applicationId: 8,
+      name: '请假单',
+      formKind: 'workflow',
+      fields: [],
+    });
+    formRepo.find.mockResolvedValue([{ id: 20, applicationId: 77, fields: [] }]);
+    formRepo.save.mockImplementation(async (row: Partial<AppForm>) => ({
+      id: 12,
+      ...row,
+    }));
+    await expect(
+      service.saveFields(1, 8, 12, [
+        {
+          key: 'field_device',
+          type: 'data',
+          title: '选择设备',
+          sourceFormId: 20,
+          linkage: { sourceFormId: 20, sourceKey: 'name', fieldMappings: [] },
+        },
+      ]),
+    ).rejects.toThrow('数据源');
+    expect(formRepo.save).not.toHaveBeenCalled();
+  });
+
+  it('saveFields：数据源属于本应用时正常保存（回归锁）', async () => {
+    formRepo.findOne.mockResolvedValue({
+      id: 12,
+      applicationId: 8,
+      name: '请假单',
+      formKind: 'workflow',
+      fields: [],
+    });
+    formRepo.find.mockResolvedValue([{ id: 20, applicationId: 8, fields: [] }]);
+    formRepo.save.mockImplementation(async (row: Partial<AppForm>) => ({
+      id: 12,
+      ...row,
+    }));
+    await service.saveFields(1, 8, 12, [
+      {
+        key: 'field_device',
+        type: 'data',
+        title: '选择设备',
+        sourceFormId: 20,
+        linkage: { sourceFormId: 20, sourceKey: 'name', fieldMappings: [] },
+      },
+    ]);
+    expect(formRepo.save).toHaveBeenCalled();
   });
 });

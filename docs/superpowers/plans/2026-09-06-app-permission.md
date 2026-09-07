@@ -1,6 +1,6 @@
 # 应用配置权与使用范围 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务推进。默认在 `master` 上改。未经使用者允许不开分支、不建 worktree。未经使用者要求不 commit。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development（推荐）或 superpowers:executing-plans，按任务推进。分支 / worktree / commit 规则以根目录 `AGENTS.md`（`.cursor/rules/` 同义）为准，本计划不另复制。
 
 **Goal:** 让应用不再只有创建人能进：所有者可以在应用后台把配置权交给具体的人、按部门/角色/人员开放使用，并能把所有者交给别人；所有者停用后，只有系统管理员能在管理后台替他交出去。
 
@@ -14,7 +14,7 @@
 
 ## Global Constraints
 
-- 默认在 `master` 开发；未经允许不开分支、不建 worktree；不自动 commit。
+- 分支 / worktree / commit 规则见根目录 `AGENTS.md`「开发分支」，本计划不复制会过期的口径。
 - TypeORM `synchronize: false`。SQL 写好后停下，等使用者点名该文件并同意才能执行。
 - 表名单数下划线、列驼峰、普通索引 `IDX_表名_属性`、唯一约束 `uk_表名_属性`。
 - 模板不写行内 JS；布局优先 flex；相邻 `el-button` 容器不加 `gap`；`el-dialog` 默认 `draggable`。

@@ -36,7 +36,7 @@ export function canDeleteWorkflowRecord({
   if (status === 'running') return false
   if (status === 'approved') return Boolean(publishDelete)
   if (status === 'draft' || status === 'rejected' || status === 'error') {
-    return initiatorId === actorId
+    return initiatorId === actorId && Boolean(publishDelete)
   }
   return false
 }

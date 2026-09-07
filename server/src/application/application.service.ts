@@ -5,19 +5,20 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { AppForm } from './app-form.entity';
 import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
+import { AppAccessService } from './access/app-access.service';
+import { AppConfigurator } from './access/app-configurator.entity';
+import { AppAccessScope } from './access/app-access-scope.entity';
 import { Dictionary } from './dictionary/dictionary.entity';
 import { DictionaryItem } from './dictionary/dictionary-item.entity';
 import { CreateApplicationDto } from './dto/create-application.dto';
 import { ConvertFormKindDto } from './dto/convert-form-kind.dto';
 import { CreateFormDto } from './dto/create-form.dto';
 import { NameDto } from './dto/name.dto';
-import { AppAccessAdminService } from './access/app-access-admin.service';
-import { AppAccessService } from './access/app-access.service';
 import { flattenFields } from './form-record/flatten-fields';
 import { FormField } from './form-record/form-record.types';
 import { FormRecordStore } from './form-record/form-record.store';
@@ -97,7 +98,7 @@ export class ApplicationService {
     private readonly workflowTaskRepo: Repository<WorkflowTask>,
     private readonly formRecordStore: FormRecordStore,
     private readonly access: AppAccessService,
-    private readonly accessAdmin: AppAccessAdminService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async list(ownerId: number): Promise<
@@ -177,23 +178,37 @@ export class ApplicationService {
       where: { applicationId: id },
     });
     const dictIds = dicts.map((row) => row.id);
+    const instanceIds = (
+      await this.workflowInstanceRepo.find({
+        where: { appId: id },
+        select: { id: true },
+      })
+    ).map((row) => row.id);
+
+    // MySQL 侧一个事务全删或全不删，不会留下看得见的空壳；Mongo 集合没法进事务，
+    // 放在最后删：失败时只留下没人能看见的孤儿集合
+    await this.dataSource.transaction(async (txn) => {
+      if (instanceIds.length) {
+        await txn.delete(WorkflowTask, { instanceId: In(instanceIds) });
+      }
+      await txn.delete(WorkflowInstance, { appId: id });
+      await txn.delete(WorkflowDefinition, { appId: id });
+      if (formIds.length) {
+        await txn.delete(FormSerialSeq, { formId: In(formIds) });
+        await txn.delete(AppFormConfig, { formId: In(formIds) });
+      }
+      if (dictIds.length) {
+        await txn.delete(DictionaryItem, { dictionaryId: In(dictIds) });
+      }
+      await txn.delete(Dictionary, { applicationId: id });
+      await txn.delete(AppForm, { applicationId: id });
+      await txn.delete(AppGroup, { applicationId: id });
+      await txn.delete(AppConfigurator, { appId: id });
+      await txn.delete(AppAccessScope, { appId: id });
+      await txn.remove(Application, app);
+    });
 
     await this.formRecordStore.dropAppCollections(id, formIds);
-
-    await this.deleteWorkflowByApp(id);
-
-    if (formIds.length) {
-      await this.serialSeqRepo.delete({ formId: In(formIds) });
-      await this.formConfigRepo.delete({ formId: In(formIds) });
-    }
-    if (dictIds.length) {
-      await this.itemRepo.delete({ dictionaryId: In(dictIds) });
-    }
-    await this.dictRepo.delete({ applicationId: id });
-    await this.formRepo.delete({ applicationId: id });
-    await this.groupRepo.delete({ applicationId: id });
-    await this.accessAdmin.deleteForApp(id);
-    await this.appRepo.remove(app);
   }
 
   async getForm(ownerId: number, appId: number, formId: number) {
@@ -218,7 +233,9 @@ export class ApplicationService {
     }
     await this.access.requireConfigure(ownerId, appId);
     const form = await this.requireForm(appId, formId);
-    assertSerialSchema(flattenFields(fields as FormField[]));
+    const flat = flattenFields(fields as FormField[]);
+    assertSerialSchema(flat);
+    await this.assertSourceFormsInApp(appId, flat);
     form.fields = serializeFormSchema(
       fields as Record<string, unknown>[],
       columns,
@@ -462,19 +479,6 @@ export class ApplicationService {
     await this.workflowDefinitionRepo.delete({ formId });
   }
 
-  private async deleteWorkflowByApp(appId: number) {
-    const instances = await this.workflowInstanceRepo.find({
-      where: { appId },
-      select: { id: true },
-    });
-    const instanceIds = instances.map((row) => row.id);
-    if (instanceIds.length) {
-      await this.workflowTaskRepo.delete({ instanceId: In(instanceIds) });
-    }
-    await this.workflowInstanceRepo.delete({ appId });
-    await this.workflowDefinitionRepo.delete({ appId });
-  }
-
   private async requireGroup(applicationId: number, groupId: number) {
     const group = await this.groupRepo.findOne({
       where: { id: groupId, applicationId },
@@ -535,6 +539,28 @@ export class ApplicationService {
       fields: schema.fields,
       columns: schema.columns,
     };
+  }
+
+  // 选择数据/关联数据的数据源只能指向本应用的表：不校验的话渲染接口会把别的应用的数据带出来
+  private async assertSourceFormsInApp(appId: number, fields: FormField[]) {
+    const ids = new Set<number>();
+    for (const field of fields) {
+      const raw = field as FormField & {
+        sourceFormId?: unknown;
+        linkage?: { sourceFormId?: unknown } | null;
+      };
+      for (const value of [raw.sourceFormId, raw.linkage?.sourceFormId]) {
+        const id = Number(value);
+        if (Number.isInteger(id) && id > 0) ids.add(id);
+      }
+    }
+    if (!ids.size) return;
+    const rows = await this.formRepo.find({ where: { id: In([...ids]) } });
+    const owns = (id: number) =>
+      rows.some((row) => row.id === id && row.applicationId === appId);
+    if (![...ids].every(owns)) {
+      throw new BadRequestException('选择数据、关联数据的数据源必须是本应用里的表');
+    }
   }
 
   private normalizeFormConfig(value: unknown): Record<string, unknown> {

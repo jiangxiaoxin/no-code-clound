@@ -323,6 +323,8 @@ function onNodeClick(data) {
     // 刷新后由本组件从route 上取参数还原选择
     const query = { ...route.query }
     delete query.inbox
+    // tab 是上一张表留下的：换表后让新表按自己配置的默认页签打开
+    delete query.tab
     router.push({
       name: 'app-workspace-form',
       params: { id: appId.value, formId: data.id },

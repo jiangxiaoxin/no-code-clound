@@ -60,7 +60,10 @@ export function renderLinkageApi(instanceId, payload) {
 
 export function renderUploadApi(instanceId, fieldKey, file) {
   const payload = new FormData()
-  payload.append('fieldKey', fieldKey)
   payload.append('file', file)
-  return http.post(`/workflow/render/${instanceId}/files`, payload)
+  // fieldKey 走查询参数：服务端要在 multer 落盘前鉴权，那时还读不到表单体里的字段
+  return http.post(
+    `/workflow/render/${instanceId}/files?fieldKey=${encodeURIComponent(fieldKey)}`,
+    payload,
+  )
 }

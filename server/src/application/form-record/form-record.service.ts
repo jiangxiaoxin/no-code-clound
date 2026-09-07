@@ -8,6 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
+import { AppFormConfig } from '../app-form-config.entity';
+import { normalizeRecordActions } from '../form-config';
 import { WorkflowDefinitionService } from '../workflow/workflow-definition.service';
 import { WorkflowEngine } from '../workflow/workflow.engine';
 import { WorkflowInstance } from '../workflow/workflow-instance.entity';
@@ -89,6 +91,8 @@ export class FormRecordService {
   constructor(
     @InjectRepository(AppForm)
     private readonly formRepo: Repository<AppForm>,
+    @InjectRepository(AppFormConfig)
+    private readonly formConfigRepo: Repository<AppFormConfig>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly store: FormRecordStore,
@@ -207,7 +211,13 @@ export class FormRecordService {
     formId: number,
     recordId: string,
   ): Promise<FormRecordView> {
-    const form = await this.requireForm(ownerId, appId, formId);
+    // 权限规格 §13：同一次请求只判定一次，canConfigure 也从这份结果里取
+    const access = await this.access.getAccess(ownerId, appId);
+    if (!access.canUse) throw new NotFoundException('应用不存在');
+    const form = await this.formRepo.findOne({
+      where: { id: formId, applicationId: appId },
+    });
+    if (!form) throw new NotFoundException('表单不存在');
     const doc = await this.store.findById(formId, recordId);
     if (!doc) throw new NotFoundException('记录不存在');
     const view = await this.attachProgress(
@@ -215,7 +225,6 @@ export class FormRecordService {
       form,
       doc,
     );
-    const access = await this.access.getAccess(ownerId, appId);
     view.canConfigure = access.canConfigure;
     return view;
   }
@@ -229,6 +238,7 @@ export class FormRecordService {
     intent?: 'draft' | 'submit',
   ): Promise<FormRecordView> {
     const form = await this.requireForm(actorId, appId, formId);
+    await this.assertActionAllowed(formId, 'edit');
     if (form.formKind !== 'workflow') {
       const doc = await this.persist.persist({ form, actorId, data, recordId });
       return this.toRecordView(doc, form);
@@ -326,6 +336,7 @@ export class FormRecordService {
     recordId: string,
   ): Promise<{ ok: true }> {
     const form = await this.requireForm(ownerId, appId, formId);
+    await this.assertActionAllowed(formId, 'delete');
     const existing = await this.store.findById(formId, recordId);
     if (!existing) throw new NotFoundException('记录不存在');
     if (form.formKind === 'workflow') {
@@ -362,6 +373,7 @@ export class FormRecordService {
     formId: number,
   ): Promise<{ buffer: Buffer; filename: string }> {
     const form = await this.requireForm(ownerId, appId, formId);
+    await this.assertActionAllowed(formId, 'downloadTemplate');
     const fields = importableFields(this.readFields(form));
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('数据');
@@ -400,6 +412,7 @@ export class FormRecordService {
       throw new BadRequestException('请上传 xlsx 文件');
     }
     const form = await this.requireForm(ownerId, appId, formId);
+    await this.assertActionAllowed(formId, 'import');
     const fields = this.readFields(form);
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(file.buffer as never);
@@ -484,6 +497,26 @@ export class FormRecordService {
     });
     if (!form) throw new NotFoundException('表单不存在');
     return form;
+  }
+
+  // 表单发布页的整表开关之前只有前端在执行：这里补上服务端拦截，直接调接口也拦
+  private async assertActionAllowed(
+    formId: number,
+    action: 'edit' | 'delete' | 'import' | 'downloadTemplate',
+  ) {
+    const row = await this.formConfigRepo.findOne({ where: { formId } });
+    const actions = normalizeRecordActions(row?.config?.recordActions);
+    if (actions[action]) return;
+    const labels = {
+      edit: ['编辑', '不能修改数据'],
+      delete: ['删除', '不能删除数据'],
+      import: ['导入', '不能导入数据'],
+      downloadTemplate: ['下载导入模版', '不能下载模版'],
+    } as const;
+    const [label, tail] = labels[action];
+    throw new BadRequestException(
+      `这张表在【表单发布】里关了【${label}】，${tail}`,
+    );
   }
 
   private readFields(form: AppForm): FormField[] | null {

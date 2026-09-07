@@ -119,15 +119,19 @@ export class AppAccessAdminService {
       toInsert.push(userId);
     }
     if (toInsert.length) {
-      await this.configuratorRepo.save(
-        toInsert.map((userId) =>
-          this.configuratorRepo.create({ appId, userId }),
-        ),
-      );
-      await this.scopeRepo.delete({
-        appId,
-        type: 'user',
-        targetId: In(toInsert),
+      // 加人和删人员范围要么一起成功：删范围失败时不能留下「加了配置者但范围还在」的中间态
+      await this.dataSource.transaction(async (txn) => {
+        await txn.save(
+          AppConfigurator,
+          toInsert.map((userId) =>
+            txn.create(AppConfigurator, { appId, userId }),
+          ),
+        );
+        await txn.delete(AppAccessScope, {
+          appId,
+          type: 'user',
+          targetId: In(toInsert),
+        });
       });
     }
     return { hints };
@@ -263,22 +267,29 @@ export class AppAccessAdminService {
       throw new BadRequestException('当前所有者已变化');
     }
 
-    await this.dataSource.transaction(async (manager) => {
-      app.ownerId = toUserId;
-      await manager.save(Application, app);
-      await manager.delete(AppConfigurator, { appId, userId: toUserId });
-      await manager.delete(AppAccessScope, {
+    await this.dataSource.transaction(async (txn) => {
+      // 两笔并发移交都可能在外面读到旧所有者：用条件更新认领，落空的那笔在这里失败，避免后写覆盖前写
+      const claimed = await txn.update(
+        Application,
+        { id: appId, ownerId: fromUserId },
+        { ownerId: toUserId },
+      );
+      if (!claimed.affected) {
+        throw new BadRequestException('当前所有者已变化');
+      }
+      await txn.delete(AppConfigurator, { appId, userId: toUserId });
+      await txn.delete(AppAccessScope, {
         appId,
         type: 'user',
         targetId: toUserId,
       });
-      const oldOwnerScope = await manager.findOne(AppAccessScope, {
+      const oldOwnerScope = await txn.findOne(AppAccessScope, {
         where: { appId, type: 'user', targetId: fromUserId },
       });
       if (!oldOwnerScope) {
-        await manager.save(
+        await txn.save(
           AppAccessScope,
-          manager.create(AppAccessScope, {
+          txn.create(AppAccessScope, {
             appId,
             type: 'user',
             targetId: fromUserId,
