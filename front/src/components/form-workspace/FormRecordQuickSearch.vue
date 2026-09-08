@@ -208,7 +208,7 @@ watch(popoverVisible, (visible, wasVisible) => {
 <style scoped lang="less">
 .quick-search {
   width: 260px;
-  margin-right: 8px;
+  min-width: 260px;
 }
 
 .quick-search-caret {

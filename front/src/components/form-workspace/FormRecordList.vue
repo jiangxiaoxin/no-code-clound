@@ -575,7 +575,6 @@ defineExpose({ reload, upsertRecord })
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   margin-bottom: 12px;
 }
 
@@ -583,6 +582,11 @@ defineExpose({ reload, upsertRecord })
 .list-toolbar-extra {
   display: flex;
   align-items: center;
+  gap: 12px;
+
+  :deep(.el-button) {
+    margin-left: 0 !important;
+  }
 }
 
 .table-wrap {
@@ -607,5 +611,10 @@ defineExpose({ reload, upsertRecord })
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workflow-status-filter {
+  width: 260px;
+  min-width: 260px;
 }
 </style>
