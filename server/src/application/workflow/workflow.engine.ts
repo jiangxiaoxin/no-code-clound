@@ -933,9 +933,17 @@ export class WorkflowEngine {
     });
     if (!still) throw new ConflictException('这条待办已处理');
     await this.dispatchTasks(instance, task.nodeKey, toDispatch);
-    const names = toDispatch.join('、');
+    const relatedUsers = await this.userRepo.find({
+      where: { id: In([input.actorId, ...toDispatch]) },
+    });
+    const nameOf = (id: number) =>
+      relatedUsers.find((row) => row.id === id)?.displayName || String(id);
+    const targetNames = toDispatch.map((id) => nameOf(id)).join('、');
     const extra = input.comment?.trim() ? `：${input.comment.trim()}` : '';
-    const notes = appendNote(instance.notes, `${input.actorId} 加签 ${names}${extra}`);
+    const notes = appendNote(
+      instance.notes,
+      `${nameOf(input.actorId)} 加签 ${targetNames}${extra}`,
+    );
     await this.instanceRepo.update({ id: instance.id }, { notes });
   }
 

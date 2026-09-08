@@ -265,6 +265,7 @@ const progress = computed(() => ({
   graph: detail.value?.instance?.graph,
   notes: detail.value?.instance?.notes,
   tasks: detail.value?.tasks,
+  names: detail.value?.names,
 }))
 
 function onVisibleChange(value) {

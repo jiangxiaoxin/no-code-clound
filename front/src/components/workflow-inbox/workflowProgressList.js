@@ -1,5 +1,30 @@
 import { formatDateTime } from '../../utils/timeValue.js'
 
+function formatNoteText(text, names = {}) {
+  if (!text) return text
+  const nameOf = (id) => names[String(id)] || names[Number(id)] || id
+  const addSign = text.match(/^(\d+) 加签 ([\d、]+)([：:].*)?$/)
+  if (addSign) {
+    const actor = nameOf(addSign[1])
+    const targets = addSign[2]
+      .split('、')
+      .map((id) => nameOf(id.trim()))
+      .join('、')
+    return `${actor} 加签 ${targets}${addSign[3] || ''}`
+  }
+  return text
+}
+
+function buildNameMap(progress) {
+  const map = { ...(progress?.names || {}) }
+  for (const task of progress?.tasks || []) {
+    if (task.assigneeId != null && task.assigneeName) {
+      map[String(task.assigneeId)] = task.assigneeName
+    }
+  }
+  return map
+}
+
 function taskStatusText(task) {
   const parts = []
   if (task.status === 'cancelled') {
@@ -38,13 +63,14 @@ export function buildProgressRows(progress, formatTime = formatDateTime) {
   const titles = Object.fromEntries(
     (data.graph?.nodes || []).map((node) => [node.key, node.title || node.key]),
   )
+  const nameMap = buildNameMap(data)
   const list = []
   for (const note of data.notes || []) {
     list.push({
       kind: 'note',
       time: formatTime(note.at),
       sort: note.at || '',
-      text: note.text,
+      text: formatNoteText(note.text, nameMap),
     })
   }
   for (const task of data.tasks || []) {

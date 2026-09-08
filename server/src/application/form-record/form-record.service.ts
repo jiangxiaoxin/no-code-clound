@@ -667,7 +667,9 @@ export class FormRecordService {
       where: { instanceId: inst.id },
       order: { createdAt: 'ASC' },
     });
-    const userIds = [...new Set(tasks.map((row) => row.assigneeId))];
+    const userIds = [
+      ...new Set([inst.initiatorId, ...tasks.map((row) => row.assigneeId)]),
+    ];
     const users = userIds.length
       ? await this.userRepo.find({ where: { id: In(userIds) } })
       : [];
@@ -686,6 +688,7 @@ export class FormRecordService {
       currentNodeKey: inst.currentNodeKey,
       notes: inst.notes,
       errorReason: inst.errorReason,
+      names: Object.fromEntries(names),
       tasks: tasks.map((row) => ({
         id: row.id,
         nodeKey: row.nodeKey,

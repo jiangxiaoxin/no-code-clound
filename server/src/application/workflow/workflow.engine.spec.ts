@@ -808,7 +808,10 @@ describe('WorkflowEngine 抄送', () => {
       round: 1,
     });
     instanceRepo.findOne.mockResolvedValue(runningInstance());
-    userRepo.find.mockResolvedValue([{ id: 9, status: 'active' }]);
+    userRepo.find.mockResolvedValue([
+      { id: 21, displayName: '张三', status: 'active' },
+      { id: 9, displayName: '王五', status: 'active' },
+    ]);
     taskRepo.find.mockResolvedValue([
       { assigneeId: 21, status: 'pending' },
     ]);
@@ -829,7 +832,7 @@ describe('WorkflowEngine 抄送', () => {
       { id: 1 },
       expect.objectContaining({
         notes: expect.arrayContaining([
-          expect.objectContaining({ text: expect.stringContaining('加签') }),
+          expect.objectContaining({ text: '张三 加签 王五' }),
         ]),
       }),
     );

@@ -91,3 +91,22 @@ test('审批意见与取消原因单独输出', () => {
   assert.equal(rows[1].comment, '发起人撤回')
   assert.equal(rows[1].statusText, '未处理（已取消）')
 })
+
+test('加签系统说明把用户 id 显示为人名', () => {
+  const rows = buildProgressRows(
+    {
+      notes: [
+        {
+          at: '2026-09-08T12:00:00.000Z',
+          text: '4 加签 6：你也审批一下',
+        },
+      ],
+      names: {
+        '4': 'jiang1',
+        '6': 'jiang3',
+      },
+    },
+    formatTime,
+  )
+  assert.equal(rows[0].text, 'jiang1 加签 jiang3：你也审批一下')
+})
