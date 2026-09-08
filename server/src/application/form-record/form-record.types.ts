@@ -18,6 +18,7 @@ export type FormField = {
   uniqueInRows?: boolean;
   dictCode?: string;
   required?: boolean;
+  visible?: boolean;
   optionSource?: string;
   addressFormat?: string;
   serialSeparator?: string;

@@ -1,3 +1,7 @@
+function isSchemaVisible(field) {
+  return field?.visible !== false
+}
+
 export function walkFormFields(fields, visit) {
   for (const field of fields || []) {
     visit(field)
@@ -223,7 +227,7 @@ export function subformRequiredError(field, rows) {
 
 export function subformChildRequiredError(parent, row) {
   for (const field of parent?.fields || []) {
-    if (!field?.required) {
+    if (!isSchemaVisible(field) || !field?.required) {
       continue
     }
     if (isSubformCellEmpty(field, row?.[field.key])) {

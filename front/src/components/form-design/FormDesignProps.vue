@@ -30,6 +30,12 @@
       <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
+      <el-form-item label="显示设置">
+        <div class="required-row">
+          <span>是否可见</span>
+          <el-switch :model-value="field.visible !== false" @change="onVisibleChange" />
+        </div>
+      </el-form-item>
       <template v-if="!isCurrentDisplayField">
       <template v-if="field.type !== 'divider'">
       <el-form-item v-if="field.type !== 'divider' && field.type !== 'image' && field.type !== 'file' && field.type !== 'subform' && field.type !== 'relate-subform'" label="占位文字">
@@ -1316,6 +1322,13 @@ function onEditableChange(value) {
     return
   }
   props.field.editable = value
+}
+
+function onVisibleChange(value) {
+  if (!props.field) {
+    return
+  }
+  props.field.visible = value
 }
 
 const dictionaries = ref([])

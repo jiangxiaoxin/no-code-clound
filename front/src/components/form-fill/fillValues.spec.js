@@ -439,3 +439,15 @@ test('relate-subform 不填报、不入库、不进列表', () => {
   assert.deepEqual(buildRecordData([field], { rs1: 'x' }), {})
   assert.equal(firstRequiredError([{ ...field, required: true }], {}), null)
 })
+
+test('不可见字段不参与必填校验和列表列', () => {
+  const field = {
+    key: 'reason',
+    type: 'textarea',
+    title: '事由',
+    required: true,
+    visible: false,
+  }
+  assert.equal(isListColumn(field), false)
+  assert.equal(firstRequiredError([field], { reason: '' }), null)
+})

@@ -1,7 +1,7 @@
 <template>
   <div class="fill-grid">
     <template v-for="field in fields" :key="field.key">
-      <div v-if="isTabsField(field)" class="fill-tabs">
+      <div v-if="isTabsField(field) && isSchemaVisible(field)" class="fill-tabs">
         <el-tabs :model-value="activePaneId" @tab-change="onTabChange">
           <el-tab-pane
             v-for="pane in field.panes"
@@ -34,7 +34,7 @@
         </el-tabs>
       </div>
       <FormFillField
-        v-else-if="accessOf(field) !== 'hidden'"
+        v-else-if="isSchemaVisible(field) && accessOf(field) !== 'hidden'"
         :app-id="appId"
         :field="field"
         :fill-tip="fillTips[field.key]"
@@ -72,7 +72,7 @@ import {
 } from '../form-design/tabsField.js'
 import { resolveFieldAccess } from '../workflow-design/fieldAccess.js'
 import FormFillField from './FormFillField.vue'
-import { emptyValue } from './fillValues'
+import { emptyValue, isSchemaVisible } from './fillValues.js'
 import {
   applyLinkageResult,
   applyPendingValueWrites,
@@ -313,7 +313,9 @@ function isFieldDisabled(field) {
 }
 
 function visiblePaneFields(pane) {
-  return (pane.fields || []).filter((field) => accessOf(field) !== 'hidden')
+  return (pane.fields || []).filter(
+    (field) => isSchemaVisible(field) && accessOf(field) !== 'hidden',
+  )
 }
 
 function queryRecordsOnce(appId, formId, query, fieldKey) {

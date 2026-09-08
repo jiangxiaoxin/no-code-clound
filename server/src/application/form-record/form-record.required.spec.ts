@@ -48,4 +48,17 @@ describe('assertRequiredFields', () => {
       assertRequiredFields(fields, { reason: '' }, []),
     ).not.toThrow(BadRequestException);
   });
+
+  it('不可见字段跳过必填', () => {
+    const hidden: FormField[] = [
+      {
+        key: 'reason',
+        title: '事由',
+        type: 'textarea',
+        required: true,
+        visible: false,
+      },
+    ];
+    expect(() => assertRequiredFields(hidden, { reason: '' }, 'all')).not.toThrow();
+  });
 });

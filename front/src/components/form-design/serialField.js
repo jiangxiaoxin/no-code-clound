@@ -67,6 +67,7 @@ export function createDefaultSerialField(key) {
     required: false,
     disabled: false,
     editable: true,
+    visible: true,
     description: '',
     serialSeparator: DEFAULT_SERIAL_SEPARATOR,
     serialRule: [

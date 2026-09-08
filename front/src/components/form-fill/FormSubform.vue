@@ -158,8 +158,10 @@ const fillDeptNames = computed(() => ({
   ...props.deptNames,
 }))
 
+import { isSchemaVisible } from './fillValues.js'
+
 const children = computed(() =>
-  Array.isArray(props.field.fields) ? props.field.fields : [],
+  (Array.isArray(props.field.fields) ? props.field.fields : []).filter(isSchemaVisible),
 )
 const fillTips = computed(() => fillInfluencerTips(children.value))
 

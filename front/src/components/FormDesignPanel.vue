@@ -251,6 +251,7 @@ function createFieldFromItem(item, { child = false } = {}) {
     required: false,
     disabled: false,
     editable: true,
+    visible: true,
     description: '',
     ...(item.type === 'number' ? { rangeEnabled: false, precision: 0 } : {}),
     ...(item.type === 'date' ? { format: 'date' } : {}),

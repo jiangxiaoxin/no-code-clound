@@ -37,11 +37,16 @@ const SKIP_TYPES = new Set([
   'serialNumber',
 ])
 
+export function isSchemaVisible(field) {
+  return field?.visible !== false
+}
+
 export function isFillable(field) {
-  return Boolean(field?.key) && !SKIP_TYPES.has(field.type)
+  return Boolean(field?.key) && !SKIP_TYPES.has(field.type) && isSchemaVisible(field)
 }
 
 export function isListColumn(field) {
+  if (!isSchemaVisible(field)) return false
   return (
     isFillable(field) ||
     field?.type === 'subform' ||
@@ -255,6 +260,7 @@ export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
 export function firstRequiredError(fields, values) {
   for (const field of flattenFields(fields)) {
     if (field.type === 'subform') {
+      if (!isSchemaVisible(field)) continue
       const required = subformRowsRequiredError(field, values[field.key])
       if (required) {
         // 直接return，提前拦截，不要每个field 都去处理一遍，节省性能
@@ -272,7 +278,7 @@ export function firstRequiredError(fields, values) {
     // 关联数据、选择数据存的是源数据 id，不走普通填报校验，必填要单独判
     if (field.type === 'relate' || field.type === 'data') {
       const id = values[field.key]
-      if (field.required && (typeof id !== 'string' || !id)) {
+      if (isSchemaVisible(field) && field.required && (typeof id !== 'string' || !id)) {
         return {
           message: `请填写「${field.title || '未命名'}」`,
           key: field.key,

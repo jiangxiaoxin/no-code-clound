@@ -45,7 +45,7 @@ export function assertRequiredFields(
 ): void {
   const wanted = keys === 'all' ? null : new Set(keys);
   for (const field of flattenFields(fields ?? [])) {
-    if (!field.required || !field.key) continue;
+    if (field.visible === false || !field.required || !field.key) continue;
     if (SKIP_REQUIRED_TYPES.has(field.type)) continue;
     if (wanted && !wanted.has(field.key)) continue;
     if (isMainFieldEmpty(field, data[field.key])) {

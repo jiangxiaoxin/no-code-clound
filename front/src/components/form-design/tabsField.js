@@ -67,6 +67,7 @@ export function createTabsField(key, paneIds) {
     required: false,
     disabled: false,
     editable: true,
+    visible: true,
     description: '',
     panes: defaultPanes(paneIds),
   }
