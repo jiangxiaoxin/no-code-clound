@@ -14,6 +14,7 @@ import { WorkflowDefinitionService } from '../workflow/workflow-definition.servi
 import { WorkflowEngine } from '../workflow/workflow.engine';
 import { WorkflowInstance } from '../workflow/workflow-instance.entity';
 import { WorkflowTask } from '../workflow/workflow-task.entity';
+import { allowResubmitAfterTerminated } from '../workflow/workflow.graph';
 import { InstanceStatus } from '../workflow/workflow.types';
 import {
   FormRecordPersistService,
@@ -63,6 +64,7 @@ export type FormRecordView = {
     };
     nextNodeTitle?: string;
     workflowHint?: string;
+    allowResubmitAfterTerminated?: boolean;
     canConfigure?: boolean;
     workflowProgress?: {
       graph: WorkflowInstance['graph'];
@@ -192,10 +194,19 @@ export class FormRecordService {
         .map((item) => item.workflowInstanceId)
         .filter((id): id is number => Number.isInteger(id)),
     );
+    const allowResubmit =
+      form.formKind === 'workflow'
+        ? allowResubmitAfterTerminated(
+            (await this.definition.getRuntime(formId)).graph,
+          )
+        : undefined;
     return {
       items: items.map((item) => {
         const view = this.toView(item, names);
         this.attachInstance(view, instances.get(item.workflowInstanceId ?? 0));
+        if (allowResubmit !== undefined) {
+          view.allowResubmitAfterTerminated = allowResubmit;
+        }
         return view;
       }),
       total,
@@ -269,6 +280,13 @@ export class FormRecordService {
       }
       const saved = await this.store.findById(formId, recordId);
       return this.toRecordView(saved ?? doc, form);
+    }
+
+    if (
+      (status === 'approved' || status === 'rejected') &&
+      !allowResubmitAfterTerminated(runtime.graph)
+    ) {
+      throw new BadRequestException('流程终止后不能修改');
     }
 
     if (status === 'approved') {
@@ -586,6 +604,11 @@ export class FormRecordService {
         where: { id: doc.workflowInstanceId },
       });
       this.attachInstance(view, inst);
+    }
+    if (form.formKind === 'workflow') {
+      view.allowResubmitAfterTerminated = allowResubmitAfterTerminated(
+        (await this.definition.getRuntime(form.id)).graph,
+      );
     }
     return view;
   }

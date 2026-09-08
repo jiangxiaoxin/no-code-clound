@@ -55,6 +55,9 @@
                 :visited-node-keys="record.workflowProgress.visitedNodeKeys"
                 :current-node-key="record.workflowProgress.currentNodeKey"
                 :instance-status="record.workflowStatus"
+                :allow-resubmit-after-terminated="
+                  record.allowResubmitAfterTerminated !== false
+                "
               />
               <p
                 v-if="record.workflowProgress.errorReason"
@@ -196,6 +199,8 @@ const showEdit = computed(() => {
     actorId: actorId.value,
     hasInstance: Boolean(props.record?.workflowInstanceId),
     publishEdit: true,
+    allowResubmitAfterTerminated:
+      props.record?.allowResubmitAfterTerminated !== false,
   })
 })
 const showRetry = computed(() => {

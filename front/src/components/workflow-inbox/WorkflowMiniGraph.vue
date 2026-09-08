@@ -7,6 +7,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import LogicFlow, { RectNode, RectNodeModel } from '@logicflow/core'
 import '@logicflow/core/es/index.css'
 import { toLogicflowGraph } from '../workflow-design/workflowGraph.js'
+import { resolveHighlightNodeKey } from './workflowMiniGraph.js'
 
 class MiniNodeModel extends RectNodeModel {
   initNodeData(data) {
@@ -22,23 +23,8 @@ const props = defineProps({
   visitedNodeKeys: { type: Array, default: () => [] },
   currentNodeKey: { type: String, default: '' },
   instanceStatus: { type: String, default: '' },
+  allowResubmitAfterTerminated: { type: Boolean, default: true },
 })
-
-function resolveHighlightNodeKey() {
-  if (props.currentNodeKey) return props.currentNodeKey
-  if (props.instanceStatus !== 'approved') return ''
-  const endNodes = (props.graph?.nodes || []).filter((node) => node.type === 'end')
-  if (!endNodes.length) return ''
-  if (endNodes.length === 1) return endNodes[0].key
-  const endKeys = new Set(endNodes.map((node) => node.key))
-  const visited = new Set(props.visitedNodeKeys || [])
-  for (const edge of props.graph?.edges || []) {
-    if (endKeys.has(edge.to) && visited.has(edge.from)) {
-      return edge.to
-    }
-  }
-  return endNodes[0].key
-}
 
 const canvasRef = ref(null)
 let lf = null
@@ -47,7 +33,13 @@ function paint() {
   if (!lf || !props.graph) return
   lf.render(toLogicflowGraph(props.graph))
   const visited = new Set(props.visitedNodeKeys || [])
-  const highlightKey = resolveHighlightNodeKey()
+  const highlightKey = resolveHighlightNodeKey({
+    currentNodeKey: props.currentNodeKey,
+    instanceStatus: props.instanceStatus,
+    graph: props.graph,
+    visitedNodeKeys: props.visitedNodeKeys,
+    allowResubmitAfterTerminated: props.allowResubmitAfterTerminated,
+  })
   for (const node of props.graph.nodes || []) {
     const current = node.key === highlightKey
     lf.setProperties(node.key, {
@@ -87,7 +79,13 @@ onMounted(async () => {
 defineExpose({ resizeCanvas })
 
 watch(
-  () => [props.graph, props.visitedNodeKeys, props.currentNodeKey, props.instanceStatus],
+  () => [
+    props.graph,
+    props.visitedNodeKeys,
+    props.currentNodeKey,
+    props.instanceStatus,
+    props.allowResubmitAfterTerminated,
+  ],
   paint,
 )
 

@@ -263,6 +263,7 @@ function rowCanEdit(row) {
     actorId: actorId.value,
     hasInstance: Boolean(row.workflowInstanceId),
     publishEdit: actions.value.edit,
+    allowResubmitAfterTerminated: row.allowResubmitAfterTerminated !== false,
   })
 }
 

@@ -12,9 +12,11 @@ import { AddSignTaskDto } from './dto/add-sign-task.dto';
 import { CompleteTaskDto } from './dto/complete-task.dto';
 import { ReturnTaskDto } from './dto/return-task.dto';
 import { TransferTaskDto } from './dto/transfer-task.dto';
+import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
+import { allowResubmitAfterTerminated } from './workflow.graph';
 import { InstanceStatus } from './workflow.types';
 
 const EDITABLE: InstanceStatus[] = ['draft', 'rejected', 'error'];
@@ -31,6 +33,7 @@ export class WorkflowInstanceService {
     private readonly persist: FormRecordPersistService,
     private readonly engine: WorkflowEngine,
     private readonly access: AppAccessService,
+    private readonly definition: WorkflowDefinitionService,
   ) {}
 
   async saveDraft(
@@ -39,6 +42,7 @@ export class WorkflowInstanceService {
     data: Record<string, unknown>,
   ) {
     const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
+    await this.assertTerminatedEditable(instance);
     const form = await this.requireForm(instance.formId);
     await this.persist.persist({
       form,
@@ -60,6 +64,7 @@ export class WorkflowInstanceService {
     data: Record<string, unknown>,
   ) {
     const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
+    await this.assertTerminatedEditable(instance);
     const form = await this.requireForm(instance.formId);
     await this.persist.persist({
       form,
@@ -211,6 +216,16 @@ export class WorkflowInstanceService {
       throw new BadRequestException('当前状态不能修改');
     }
     return instance;
+  }
+
+  private async assertTerminatedEditable(instance: WorkflowInstance) {
+    if (instance.status !== 'rejected' && instance.status !== 'approved') {
+      return;
+    }
+    const runtime = await this.definition.getRuntime(instance.formId);
+    if (!allowResubmitAfterTerminated(runtime.graph)) {
+      throw new BadRequestException('流程终止后不能修改');
+    }
   }
 
   private async requireForm(formId: number) {

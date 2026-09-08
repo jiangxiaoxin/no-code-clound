@@ -38,6 +38,9 @@
                 :visited-node-keys="detail.instance?.visitedNodeKeys"
                 :current-node-key="detail.instance?.currentNodeKey"
                 :instance-status="detail.instance?.status"
+                :allow-resubmit-after-terminated="
+                  detail.allowResubmitAfterTerminated !== false
+                "
               />
               <p v-if="detail.instance?.errorReason" class="wf-error">
                 {{ detail.instance.errorReason }}

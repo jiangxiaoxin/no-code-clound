@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
+import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowInstanceService } from './workflow-instance.service';
@@ -28,6 +29,7 @@ describe('WorkflowInstanceService', () => {
     returnTo: jest.fn(),
     resubmitStart: jest.fn(),
   };
+  const definition = { getRuntime: jest.fn() };
   const access = {
     getAccess: jest.fn(),
     requireUse: jest.fn(),
@@ -50,6 +52,7 @@ describe('WorkflowInstanceService', () => {
       currentNodeKey: 'n1',
     });
     engine.completeTask.mockResolvedValue({ waitingOthers: false });
+    definition.getRuntime.mockResolvedValue({ graph: {} });
     const module = await Test.createTestingModule({
       providers: [
         WorkflowInstanceService,
@@ -59,6 +62,7 @@ describe('WorkflowInstanceService', () => {
         { provide: FormRecordPersistService, useValue: persist },
         { provide: WorkflowEngine, useValue: engine },
         { provide: AppAccessService, useValue: access },
+        { provide: WorkflowDefinitionService, useValue: definition },
       ],
     }).compile();
     service = module.get(WorkflowInstanceService);
@@ -106,6 +110,38 @@ describe('WorkflowInstanceService', () => {
     await expect(service.saveDraft(1, 5, {})).rejects.toThrow(
       '当前状态不能修改',
     );
+  });
+
+  it('关掉终止后再交时已驳回不能再存再交', async () => {
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'rejected',
+      formId: 12,
+      recordId,
+      appId: 8,
+    });
+    definition.getRuntime.mockResolvedValue({
+      graph: {
+        nodes: [
+          {
+            key: 'start',
+            type: 'start',
+            title: '开始',
+            x: 0,
+            y: 0,
+            allowResubmitAfterTerminated: false,
+          },
+        ],
+      },
+    });
+    await expect(service.saveDraft(1, 5, { field_reason: '改' })).rejects.toThrow(
+      '流程终止后不能修改',
+    );
+    await expect(service.submit(1, 5, { field_reason: '改' })).rejects.toThrow(
+      '流程终止后不能修改',
+    );
+    expect(persist.persist).not.toHaveBeenCalled();
   });
 
   it('审批人不能重试，配置者可以', async () => {

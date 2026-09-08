@@ -22,6 +22,14 @@ function nodeByKey(graph: WorkflowGraph, key: string): WorkflowNode | undefined 
   return graph.nodes.find((node) => node.key === key);
 }
 
+export function allowResubmitAfterTerminated(
+  graph?: WorkflowGraph | null,
+): boolean {
+  const start = graph?.nodes?.find((node) => node.type === 'start');
+  if (!start || start.type !== 'start') return true;
+  return start.allowResubmitAfterTerminated !== false;
+}
+
 export function previousApproveNodeKey(
   graph: WorkflowGraph,
   visited: string[] | null | undefined,

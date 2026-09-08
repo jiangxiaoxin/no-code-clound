@@ -508,6 +508,49 @@ describe('FormRecordService', () => {
     ).rejects.toThrow('只有发起人能修改这条数据');
   });
 
+  it('流程终止后关掉再提交则已通过和已驳回都不能改', async () => {
+    formRepo.findOne.mockResolvedValue({ ...form, formKind: 'workflow' });
+    definition.getRuntime.mockResolvedValue({
+      hasBeenEnabled: true,
+      enabled: true,
+      graph: {
+        nodes: [
+          {
+            key: 'start',
+            type: 'start',
+            title: '开始',
+            x: 0,
+            y: 0,
+            allowResubmitAfterTerminated: false,
+          },
+        ],
+      },
+      version: 1,
+    });
+    store.findById.mockResolvedValue({
+      ...doc,
+      createdBy: 1,
+      workflowStatus: 'approved',
+      workflowInstanceId: 7,
+    });
+    instanceRepo.findOne.mockResolvedValue({ id: 7, initiatorId: 1 });
+    await expect(
+      service.update(1, 8, 12, doc._id.toHexString(), { name: 'y' }, 'submit'),
+    ).rejects.toThrow('流程终止后不能修改');
+    expect(engine.resubmitApproved).not.toHaveBeenCalled();
+
+    store.findById.mockResolvedValue({
+      ...doc,
+      createdBy: 1,
+      workflowStatus: 'rejected',
+      workflowInstanceId: 7,
+    });
+    await expect(
+      service.update(1, 8, 12, doc._id.toHexString(), { name: 'y' }, 'submit'),
+    ).rejects.toThrow('流程终止后不能修改');
+    expect(engine.submit).not.toHaveBeenCalled();
+  });
+
   it('普通表单带 intent 仍当普通保存', async () => {
     formRepo.findOne.mockResolvedValue(form);
     store.insert.mockResolvedValue({ id: doc._id.toHexString() });

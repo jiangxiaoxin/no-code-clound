@@ -1,6 +1,7 @@
 import { FormField } from '../form-record/form-record.types';
 import { WorkflowGraph } from './workflow.types';
 import {
+  allowResubmitAfterTerminated,
   nextStay,
   previousApproveNodeKey,
   validatePublishedGraph,
@@ -230,5 +231,31 @@ describe('workflow.graph 抄送', () => {
     if (stay.kind !== 'approve') return;
     expect(stay.nodeKey).toBe('n2');
     expect(stay.ccNodeKeys).toEqual(['cc1']);
+  });
+
+  it('开始节点缺省允许流程终止后再交，关掉才禁止', () => {
+    expect(allowResubmitAfterTerminated(undefined)).toBe(true);
+    expect(allowResubmitAfterTerminated({ nodes: [], edges: [] })).toBe(true);
+    expect(
+      allowResubmitAfterTerminated({
+        nodes: [{ key: 'start', type: 'start', title: '开始', x: 0, y: 0 }],
+        edges: [],
+      }),
+    ).toBe(true);
+    expect(
+      allowResubmitAfterTerminated({
+        nodes: [
+          {
+            key: 'start',
+            type: 'start',
+            title: '开始',
+            x: 0,
+            y: 0,
+            allowResubmitAfterTerminated: false,
+          },
+        ],
+        edges: [],
+      }),
+    ).toBe(false);
   });
 });

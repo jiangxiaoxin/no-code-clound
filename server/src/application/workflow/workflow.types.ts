@@ -16,7 +16,11 @@ export type WorkflowNodeBase = {
 };
 
 export type WorkflowNode =
-  | (WorkflowNodeBase & { type: 'start' | 'end' | 'branch' })
+  | (WorkflowNodeBase & {
+      type: 'start';
+      allowResubmitAfterTerminated?: boolean;
+    })
+  | (WorkflowNodeBase & { type: 'end' | 'branch' })
   | (WorkflowNodeBase & {
       type: 'approve';
       approver: ApproverRule;

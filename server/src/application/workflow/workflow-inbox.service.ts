@@ -10,7 +10,8 @@ import { flattenFields } from '../form-record/flatten-fields';
 import { parseFormSchema } from '../form-schema';
 import { FormRecordStore } from '../form-record/form-record.store';
 import { FormField } from '../form-record/form-record.types';
-import { previousApproveNodeKey } from './workflow.graph';
+import { previousApproveNodeKey, allowResubmitAfterTerminated } from './workflow.graph';
+import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
@@ -51,6 +52,7 @@ export class WorkflowInboxService {
     private readonly store: FormRecordStore,
     private readonly dictionary: DictionaryService,
     private readonly engine: WorkflowEngine,
+    private readonly definition: WorkflowDefinitionService,
   ) {}
 
   async query(
@@ -188,6 +190,8 @@ export class WorkflowInboxService {
         kind === 'cc' && task
           ? instance.graph.nodes.find((item) => item.key === task.nodeKey)
           : undefined;
+    const runtime = await this.definition.getRuntime(instance.formId);
+    const allowResubmit = allowResubmitAfterTerminated(runtime.graph);
     return {
       kind,
       form: {
@@ -226,7 +230,8 @@ export class WorkflowInboxService {
         createdAt: row.createdAt,
       })),
       names,
-      actions: this.actionsOf(kind, instance, task),
+      allowResubmitAfterTerminated: allowResubmit,
+      actions: this.actionsOf(kind, instance, task, allowResubmit),
       fieldAccess:
         kind === 'todo' && task?.nodeKey === 'start'
           ? {}
@@ -244,6 +249,7 @@ export class WorkflowInboxService {
     kind: 'todo' | 'mine' | 'done' | 'cc',
     instance: WorkflowInstance,
     task: WorkflowTask | null,
+    allowResubmit = true,
   ) {
     if (kind === 'todo') {
       const pending = task?.status === 'pending';
@@ -305,6 +311,22 @@ export class WorkflowInboxService {
       };
     }
     if (instance.status === 'approved') {
+      return {
+        canApprove: false,
+        canReject: false,
+        canTransfer: false,
+        canAddSign: false,
+        canReturnPrevious: false,
+        canReturnStart: false,
+        canResubmit: false,
+        canDraft: false,
+        canSubmit: false,
+        canCancel: false,
+        canRetry: false,
+        readOnly: true,
+      };
+    }
+    if (instance.status === 'rejected' && !allowResubmit) {
       return {
         canApprove: false,
         canReject: false,

@@ -7,7 +7,16 @@ function asNumber(value, fallback = 0) {
 
 export function emptyDraftGraph() {
   return {
-    nodes: [{ key: 'start', type: 'start', title: '开始', x: 240, y: 40 }],
+    nodes: [
+      {
+        key: 'start',
+        type: 'start',
+        title: '开始',
+        x: 240,
+        y: 40,
+        allowResubmitAfterTerminated: true,
+      },
+    ],
     edges: [],
   }
 }
@@ -33,6 +42,7 @@ export function toLogicflowGraph(product) {
       allowAddSign: node.allowAddSign,
       allowReturnPrevious: node.allowReturnPrevious,
       allowReturnStart: node.allowReturnStart,
+      allowResubmitAfterTerminated: node.allowResubmitAfterTerminated,
     },
   }))
   const edges = (product?.edges || []).map((edge) => ({
@@ -90,6 +100,12 @@ export function toProductGraph(raw) {
           packed.allowReturnStart = Boolean(props.allowReturnStart)
         }
         return packed
+      }
+      if (type === 'start') {
+        return {
+          ...base,
+          allowResubmitAfterTerminated: props.allowResubmitAfterTerminated !== false,
+        }
       }
       return base
     })

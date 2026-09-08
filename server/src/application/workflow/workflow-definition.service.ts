@@ -25,7 +25,16 @@ export type WorkflowRuntime = {
 
 function emptyStartGraph(): WorkflowGraph {
   return {
-    nodes: [{ key: 'start', type: 'start', title: '开始', x: 240, y: 40 }],
+    nodes: [
+      {
+        key: 'start',
+        type: 'start',
+        title: '开始',
+        x: 240,
+        y: 40,
+        allowResubmitAfterTerminated: true,
+      },
+    ],
     edges: [],
   };
 }

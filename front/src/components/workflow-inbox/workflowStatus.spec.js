@@ -38,6 +38,21 @@ test('已通过只有发起人且有实例能编辑', () => {
   )
 })
 
+test('关掉终止后再交时已通过和已驳回都不能编辑', () => {
+  const base = {
+    formKind: 'workflow',
+    initiatorId: 5,
+    actorId: 5,
+    hasInstance: true,
+    publishEdit: true,
+    allowResubmitAfterTerminated: false,
+  }
+  assert.equal(canEditWorkflowRecord({ ...base, status: 'approved' }), false)
+  assert.equal(canEditWorkflowRecord({ ...base, status: 'rejected' }), false)
+  assert.equal(canEditWorkflowRecord({ ...base, status: 'draft' }), true)
+  assert.equal(canEditWorkflowRecord({ ...base, status: 'error' }), true)
+})
+
 test('审批中不能删', () => {
   assert.equal(
     canDeleteWorkflowRecord({

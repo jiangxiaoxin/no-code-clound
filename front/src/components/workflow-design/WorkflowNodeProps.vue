@@ -115,7 +115,20 @@
         <label class="wf-label">分支名称</label>
         <el-input :model-value="node.title" :disabled="disabled" @update:model-value="onTitle" />
       </template>
-      <template v-else-if="node?.type === 'start' || node?.type === 'end'">
+      <template v-else-if="node?.type === 'start'">
+        <label class="wf-label">节点名称</label>
+        <el-input :model-value="node.title" :disabled="disabled" @update:model-value="onTitle" />
+        <div class="wf-switch-row">
+          <label class="wf-label">流程终止后是否可以修改后重新提交</label>
+          <el-switch
+            :model-value="node.allowResubmitAfterTerminated !== false"
+            :disabled="disabled"
+            @change="onAllowResubmitAfterTerminated"
+          />
+        </div>
+        <p class="wf-action-hint">关闭后，已通过和已驳回的单据不能再改、不能再交。草稿和异常不受影响。</p>
+      </template>
+      <template v-else-if="node?.type === 'end'">
         <label class="wf-label">节点名称</label>
         <el-input :model-value="node.title" :disabled="disabled" @update:model-value="onTitle" />
       </template>
@@ -170,6 +183,10 @@ function patch(next) {
 
 function onTitle(title) {
   patch({ title })
+}
+
+function onAllowResubmitAfterTerminated(value) {
+  patch({ allowResubmitAfterTerminated: value })
 }
 
 function onUserIds(userIds) {

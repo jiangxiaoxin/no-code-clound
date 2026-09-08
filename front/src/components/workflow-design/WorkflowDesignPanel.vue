@@ -330,6 +330,8 @@ function restoreStart(data) {
       key: 'start',
       title: '开始',
       type: 'start',
+      allowResubmitAfterTerminated:
+        data.properties?.allowResubmitAfterTerminated !== false,
     },
   })
   ElMessage.warning('开始节点不能删除')

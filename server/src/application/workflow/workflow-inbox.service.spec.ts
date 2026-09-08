@@ -7,6 +7,7 @@ import { Department } from '../../admin/department/department.entity';
 import { DictionaryService } from '../dictionary/dictionary.service';
 import { FormRecordStore } from '../form-record/form-record.store';
 import { User } from '../../user/user.entity';
+import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInboxService } from './workflow-inbox.service';
 import { WorkflowInstance } from './workflow-instance.entity';
@@ -33,6 +34,7 @@ describe('WorkflowInboxService', () => {
   const store = { findById: jest.fn() };
   const dictionary = { listEnabledItemsByApp: jest.fn() };
   const engine = { markStuckByDisabledApprovers: jest.fn() };
+  const definition = { getRuntime: jest.fn() };
 
   function qb(result: { items: unknown[]; total: number }) {
     const chain: Record<string, jest.Mock> = {};
@@ -89,6 +91,7 @@ describe('WorkflowInboxService', () => {
     userRepo.find.mockResolvedValue([]);
     departmentRepo.find.mockResolvedValue([]);
     dictionary.listEnabledItemsByApp.mockResolvedValue([]);
+    definition.getRuntime.mockResolvedValue({ graph: {} });
     const module = await Test.createTestingModule({
       providers: [
         WorkflowInboxService,
@@ -101,6 +104,7 @@ describe('WorkflowInboxService', () => {
         { provide: FormRecordStore, useValue: store },
         { provide: DictionaryService, useValue: dictionary },
         { provide: WorkflowEngine, useValue: engine },
+        { provide: WorkflowDefinitionService, useValue: definition },
       ],
     }).compile();
     service = module.get(WorkflowInboxService);
@@ -258,6 +262,44 @@ describe('WorkflowInboxService', () => {
 
     const detail = await service.open(5, 'mine', 1);
     expect(detail.actions.readOnly).toBe(true);
+    expect(detail.actions.canSubmit).toBe(false);
+  });
+
+  it('关掉终止后再交时已驳回在我发起的里只读', async () => {
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'rejected',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: { nodes: [] },
+      currentNodeKey: null,
+      visitedNodeKeys: [],
+      round: 1,
+      errorReason: null,
+      notes: [],
+      hasApproved: true,
+    });
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    taskRepo.find.mockResolvedValue([]);
+    userRepo.find.mockResolvedValue([{ id: 5, displayName: '张三', status: 'active' }]);
+    definition.getRuntime.mockResolvedValue({
+      graph: {
+        nodes: [
+          {
+            key: 'start',
+            type: 'start',
+            allowResubmitAfterTerminated: false,
+          },
+        ],
+      },
+    });
+
+    const detail = await service.open(5, 'mine', 1);
+    expect(detail.actions.readOnly).toBe(true);
+    expect(detail.actions.canDraft).toBe(false);
     expect(detail.actions.canSubmit).toBe(false);
   });
 

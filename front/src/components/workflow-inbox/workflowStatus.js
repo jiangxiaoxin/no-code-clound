@@ -17,10 +17,17 @@ export function canEditWorkflowRecord({
   actorId,
   hasInstance,
   publishEdit,
+  allowResubmitAfterTerminated,
 }) {
   if (formKind !== 'workflow' || !publishEdit) return false
   if (status === 'running') return false
   if (initiatorId !== actorId) return false
+  if (
+    (status === 'approved' || status === 'rejected') &&
+    allowResubmitAfterTerminated === false
+  ) {
+    return false
+  }
   if (status === 'approved') return Boolean(hasInstance)
   return status === 'draft' || status === 'rejected' || status === 'error'
 }
