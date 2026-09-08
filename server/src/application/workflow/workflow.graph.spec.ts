@@ -145,6 +145,7 @@ describe('workflow.graph', () => {
   it('只有分支直达结束时标记未经审批', () => {
     expect(nextStay(branchToEndGraph, 'start', {})).toMatchObject({
       kind: 'end',
+      endNodeKey: 'end',
       passedApprove: false,
     });
   });

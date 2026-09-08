@@ -484,14 +484,21 @@ export class WorkflowEngine {
       const notes = stay.passedApprove
         ? instance.notes
         : appendNote(instance.notes, '未经过审批即结束');
+      const visitedNodeKeys = [
+        ...new Set([
+          ...(instance.visitedNodeKeys ?? []),
+          ...stay.visited,
+          stay.endNodeKey,
+        ]),
+      ];
       // 和推进到下一个审批节点一样要抢占：别人已驳回或发起人已撤回时不能改成已通过
       const ended = await this.instanceRepo.update(
         this.claimWhere(instance, fromNodeKey),
         {
           status: 'approved',
-          currentNodeKey: null,
+          currentNodeKey: stay.endNodeKey,
           endedAt: new Date(),
-          visitedNodeKeys: stay.visited,
+          visitedNodeKeys,
           retryStep: null,
           errorReason: null,
           notes,
@@ -505,8 +512,8 @@ export class WorkflowEngine {
       return {
         ...instance,
         status: 'approved',
-        currentNodeKey: null,
-        visitedNodeKeys: stay.visited,
+        currentNodeKey: stay.endNodeKey,
+        visitedNodeKeys,
         notes,
       };
     }

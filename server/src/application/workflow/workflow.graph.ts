@@ -9,7 +9,13 @@ import {
 
 export type NextStay =
   | { kind: 'approve'; nodeKey: string; visited: string[]; ccNodeKeys: string[] }
-  | { kind: 'end'; visited: string[]; passedApprove: boolean; ccNodeKeys: string[] }
+  | {
+      kind: 'end';
+      visited: string[];
+      endNodeKey: string;
+      passedApprove: boolean;
+      ccNodeKeys: string[];
+    }
   | { kind: 'error'; visited: string[]; reason: string; ccNodeKeys: string[] };
 
 function nodeByKey(graph: WorkflowGraph, key: string): WorkflowNode | undefined {
@@ -348,7 +354,7 @@ export function nextStay(
     if (node.type === 'branch') {
       edge = pickBranchEdge(edges, data);
     } else if (node.type === 'end') {
-      return { kind: 'end', visited, passedApprove, ccNodeKeys };
+      return { kind: 'end', visited, endNodeKey: current, passedApprove, ccNodeKeys };
     } else {
       edge = edges[0];
     }
@@ -388,7 +394,7 @@ export function nextStay(
       return { kind: 'approve', nodeKey: next.key, visited, ccNodeKeys };
     }
     if (next.type === 'end') {
-      return { kind: 'end', visited, passedApprove, ccNodeKeys };
+      return { kind: 'end', visited, endNodeKey: next.key, passedApprove, ccNodeKeys };
     }
     current = next.key;
   }

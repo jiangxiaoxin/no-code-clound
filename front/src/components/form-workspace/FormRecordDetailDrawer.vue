@@ -8,46 +8,91 @@
     @update:model-value="onVisibleChange"
     @closed="resetDetail"
   >
-    <div v-if="record" class="fill-drawer-body">
-      <FormFillGrid
-        ref="gridRef"
-        :app-id="appId"
-        :fields="fields"
-        :values="detailValues"
-        :dict-items-by-code="dictItemsByCode"
-        :disabled="!editing"
-        :updating="true"
-        :user-names="record?.userNames || {}"
-        :record-id="record?.id || ''"
-        :data-source="recordSource"
-      />
-      <div v-if="isWorkflowForm" class="wf-progress">
-        <div class="wf-progress-title">流程进度</div>
-        <p v-if="record.workflowHint" class="wf-progress-hint">
-          {{ record.workflowHint }}
-        </p>
-        <template v-else-if="record.workflowProgress">
-          <WorkflowMiniGraph
-            :graph="record.workflowProgress.graph"
-            :visited-node-keys="record.workflowProgress.visitedNodeKeys"
-            :current-node-key="record.workflowProgress.currentNodeKey"
+    <div
+      v-if="record"
+      class="fill-drawer-body"
+      :class="{ 'wf-drawer-body': isWorkflowForm }"
+    >
+      <el-tabs
+        v-if="isWorkflowForm"
+        v-model="activeTab"
+        class="wf-tabs"
+        @tab-change="onTabChange"
+      >
+        <el-tab-pane label="表单" name="form" class="wf-pane-form">
+          <FormFillGrid
+            ref="gridRef"
+            :app-id="appId"
+            :fields="fields"
+            :values="detailValues"
+            :dict-items-by-code="dictItemsByCode"
+            :disabled="!editing"
+            :updating="true"
+            :user-names="record?.userNames || {}"
+            :record-id="record?.id || ''"
+            :data-source="recordSource"
           />
-          <p v-if="record.workflowProgress.errorReason" class="wf-progress-error">
-            {{ record.workflowProgress.errorReason }}
-          </p>
-          <WorkflowProgressList :progress="record.workflowProgress" />
-        </template>
-      </div>
-      <div v-if="!editing" class="record-audit">
-        <div class="record-audit-row">
-          <span>创建人：{{ createdByLabel }}</span>
-          <span>创建时间：{{ createdAtLabel }}</span>
+          <div v-if="!editing" class="record-audit">
+            <div class="record-audit-row">
+              <span>创建人：{{ createdByLabel }}</span>
+              <span>创建时间：{{ createdAtLabel }}</span>
+            </div>
+            <div class="record-audit-row">
+              <span>更新人：{{ updatedByLabel }}</span>
+              <span>更新时间：{{ updatedAtLabel }}</span>
+            </div>
+          </div>
+        </el-tab-pane>
+        <el-tab-pane label="流程" name="progress" lazy class="wf-pane-process">
+          <div class="wf-process">
+            <p v-if="record.workflowHint" class="wf-progress-hint">
+              {{ record.workflowHint }}
+            </p>
+            <template v-else-if="record.workflowProgress">
+              <WorkflowMiniGraph
+                ref="graphRef"
+                :graph="record.workflowProgress.graph"
+                :visited-node-keys="record.workflowProgress.visitedNodeKeys"
+                :current-node-key="record.workflowProgress.currentNodeKey"
+                :instance-status="record.workflowStatus"
+              />
+              <p
+                v-if="record.workflowProgress.errorReason"
+                class="wf-progress-error"
+              >
+                {{ record.workflowProgress.errorReason }}
+              </p>
+              <div class="wf-process-list">
+                <WorkflowProgressList :progress="record.workflowProgress" />
+              </div>
+            </template>
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+      <template v-else>
+        <FormFillGrid
+          ref="gridRef"
+          :app-id="appId"
+          :fields="fields"
+          :values="detailValues"
+          :dict-items-by-code="dictItemsByCode"
+          :disabled="!editing"
+          :updating="true"
+          :user-names="record?.userNames || {}"
+          :record-id="record?.id || ''"
+          :data-source="recordSource"
+        />
+        <div v-if="!editing" class="record-audit">
+          <div class="record-audit-row">
+            <span>创建人：{{ createdByLabel }}</span>
+            <span>创建时间：{{ createdAtLabel }}</span>
+          </div>
+          <div class="record-audit-row">
+            <span>更新人：{{ updatedByLabel }}</span>
+            <span>更新时间：{{ updatedAtLabel }}</span>
+          </div>
         </div>
-        <div class="record-audit-row">
-          <span>更新人：{{ updatedByLabel }}</span>
-          <span>更新时间：{{ updatedAtLabel }}</span>
-        </div>
-      </div>
+      </template>
     </div>
     <template #footer>
       <div class="record-detail-footer">
@@ -91,7 +136,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import FormFillGrid from '../form-fill/FormFillGrid.vue'
 import { cloneRecordValues, firstRequiredError, buildRecordData } from '../form-fill/fillValues.js'
@@ -127,6 +172,8 @@ const retrying = ref(false)
 const detailValues = reactive({})
 const snapshot = ref({})
 const gridRef = ref(null)
+const graphRef = ref(null)
+const activeTab = ref('form')
 
 const recordSource = computed(
   () =>
@@ -183,10 +230,20 @@ function startEdit() {
 
 function resetDetail() {
   editing.value = false
+  activeTab.value = 'form'
   snapshot.value = {}
   for (const key of Object.keys(detailValues)) {
     delete detailValues[key]
   }
+}
+
+function onTabChange(name) {
+  if (name !== 'progress') return
+  nextTick(() => {
+    nextTick(() => {
+      graphRef.value?.resizeCanvas?.()
+    })
+  })
 }
 
 function cancelEdit() {
@@ -255,6 +312,7 @@ watch(
   [() => props.modelValue, () => props.record?.id, () => props.startEditing],
   () => {
     if (props.modelValue && props.record) {
+      activeTab.value = 'form'
       editing.value = Boolean(props.startEditing && showEdit.value)
       applyValues(props.record.data)
     }
@@ -265,6 +323,68 @@ watch(
 
 <style scoped lang="less">
 @import '../form-fill/fillLayout.less';
+
+:deep(.el-drawer__body) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wf-drawer-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.wf-tabs {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.wf-tabs :deep(.el-tabs__header) {
+  flex: none;
+  margin-bottom: 8px;
+}
+
+.wf-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wf-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  overflow: auto;
+}
+
+.wf-tabs :deep(.wf-pane-process) {
+  overflow: hidden;
+}
+
+.wf-process {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.wf-process :deep(.wf-mini-graph) {
+  flex: 1 1 0;
+  min-height: 280px;
+  height: auto;
+  margin-bottom: 0;
+}
+
+.wf-process-list {
+  flex: 0 1 auto;
+  max-height: 45%;
+  overflow: auto;
+  margin-top: 24px;
+}
 
 .record-audit {
   display: flex;
@@ -292,15 +412,6 @@ watch(
 
 .record-detail-footer-right {
   display: flex;
-}
-
-.wf-progress {
-  margin-top: 24px;
-}
-
-.wf-progress-title {
-  margin-bottom: 8px;
-  font-weight: 600;
 }
 
 .wf-progress-hint,

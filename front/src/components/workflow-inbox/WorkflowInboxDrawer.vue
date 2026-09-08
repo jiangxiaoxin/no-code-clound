@@ -37,6 +37,7 @@
                 :graph="detail.instance?.graph"
                 :visited-node-keys="detail.instance?.visitedNodeKeys"
                 :current-node-key="detail.instance?.currentNodeKey"
+                :instance-status="detail.instance?.status"
               />
               <p v-if="detail.instance?.errorReason" class="wf-error">
                 {{ detail.instance.errorReason }}
