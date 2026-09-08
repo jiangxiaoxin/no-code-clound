@@ -451,3 +451,30 @@ test('不可见字段不参与必填校验和列表列', () => {
   assert.equal(isListColumn(field), false)
   assert.equal(firstRequiredError([field], { reason: '' }), null)
 })
+
+test('流程表单按节点权限跳过不可见和只读字段的必填', () => {
+  const fields = [
+    { key: 'reason', type: 'textarea', title: '事由', required: true },
+    { key: 'leaveType', type: 'select', title: '请假类型', required: true },
+    { key: 'days', type: 'number', title: '天数', required: true },
+  ]
+  const fieldAccess = {
+    reason: 'readonly',
+    leaveType: 'hidden',
+    days: 'editable',
+  }
+  assert.equal(
+    firstRequiredError(fields, { reason: '', leaveType: '', days: 1 }, {
+      workflowForm: true,
+      fieldAccess,
+    }),
+    null,
+  )
+  assert.equal(
+    firstRequiredError(fields, { reason: '', leaveType: '', days: undefined }, {
+      workflowForm: true,
+      fieldAccess,
+    })?.key,
+    'days',
+  )
+})

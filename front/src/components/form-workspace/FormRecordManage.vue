@@ -257,6 +257,7 @@ async function createRecord(intent) {
   }
   const err = firstRequiredError(fields.value, values, {
     workflowForm: workflowEnabled.value,
+    fieldAccess: startFieldAccess.value,
   })
   if (err) {
     ElMessage.warning(err.message)

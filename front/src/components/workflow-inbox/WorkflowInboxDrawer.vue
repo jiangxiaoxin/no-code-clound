@@ -379,6 +379,7 @@ function onDraft() {
 function onSubmit() {
   const err = firstRequiredError(detail.value?.form?.fields || [], values, {
     workflowForm: true,
+    fieldAccess: gridFieldAccess.value,
   })
   if (err) {
     ElMessage.warning(err.message)
@@ -473,6 +474,7 @@ async function onReturnStart() {
 function onResubmit() {
   const err = firstRequiredError(detail.value?.form?.fields || [], values, {
     workflowForm: true,
+    fieldAccess: gridFieldAccess.value,
   })
   if (err) {
     ElMessage.warning(err.message)
