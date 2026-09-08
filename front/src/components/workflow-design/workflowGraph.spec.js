@@ -64,7 +64,7 @@ test('简报字段进出 LogicFlow 后不丢', () => {
   assert.deepEqual(back.nodes[1].briefFieldKeys, ['field_reason', 'field_days'])
 })
 
-test('审批节点四个操作开关：缺省只开退回上一节点', () => {
+test('审批节点转交加签缺省关闭', () => {
   const product = toProductGraph({
     nodes: [{
       id: 'n1',
@@ -77,8 +77,6 @@ test('审批节点四个操作开关：缺省只开退回上一节点', () => {
   })
   assert.equal(product.nodes[0].allowTransfer, false)
   assert.equal(product.nodes[0].allowAddSign, false)
-  assert.equal(product.nodes[0].allowReturnPrevious, true)
-  assert.equal(product.nodes[0].allowReturnStart, false)
 })
 
 test('开始节点终止后再交开关进出 LogicFlow 后不丢，缺省为开', () => {

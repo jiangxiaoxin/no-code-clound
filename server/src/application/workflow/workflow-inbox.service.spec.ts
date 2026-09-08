@@ -475,7 +475,7 @@ describe('WorkflowInboxService', () => {
     expect(detail.actions.canTransfer).toBe(false);
     expect(detail.actions.canAddSign).toBe(false);
     expect(detail.actions.canReturnPrevious).toBe(false);
-    expect(detail.actions.canReturnStart).toBe(false);
+    expect(detail.actions.canReturnStart).toBe(true);
     expect(detail.actions.canResubmit).toBe(false);
     expect(detail.fieldAccess).toEqual({ field_reason: 'editable' });
   });

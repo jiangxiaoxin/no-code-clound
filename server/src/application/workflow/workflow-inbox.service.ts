@@ -219,6 +219,7 @@ export class WorkflowInboxService {
       tasks: tasks.map((row) => ({
         id: row.id,
         nodeKey: row.nodeKey,
+        round: row.round,
         assigneeId: row.assigneeId,
         assigneeName: names[String(row.assigneeId)] || '',
         assigneeDisabled: disabled.has(row.assigneeId),
@@ -283,9 +284,8 @@ export class WorkflowInboxService {
         canReject: pending,
         canTransfer: pending && approve?.allowTransfer === true,
         canAddSign: pending && approve?.allowAddSign === true,
-        canReturnPrevious:
-          pending && approve?.allowReturnPrevious !== false && hasPrevious,
-        canReturnStart: pending && approve?.allowReturnStart === true,
+        canReturnPrevious: pending && hasPrevious,
+        canReturnStart: pending,
         canResubmit: false,
         canDraft: false,
         canSubmit: false,
@@ -578,7 +578,7 @@ function doneStatusText(action: string | null | undefined) {
   if (action === 'reject') return '已驳回';
   if (action === 'transfer') return '已转交';
   if (action === 'returnPrevious') return '已退回';
-  if (action === 'returnStart') return '已打回';
+  if (action === 'returnStart') return '已退回发起人';
   if (action === 'resubmit') return '已提交';
   return '已通过';
 }

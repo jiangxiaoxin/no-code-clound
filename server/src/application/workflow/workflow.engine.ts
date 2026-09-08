@@ -133,6 +133,7 @@ export class WorkflowEngine {
     instance.currentNodeKey = null;
     instance.errorReason = null;
     instance.retryStep = null;
+    await this.recordSubmit(instance, nextRound);
     return this.advance(instance, 'start');
   }
 
@@ -176,6 +177,7 @@ export class WorkflowEngine {
     instance.hasApproved = false;
     instance.visitedNodeKeys = [];
     instance.currentNodeKey = null;
+    await this.recordSubmit(instance, nextRound);
     return this.advance(instance, 'start');
   }
 
@@ -644,6 +646,18 @@ export class WorkflowEngine {
 
   // 同一轮里给同一个人派两次会撞唯一约束，所以先把取消过的那条改回待处理，
   // 只插还没有的人。已经处理过的保持原样，重试不会让他再批一遍。
+  private async recordSubmit(instance: WorkflowInstance, round: number) {
+    await this.taskRepo.insert({
+      instanceId: instance.id,
+      nodeKey: 'start',
+      round,
+      assigneeId: instance.initiatorId,
+      status: 'done',
+      action: 'submit',
+      finishedAt: new Date(),
+    });
+  }
+
   private async dispatchTasks(
     instance: WorkflowInstance,
     nodeKey: string,
@@ -925,16 +939,10 @@ export class WorkflowEngine {
   }): Promise<void> {
     const comment = String(input.comment || '').trim();
     if (!comment) throw new BadRequestException('请填写退回意见');
-    const { task, instance, node } = await this.requirePendingApprove(
+    const { task, instance } = await this.requirePendingApprove(
       input.taskId,
       input.actorId,
     );
-    if (input.target === 'previous' && node.allowReturnPrevious === false) {
-      throw new BadRequestException('该节点未开启退回上一节点');
-    }
-    if (input.target === 'start' && !node.allowReturnStart) {
-      throw new BadRequestException('该节点未开启打回发起人');
-    }
     const prevKey =
       input.target === 'previous'
         ? previousApproveNodeKey(
@@ -963,7 +971,7 @@ export class WorkflowEngine {
     const cancelReason =
       input.target === 'previous'
         ? `退回至「${prevTitle}」`
-        : '打回至发起人修改';
+        : '退回至发起人';
     await this.taskRepo.update(
       { instanceId: instance.id, status: 'pending' },
       { status: 'cancelled', cancelReason },

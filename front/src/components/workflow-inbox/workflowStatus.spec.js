@@ -91,7 +91,7 @@ test('提交成功提示用节点标题', () => {
   assert.equal(submitSuccessText(''), '已提交并通过')
 })
 
-test('待办底部显示通过驳回', () => {
+test('待办底部显示同意驳回', () => {
   assert.deepEqual(
     inboxActionsVisible('todo', { canApprove: true, canReject: true }),
     {

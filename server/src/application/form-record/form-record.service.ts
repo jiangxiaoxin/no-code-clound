@@ -689,6 +689,7 @@ export class FormRecordService {
       tasks: tasks.map((row) => ({
         id: row.id,
         nodeKey: row.nodeKey,
+        round: row.round,
         assigneeId: row.assigneeId,
         assigneeName: names.get(row.assigneeId) || '',
         assigneeDisabled: disabled.has(row.assigneeId),

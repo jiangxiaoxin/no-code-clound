@@ -50,13 +50,7 @@
           <el-checkbox :model-value="Boolean(node.allowAddSign)" :disabled="disabled" @change="onAllowAddSign" class="same-as-radio">
             允许加签
           </el-checkbox>
-          <el-checkbox :model-value="node.allowReturnPrevious !== false" :disabled="disabled" @change="onAllowReturnPrevious" class="same-as-radio">
-            允许退回上一节点
-          </el-checkbox>
-          <el-checkbox :model-value="Boolean(node.allowReturnStart)" :disabled="disabled" @change="onAllowReturnStart" class="same-as-radio">
-            允许打回发起人
-          </el-checkbox>
-          <p class="wf-action-hint">打回发起人：发起人改单后继续审，不是驳回</p>
+          <p class="wf-action-hint">同意、驳回、退回至上一审批节点、退回至发起人默认就有。上一审批节点没有时，退回至上一审批节点不出现。</p>
         </template>
         <div class="wf-label">字段权限</div>
         <div class="wf-access-table">
@@ -248,14 +242,6 @@ function onAllowTransfer(allowTransfer) {
 
 function onAllowAddSign(allowAddSign) {
   patch({ allowAddSign: Boolean(allowAddSign) })
-}
-
-function onAllowReturnPrevious(allowReturnPrevious) {
-  patch({ allowReturnPrevious: Boolean(allowReturnPrevious) })
-}
-
-function onAllowReturnStart(allowReturnStart) {
-  patch({ allowReturnStart: Boolean(allowReturnStart) })
 }
 
 function accessOf(field) {

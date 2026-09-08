@@ -155,7 +155,16 @@ describe('WorkflowEngine', () => {
   it('事假：提交后派给同部门经理，或签一人通过后另一人取消', async () => {
     instanceRepo.findOne.mockResolvedValueOnce(null);
     await engine.submit({ form, recordId, actorId: 5 });
-    expect(taskRepo.insert).toHaveBeenCalledTimes(1);
+    expect(taskRepo.insert).toHaveBeenCalledTimes(2);
+    expect(taskRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeKey: 'start',
+        round: 1,
+        assigneeId: 5,
+        status: 'done',
+        action: 'submit',
+      }),
+    );
 
     taskRepo.findOne.mockResolvedValue({
       id: 1,
@@ -385,7 +394,9 @@ describe('WorkflowEngine', () => {
 
   it('派待办失败进异常，不会停在审批中却没有待办', async () => {
     instanceRepo.findOne.mockResolvedValue(null);
-    taskRepo.insert.mockRejectedValue(new Error('数据库炸了'));
+    taskRepo.insert
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('数据库炸了'));
     await engine.submit({ form, recordId, actorId: 5 });
     expect(instanceRepo.update).toHaveBeenCalledWith(
       expect.anything(),

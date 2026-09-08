@@ -85,6 +85,7 @@ export type TaskAction =
   | 'addSign'
   | 'returnPrevious'
   | 'returnStart'
-  | 'resubmit';
+  | 'resubmit'
+  | 'submit';
 
 export type InstanceNote = { at: string; text: string };

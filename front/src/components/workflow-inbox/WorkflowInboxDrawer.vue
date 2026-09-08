@@ -71,7 +71,7 @@
             :disabled="acting"
             @click="onApprove"
           >
-            通过
+            同意
           </el-button>
           <el-button
             v-if="visible.reject"
@@ -104,7 +104,7 @@
             :disabled="acting"
             @click="onReturnPrevious"
           >
-            退回上一节点
+            退回至上一审批节点
           </el-button>
           <el-button
             v-if="visible.returnStart"
@@ -112,7 +112,7 @@
             :disabled="acting"
             @click="onReturnStart"
           >
-            打回发起人
+            退回至发起人
           </el-button>
           <el-button
             v-if="visible.resubmit"
@@ -440,26 +440,26 @@ async function promptReturnComment(title) {
 async function onReturnPrevious() {
   let commentText
   try {
-    commentText = await promptReturnComment('退回上一节点')
+    commentText = await promptReturnComment('退回至上一审批节点')
   } catch {
     return
   }
   return runAction(async () => {
     await returnPreviousWorkflowTaskApi(props.itemId, { comment: commentText })
-    ElMessage.success('已退回上一节点')
+    ElMessage.success('已退回至上一审批节点')
   })
 }
 
 async function onReturnStart() {
   let commentText
   try {
-    commentText = await promptReturnComment('打回发起人')
+    commentText = await promptReturnComment('退回至发起人')
   } catch {
     return
   }
   return runAction(async () => {
     await returnStartWorkflowTaskApi(props.itemId, { comment: commentText })
-    ElMessage.success('已打回发起人')
+    ElMessage.success('已退回至发起人')
   })
 }
 
