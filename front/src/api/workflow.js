@@ -46,6 +46,26 @@ export function completeWorkflowTaskApi(taskId, payload) {
   return http.post(`/workflow/tasks/${taskId}/complete`, payload)
 }
 
+export function transferWorkflowTaskApi(taskId, payload) {
+  return http.post(`/workflow/tasks/${taskId}/transfer`, payload)
+}
+
+export function addSignWorkflowTaskApi(taskId, payload) {
+  return http.post(`/workflow/tasks/${taskId}/add-sign`, payload)
+}
+
+export function returnPreviousWorkflowTaskApi(taskId, payload) {
+  return http.post(`/workflow/tasks/${taskId}/return-previous`, payload)
+}
+
+export function returnStartWorkflowTaskApi(taskId, payload) {
+  return http.post(`/workflow/tasks/${taskId}/return-start`, payload)
+}
+
+export function resubmitWorkflowTaskApi(taskId, payload) {
+  return http.post(`/workflow/tasks/${taskId}/resubmit`, payload)
+}
+
 export function saveWorkflowInstanceDraftApi(instanceId, data) {
   return http.post(`/workflow/instances/${instanceId}/draft`, { data })
 }

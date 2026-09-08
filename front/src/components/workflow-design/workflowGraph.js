@@ -29,6 +29,10 @@ export function toLogicflowGraph(product) {
       commentRequiredOnReject: node.commentRequiredOnReject,
       fieldAccess: node.fieldAccess,
       briefFieldKeys: node.briefFieldKeys,
+      allowTransfer: node.allowTransfer,
+      allowAddSign: node.allowAddSign,
+      allowReturnPrevious: node.allowReturnPrevious,
+      allowReturnStart: node.allowReturnStart,
     },
   }))
   const edges = (product?.edges || []).map((edge) => ({
@@ -80,6 +84,10 @@ export function toProductGraph(raw) {
           packed.signMode = props.signMode === 'all' ? 'all' : 'any'
           packed.commentRequiredOnApprove = Boolean(props.commentRequiredOnApprove)
           packed.commentRequiredOnReject = props.commentRequiredOnReject !== false
+          packed.allowTransfer = Boolean(props.allowTransfer)
+          packed.allowAddSign = Boolean(props.allowAddSign)
+          packed.allowReturnPrevious = props.allowReturnPrevious !== false
+          packed.allowReturnStart = Boolean(props.allowReturnStart)
         }
         return packed
       }

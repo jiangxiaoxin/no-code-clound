@@ -23,6 +23,10 @@ describe('WorkflowInstanceService', () => {
     cancel: jest.fn(),
     retry: jest.fn(),
     completeTask: jest.fn(),
+    transfer: jest.fn(),
+    addSign: jest.fn(),
+    returnTo: jest.fn(),
+    resubmitStart: jest.fn(),
   };
   const access = {
     getAccess: jest.fn(),
@@ -179,5 +183,59 @@ describe('WorkflowInstanceService', () => {
     expect(engine.completeTask).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'reject', comment: '' }),
     );
+  });
+
+  it('转交交给引擎', async () => {
+    await service.transfer(3, 21, { assigneeId: 9, comment: '代批' });
+    expect(engine.transfer).toHaveBeenCalledWith({
+      taskId: 3,
+      actorId: 21,
+      assigneeId: 9,
+      comment: '代批',
+    });
+  });
+
+  it('发起人提交先落库再推进', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 8,
+      nodeKey: 'start',
+      instanceId: 1,
+      assigneeId: 5,
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      formId: 12,
+      recordId,
+    });
+    engine.resubmitStart.mockResolvedValue({ nextNodeTitle: '部门审批' });
+    await service.resubmit(8, 5, { field_reason: '改' });
+    expect(persist.persist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recordId,
+        actorId: 5,
+        requiredKeys: 'all',
+        data: { field_reason: '改' },
+      }),
+    );
+    expect(engine.resubmitStart).toHaveBeenCalledWith({
+      taskId: 8,
+      actorId: 5,
+    });
+  });
+
+  it('start 待办不能当审批通过', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 8,
+      nodeKey: 'start',
+      instanceId: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      graph: { nodes: [{ key: 'start', type: 'start' }] },
+    });
+    await expect(
+      service.complete(8, 5, { action: 'approve', comment: '' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

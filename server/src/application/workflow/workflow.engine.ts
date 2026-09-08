@@ -14,7 +14,7 @@ import { WorkflowApproverService, type ResolvedApprovers } from './workflow.appr
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
-import { nextStay } from './workflow.graph';
+import { nextStay, previousApproveNodeKey } from './workflow.graph';
 import {
   InstanceNote,
   RetryPatch,
@@ -791,6 +791,288 @@ export class WorkflowEngine {
     });
   }
 
+  async transfer(input: {
+    taskId: number;
+    actorId: number;
+    assigneeId: number;
+    comment: string;
+  }): Promise<void> {
+    if (input.assigneeId === input.actorId) {
+      throw new BadRequestException('不能转交给自己');
+    }
+    const { task, instance, node } = await this.requirePendingApprove(
+      input.taskId,
+      input.actorId,
+    );
+    if (!node.allowTransfer) {
+      throw new BadRequestException('该节点未开启转交');
+    }
+    const users = await this.userRepo.find({
+      where: { id: In([input.assigneeId]) },
+    });
+    const user = users[0];
+    if (!user) throw new NotFoundException('人员不存在');
+    if (user.status !== 'active') {
+      throw new BadRequestException('账号已停用');
+    }
+    const existing = await this.taskRepo.find({
+      where: {
+        instanceId: instance.id,
+        nodeKey: task.nodeKey,
+        round: instance.round,
+        assigneeId: input.assigneeId,
+      },
+    });
+    if (existing.some((row) => row.status === 'pending')) {
+      throw new BadRequestException('该用户已有待办');
+    }
+    const done = await this.taskRepo.update(
+      { id: task.id, status: 'pending', assigneeId: input.actorId },
+      {
+        status: 'done',
+        action: 'transfer',
+        comment: input.comment || null,
+        finishedAt: new Date(),
+      },
+    );
+    if (!done.affected) throw new ConflictException('这条待办已处理');
+    await this.dispatchTasks(instance, task.nodeKey, [input.assigneeId]);
+  }
+
+  async addSign(input: {
+    taskId: number;
+    actorId: number;
+    assigneeIds: number[];
+    comment: string;
+  }): Promise<void> {
+    const { task, instance, node } = await this.requirePendingApprove(
+      input.taskId,
+      input.actorId,
+    );
+    if (!node.allowAddSign) {
+      throw new BadRequestException('该节点未开启加签');
+    }
+    const unique = [
+      ...new Set(
+        (input.assigneeIds || []).filter(
+          (id) => Number.isInteger(id) && id > 0 && id !== input.actorId,
+        ),
+      ),
+    ];
+    if (!unique.length) throw new BadRequestException('请选择加签人员');
+    const users = await this.userRepo.find({
+      where: { id: In(unique), status: 'active' },
+    });
+    const activeIds = users.map((row) => row.id);
+    if (!activeIds.length) throw new BadRequestException('请选择加签人员');
+    const existing = await this.taskRepo.find({
+      where: {
+        instanceId: instance.id,
+        nodeKey: task.nodeKey,
+        round: instance.round,
+      },
+    });
+    const pendingIds = new Set(
+      existing
+        .filter((row) => row.status === 'pending')
+        .map((row) => row.assigneeId),
+    );
+    const toDispatch = activeIds.filter((id) => !pendingIds.has(id));
+    if (!toDispatch.length) {
+      throw new BadRequestException('所选人员已有待办');
+    }
+    const still = await this.taskRepo.findOne({
+      where: { id: task.id, status: 'pending', assigneeId: input.actorId },
+    });
+    if (!still) throw new ConflictException('这条待办已处理');
+    await this.dispatchTasks(instance, task.nodeKey, toDispatch);
+    const names = toDispatch.join('、');
+    const extra = input.comment?.trim() ? `：${input.comment.trim()}` : '';
+    const notes = appendNote(instance.notes, `${input.actorId} 加签 ${names}${extra}`);
+    await this.instanceRepo.update({ id: instance.id }, { notes });
+  }
+
+  async returnTo(input: {
+    taskId: number;
+    actorId: number;
+    target: 'previous' | 'start';
+    comment: string;
+  }): Promise<void> {
+    const comment = String(input.comment || '').trim();
+    if (!comment) throw new BadRequestException('请填写退回意见');
+    const { task, instance, node } = await this.requirePendingApprove(
+      input.taskId,
+      input.actorId,
+    );
+    if (input.target === 'previous' && node.allowReturnPrevious === false) {
+      throw new BadRequestException('该节点未开启退回上一节点');
+    }
+    if (input.target === 'start' && !node.allowReturnStart) {
+      throw new BadRequestException('该节点未开启打回发起人');
+    }
+    const prevKey =
+      input.target === 'previous'
+        ? previousApproveNodeKey(
+            instance.graph,
+            instance.visitedNodeKeys,
+            task.nodeKey,
+          )
+        : null;
+    if (input.target === 'previous' && !prevKey) {
+      throw new BadRequestException('没有上一审批节点');
+    }
+    const done = await this.taskRepo.update(
+      { id: task.id, status: 'pending', assigneeId: input.actorId },
+      {
+        status: 'done',
+        action: input.target === 'previous' ? 'returnPrevious' : 'returnStart',
+        comment,
+        finishedAt: new Date(),
+      },
+    );
+    if (!done.affected) throw new ConflictException('这条待办已处理');
+    const prevTitle =
+      prevKey && nodeOf(instance.graph, prevKey)?.title
+        ? nodeOf(instance.graph, prevKey)!.title
+        : '';
+    const cancelReason =
+      input.target === 'previous'
+        ? `退回至「${prevTitle}」`
+        : '打回至发起人修改';
+    await this.taskRepo.update(
+      { instanceId: instance.id, status: 'pending' },
+      { status: 'cancelled', cancelReason },
+    );
+    const nextRound = instance.round + 1;
+    if (input.target === 'previous' && prevKey) {
+      const prevNode = findApproveNode(instance.graph, prevKey);
+      const visited = truncateVisited(instance.visitedNodeKeys, prevKey);
+      const previousRound = instance.round;
+      const approved = await this.taskRepo.find({
+        where: {
+          instanceId: instance.id,
+          nodeKey: prevKey,
+          round: previousRound,
+          status: 'done',
+          action: 'approve',
+        },
+      });
+      const candidateIds = [...new Set(approved.map((row) => row.assigneeId))];
+      const active = candidateIds.length
+        ? (
+            await this.userRepo.find({
+              where: { id: In(candidateIds), status: 'active' },
+            })
+          ).map((row) => row.id)
+        : [];
+      if (!active.length) {
+        await this.instanceRepo.update(
+          { id: instance.id, status: 'running' },
+          {
+            status: 'error',
+            currentNodeKey: prevKey,
+            visitedNodeKeys: visited,
+            round: nextRound,
+            retryStep: 'dispatch',
+            errorReason: `退回后节点「${prevNode.title}」没有可用的审批人`,
+          },
+        );
+        await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+          workflowStatus: 'error',
+          workflowInstanceId: instance.id,
+        });
+        return;
+      }
+      const claimed = await this.instanceRepo.update(
+        { id: instance.id, status: 'running' },
+        {
+          currentNodeKey: prevKey,
+          visitedNodeKeys: visited,
+          round: nextRound,
+          retryStep: null,
+          errorReason: null,
+        },
+      );
+      if (!claimed.affected) {
+        throw new ConflictException('单据状态已变化，请刷新后再看');
+      }
+      instance.round = nextRound;
+      instance.currentNodeKey = prevKey;
+      await this.dispatchTasks(instance, prevKey, active);
+      await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+        workflowStatus: 'running',
+        workflowInstanceId: instance.id,
+      });
+      return;
+    }
+    const claimed = await this.instanceRepo.update(
+      { id: instance.id, status: 'running' },
+      {
+        currentNodeKey: 'start',
+        visitedNodeKeys: ['start'],
+        round: nextRound,
+        retryStep: null,
+        errorReason: null,
+      },
+    );
+    if (!claimed.affected) {
+      throw new ConflictException('单据状态已变化，请刷新后再看');
+    }
+    await this.taskRepo.insert({
+      instanceId: instance.id,
+      nodeKey: 'start',
+      round: nextRound,
+      assigneeId: instance.initiatorId,
+      status: 'pending',
+    });
+    await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+      workflowStatus: 'running',
+      workflowInstanceId: instance.id,
+    });
+  }
+
+  async resubmitStart(input: { taskId: number; actorId: number }): Promise<{
+    nextNodeTitle?: string;
+  }> {
+    const task = await this.taskRepo.findOne({ where: { id: input.taskId } });
+    if (!task) throw new NotFoundException('待办不存在');
+    if (task.nodeKey !== 'start') {
+      throw new BadRequestException('不是发起人待办');
+    }
+    const instance = await this.requireInstance(task.instanceId);
+    if (instance.status !== 'running') {
+      throw new ConflictException('单据状态已变化，请刷新后再看');
+    }
+    if (instance.initiatorId !== input.actorId) {
+      throw new NotFoundException('待办不存在');
+    }
+    const done = await this.taskRepo.update(
+      { id: task.id, status: 'pending', assigneeId: input.actorId },
+      {
+        status: 'done',
+        action: 'resubmit',
+        finishedAt: new Date(),
+      },
+    );
+    if (!done.affected) throw new ConflictException('这条待办已处理');
+    const advanced = await this.advance(instance, 'start');
+    return { nextNodeTitle: titleOf(advanced.graph, advanced.currentNodeKey) };
+  }
+
+  private async requirePendingApprove(taskId: number, actorId: number) {
+    const task = await this.taskRepo.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('待办不存在');
+    const instance = await this.requireInstance(task.instanceId);
+    if (instance.status !== 'running') {
+      throw new ConflictException('单据状态已变化，请刷新后再看');
+    }
+    const node = findApproveNode(instance.graph, task.nodeKey);
+    if (task.status !== 'pending' || task.assigneeId !== actorId) {
+      throw new ConflictException('这条待办已处理');
+    }
+    return { task, instance, node };
+  }
+
   // 派出去之后审批人才被停用：这条单没人能批，转成异常，发起人和配置者才看得到【重试】。
   // 打开单据详情时顺带检查，本期没有定时任务。
   async markStuckByDisabledApprovers(
@@ -869,4 +1151,13 @@ function appendNote(
   text: string,
 ): InstanceNote[] {
   return [...(notes || []), { at: new Date().toISOString(), text }];
+}
+
+function truncateVisited(
+  visited: string[] | null | undefined,
+  keepThrough: string,
+): string[] {
+  const keys = visited || [];
+  const index = keys.lastIndexOf(keepThrough);
+  return index >= 0 ? keys.slice(0, index + 1) : [keepThrough];
 }

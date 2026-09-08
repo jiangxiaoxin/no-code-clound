@@ -43,6 +43,20 @@
           <el-checkbox :model-value="node.commentRequiredOnReject !== false" :disabled="disabled" @change="onCommentRequiredOnReject" class="same-as-radio">
             拒绝时意见必填
           </el-checkbox>
+          <div class="wf-label wf-label-break">审批操作</div>
+          <el-checkbox :model-value="Boolean(node.allowTransfer)" :disabled="disabled" @change="onAllowTransfer" class="same-as-radio">
+            允许转交
+          </el-checkbox>
+          <el-checkbox :model-value="Boolean(node.allowAddSign)" :disabled="disabled" @change="onAllowAddSign" class="same-as-radio">
+            允许加签
+          </el-checkbox>
+          <el-checkbox :model-value="node.allowReturnPrevious !== false" :disabled="disabled" @change="onAllowReturnPrevious" class="same-as-radio">
+            允许退回上一节点
+          </el-checkbox>
+          <el-checkbox :model-value="Boolean(node.allowReturnStart)" :disabled="disabled" @change="onAllowReturnStart" class="same-as-radio">
+            允许打回发起人
+          </el-checkbox>
+          <p class="wf-action-hint">打回发起人：发起人改单后继续审，不是驳回</p>
         </template>
         <div class="wf-label">字段权限</div>
         <div class="wf-access-table">
@@ -209,6 +223,22 @@ function onCommentRequiredOnApprove(commentRequiredOnApprove) {
 
 function onCommentRequiredOnReject(commentRequiredOnReject) {
   patch({ commentRequiredOnReject })
+}
+
+function onAllowTransfer(allowTransfer) {
+  patch({ allowTransfer: Boolean(allowTransfer) })
+}
+
+function onAllowAddSign(allowAddSign) {
+  patch({ allowAddSign: Boolean(allowAddSign) })
+}
+
+function onAllowReturnPrevious(allowReturnPrevious) {
+  patch({ allowReturnPrevious: Boolean(allowReturnPrevious) })
+}
+
+function onAllowReturnStart(allowReturnStart) {
+  patch({ allowReturnStart: Boolean(allowReturnStart) })
 }
 
 function accessOf(field) {
@@ -441,5 +471,12 @@ onMounted(loadRoles)
   :deep(.el-checkbox__label) {
     line-height: 21px;
   }
+}
+
+.wf-action-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
 }
 </style>

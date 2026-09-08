@@ -29,7 +29,11 @@ const rows = computed(() => {
     })
   }
   for (const task of progress.tasks || []) {
-    const parts = [task.assigneeName || '审批人', titles[task.nodeKey] || task.nodeKey]
+    const nodeTitle =
+      task.nodeKey === 'start' && task.status === 'pending'
+        ? '待发起人修改'
+        : titles[task.nodeKey] || task.nodeKey
+    const parts = [task.assigneeName || '审批人', nodeTitle]
     if (task.status === 'cancelled') {
       parts.push('未处理（已取消）')
       if (task.cancelReason) parts.push(task.cancelReason)
@@ -39,6 +43,14 @@ const rows = computed(() => {
       parts.push('驳回')
     } else if (task.action === 'cc') {
       parts.push('已抄送')
+    } else if (task.action === 'transfer') {
+      parts.push('转交')
+    } else if (task.action === 'returnPrevious') {
+      parts.push('退回至上一节点')
+    } else if (task.action === 'returnStart') {
+      parts.push('打回至发起人修改')
+    } else if (task.action === 'resubmit') {
+      parts.push('已重新提交')
     } else if (task.status === 'pending') {
       parts.push('待处理')
     }

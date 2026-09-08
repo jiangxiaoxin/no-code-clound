@@ -8,7 +8,10 @@ import { Repository } from 'typeorm';
 import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
+import { AddSignTaskDto } from './dto/add-sign-task.dto';
 import { CompleteTaskDto } from './dto/complete-task.dto';
+import { ReturnTaskDto } from './dto/return-task.dto';
+import { TransferTaskDto } from './dto/transfer-task.dto';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
@@ -104,7 +107,7 @@ export class WorkflowInstanceService {
     });
     if (!instance) throw new NotFoundException('单据不存在');
     const node = instance.graph.nodes.find((item) => item.key === task.nodeKey);
-    if (!node || node.type !== 'approve') {
+    if (task.nodeKey === 'start' || !node || node.type !== 'approve') {
       throw new NotFoundException('审批节点不存在');
     }
     const comment = String(dto.comment || '').trim();
@@ -128,6 +131,69 @@ export class WorkflowInstanceService {
       comment,
       dataPatch,
     });
+  }
+
+  async transfer(taskId: number, actorId: number, dto: TransferTaskDto) {
+    await this.engine.transfer({
+      taskId,
+      actorId,
+      assigneeId: dto.assigneeId,
+      comment: dto.comment || '',
+    });
+  }
+
+  async addSign(taskId: number, actorId: number, dto: AddSignTaskDto) {
+    await this.engine.addSign({
+      taskId,
+      actorId,
+      assigneeIds: dto.assigneeIds || [],
+      comment: dto.comment || '',
+    });
+  }
+
+  async returnPrevious(taskId: number, actorId: number, dto: ReturnTaskDto) {
+    await this.engine.returnTo({
+      taskId,
+      actorId,
+      target: 'previous',
+      comment: dto.comment,
+    });
+  }
+
+  async returnStart(taskId: number, actorId: number, dto: ReturnTaskDto) {
+    await this.engine.returnTo({
+      taskId,
+      actorId,
+      target: 'start',
+      comment: dto.comment,
+    });
+  }
+
+  async resubmit(
+    taskId: number,
+    actorId: number,
+    data: Record<string, unknown>,
+  ) {
+    const task = await this.taskRepo.findOne({ where: { id: taskId } });
+    if (!task) throw new NotFoundException('待办不存在');
+    if (task.nodeKey !== 'start') {
+      throw new BadRequestException('不是发起人待办');
+    }
+    const instance = await this.instanceRepo.findOne({
+      where: { id: task.instanceId },
+    });
+    if (!instance || instance.initiatorId !== actorId) {
+      throw new NotFoundException('单据不存在');
+    }
+    const form = await this.requireForm(instance.formId);
+    await this.persist.persist({
+      form,
+      actorId,
+      recordId: instance.recordId,
+      data,
+      requiredKeys: 'all',
+    });
+    return this.engine.resubmitStart({ taskId, actorId });
   }
 
   private async requireInitiator(

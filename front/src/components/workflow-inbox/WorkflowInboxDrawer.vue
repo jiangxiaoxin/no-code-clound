@@ -27,7 +27,7 @@
               :record-id="detail.record?.id || ''"
               :field-access="gridFieldAccess"
               :data-source="inboxSource"
-              :lock-subform="kind === 'todo'"
+              :lock-subform="lockSubform"
             />
           </el-tab-pane>
           <el-tab-pane label="流程" name="progress" lazy class="wf-pane-process">
@@ -51,7 +51,7 @@
     </div>
     <template #footer>
       <div class="wf-drawer-footer">
-        <div v-if="kind === 'todo' && !detail?.recordMissing" class="wf-comment">
+        <div v-if="showComment" class="wf-comment">
           <el-input
             v-model="comment"
             type="textarea"
@@ -77,6 +77,47 @@
             @click="onReject"
           >
             驳回
+          </el-button>
+          <el-button
+            v-if="visible.transfer"
+            :loading="acting"
+            :disabled="acting"
+            @click="openTransfer"
+          >
+            转交
+          </el-button>
+          <el-button
+            v-if="visible.addSign"
+            :loading="acting"
+            :disabled="acting"
+            @click="openAddSign"
+          >
+            加签
+          </el-button>
+          <el-button
+            v-if="visible.returnPrevious"
+            :loading="acting"
+            :disabled="acting"
+            @click="onReturnPrevious"
+          >
+            退回上一节点
+          </el-button>
+          <el-button
+            v-if="visible.returnStart"
+            :loading="acting"
+            :disabled="acting"
+            @click="onReturnStart"
+          >
+            打回发起人
+          </el-button>
+          <el-button
+            v-if="visible.resubmit"
+            type="primary"
+            :loading="acting"
+            :disabled="acting"
+            @click="onResubmit"
+          >
+            提交
           </el-button>
           <el-button
             v-if="visible.draft"
@@ -116,18 +157,28 @@
       </div>
     </template>
   </el-drawer>
+  <WorkflowActionPicker
+    v-model="pickerVisible"
+    :mode="pickerMode"
+    @confirm="onPickerConfirm"
+  />
 </template>
 
 <script setup>
 import { computed, nextTick, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
+  addSignWorkflowTaskApi,
   cancelWorkflowInstanceApi,
   completeWorkflowTaskApi,
   getWorkflowInboxDetailApi,
+  resubmitWorkflowTaskApi,
   retryWorkflowInstanceApi,
+  returnPreviousWorkflowTaskApi,
+  returnStartWorkflowTaskApi,
   saveWorkflowInstanceDraftApi,
   submitWorkflowInstanceApi,
+  transferWorkflowTaskApi,
 } from '../../api/workflow'
 import FormFillGrid from '../form-fill/FormFillGrid.vue'
 import { cloneRecordValues, firstRequiredError, buildRecordData } from '../form-fill/fillValues.js'
@@ -137,6 +188,7 @@ import {
   submitSuccessText,
 } from './workflowStatus.js'
 import { withDefaultFieldAccess } from '../workflow-design/fieldAccess.js'
+import WorkflowActionPicker from './WorkflowActionPicker.vue'
 import WorkflowMiniGraph from './WorkflowMiniGraph.vue'
 import WorkflowProgressList from './WorkflowProgressList.vue'
 
@@ -157,6 +209,8 @@ const comment = ref('')
 const activeTab = ref('form')
 const gridRef = ref(null)
 const graphRef = ref(null)
+const pickerVisible = ref(false)
+const pickerMode = ref('transfer')
 
 const title = computed(() => {
   if (props.kind === 'todo') return '我的待办'
@@ -176,6 +230,7 @@ const dictItemsByCode = computed(() =>
 )
 const gridFieldAccess = computed(() => {
   if ((props.kind !== 'todo' && props.kind !== 'cc') || !detail.value) return {}
+  if (detail.value.actions?.canResubmit) return {}
   return withDefaultFieldAccess(
     detail.value.fieldAccess,
     detail.value.form?.fields || [],
@@ -192,6 +247,15 @@ const visible = computed(() => {
   if (detail.value?.recordMissing) return {}
   return inboxActionsVisible(props.kind, detail.value?.actions || {})
 })
+const lockSubform = computed(
+  () => props.kind === 'todo' && !visible.value.resubmit,
+)
+const showComment = computed(
+  () =>
+    props.kind === 'todo' &&
+    !detail.value?.recordMissing &&
+    (visible.value.approve || visible.value.reject),
+)
 const progress = computed(() => ({
   graph: detail.value?.instance?.graph,
   notes: detail.value?.instance?.notes,
@@ -210,6 +274,7 @@ function reset() {
   detail.value = null
   comment.value = ''
   activeTab.value = 'form'
+  pickerVisible.value = false
   for (const key of Object.keys(values)) {
     delete values[key]
   }
@@ -329,6 +394,83 @@ function onRetry() {
   return runAction(async () => {
     await retryWorkflowInstanceApi(detail.value.instance.id)
     ElMessage.success('已重试')
+  })
+}
+
+function openTransfer() {
+  pickerMode.value = 'transfer'
+  pickerVisible.value = true
+}
+
+function openAddSign() {
+  pickerMode.value = 'addSign'
+  pickerVisible.value = true
+}
+
+function onPickerConfirm(payload) {
+  pickerVisible.value = false
+  if (pickerMode.value === 'addSign') {
+    return runAction(async () => {
+      await addSignWorkflowTaskApi(props.itemId, payload)
+      ElMessage.success('已加签')
+    })
+  }
+  return runAction(async () => {
+    await transferWorkflowTaskApi(props.itemId, payload)
+    ElMessage.success('已转交')
+  })
+}
+
+async function promptReturnComment(title) {
+  const { value } = await ElMessageBox.prompt('请填写退回意见', title, {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    inputType: 'textarea',
+    inputPlaceholder: '退回意见',
+    inputValidator: (text) =>
+      String(text || '').trim() ? true : '请填写退回意见',
+  })
+  return String(value || '').trim()
+}
+
+async function onReturnPrevious() {
+  let commentText
+  try {
+    commentText = await promptReturnComment('退回上一节点')
+  } catch {
+    return
+  }
+  return runAction(async () => {
+    await returnPreviousWorkflowTaskApi(props.itemId, { comment: commentText })
+    ElMessage.success('已退回上一节点')
+  })
+}
+
+async function onReturnStart() {
+  let commentText
+  try {
+    commentText = await promptReturnComment('打回发起人')
+  } catch {
+    return
+  }
+  return runAction(async () => {
+    await returnStartWorkflowTaskApi(props.itemId, { comment: commentText })
+    ElMessage.success('已打回发起人')
+  })
+}
+
+function onResubmit() {
+  const err = firstRequiredError(detail.value?.form?.fields || [], values)
+  if (err) {
+    ElMessage.warning(err.message)
+    gridRef.value?.revealField(err.key)
+    return
+  }
+  return runAction(async () => {
+    const result = await resubmitWorkflowTaskApi(props.itemId, {
+      data: recordPayload(),
+    })
+    ElMessage.success(submitSuccessText(result?.nextNodeTitle))
   })
 }
 
