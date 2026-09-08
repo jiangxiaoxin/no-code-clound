@@ -60,7 +60,6 @@
           :form-fields="formFields"
           :disabled="readonly"
           @change="onEdgeChange"
-          @move="onEdgeMove"
           @delete="onDeleteSelectedEdge"
         />
         <div v-else class="wf-props wf-props-empty">
@@ -104,6 +103,7 @@ import {
 import { applyDefaultFieldAccessToGraph, withDefaultFieldAccess } from './fieldAccess.js'
 import { emptyDraftGraph, toLogicflowGraph, toProductGraph } from './workflowGraph.js'
 import { sortVersions } from './workflowVersion.js'
+import { validateCanvasEdge } from './workflowConnectRules.js'
 import { validatePublishedGraph } from './workflowValidate.js'
 import WorkflowEdgeProps from './WorkflowEdgeProps.vue'
 import WorkflowNodePalette from './WorkflowNodePalette.vue'
@@ -129,6 +129,7 @@ const selectedNode = ref(null)
 const selectedEdge = ref(null)
 const manageVisible = ref(false)
 const dirty = ref(false)
+const suppressEdgeValidation = ref(false)
 let lf = null
 let lfSilent = false
 
@@ -166,7 +167,9 @@ function nextKey(prefix) {
 
 function applyGraph(product) {
   if (!lf) return
+  suppressEdgeValidation.value = true
   lf.render(toLogicflowGraph(product?.nodes?.length ? product : emptyDraftGraph()))
+  suppressEdgeValidation.value = false
   selectedNode.value = null
   selectedEdge.value = null
 }
@@ -237,22 +240,12 @@ function onNodeChange(node) {
 
 function onEdgeChange(edge) {
   if (!lf || readonly.value) return
-  lf.setProperties(edge.key, edge)
+  lf.setProperties(edge.key, {
+    ...edge,
+    title: edge.title,
+  })
+  lf.updateText(edge.key, edge.title || '')
   selectedEdge.value = edge
-  markDirty()
-}
-
-function onEdgeMove(step) {
-  if (readonly.value) return
-  const product = currentProduct()
-  const edges = product.edges.filter((item) => item.from === selectedEdge.value.from)
-  const index = edges.findIndex((item) => item.key === selectedEdge.value.key)
-  const next = index + step
-  if (next < 0 || next >= edges.length) return
-  const currentSort = edges[index].sort ?? index
-  const swapSort = edges[next].sort ?? next
-  lf.setProperties(edges[index].key, { ...edges[index], sort: swapSort })
-  lf.setProperties(edges[next].key, { ...edges[next], sort: currentSort })
   markDirty()
 }
 
@@ -286,7 +279,7 @@ function bindEvents() {
       key: data.properties?.key || data.id,
       from: data.sourceNodeId,
       to: data.targetNodeId,
-      title: data.properties?.title || '',
+      title: data.properties?.title || data.text?.value || data.text || '',
       ...data.properties,
     }
   })
@@ -305,10 +298,17 @@ function bindEvents() {
 }
 
 function onEdgeAdded({ data }) {
-  const sourceType = lf.getNodeModelById(data.sourceNodeId)?.type
-  if (sourceType === 'cc' || sourceType === 'end') {
+  if (suppressEdgeValidation.value) return
+  const graph = currentProduct()
+  const edgeKey = data.properties?.key || data.id
+  const result = validateCanvasEdge(graph, {
+    from: data.sourceNodeId,
+    to: data.targetNodeId,
+    key: edgeKey,
+  })
+  if (!result.ok) {
     lf.deleteEdge(data.id)
-    ElMessage.warning('抄送和结束不能再连出线')
+    ElMessage.warning(result.message)
     return
   }
   markDirty()

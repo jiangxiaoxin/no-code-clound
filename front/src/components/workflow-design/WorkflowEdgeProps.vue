@@ -7,34 +7,43 @@
         <el-checkbox :model-value="Boolean(edge.isDefault)" :disabled="disabled" @change="onDefault">
           其他情况
         </el-checkbox>
-        <div v-if="!edge.isDefault" class="wf-hint">
-          在下面配条件。字段只列主表（含标签页），不含子表列。
-        </div>
-        <FormFilterConditions
-          v-if="!edge.isDefault"
-          class="wf-edge-filters"
-          :class="{ 'is-disabled': disabled }"
-          :filters="filterModel"
-          :app-id="appId"
-          :source-fields="conditionFields"
-          :form-fields="conditionFields"
-        />
-        <div class="wf-sort">
-          <el-button :disabled="disabled" @click="moveUp">上移</el-button>
-          <el-button :disabled="disabled" @click="moveDown">下移</el-button>
-        </div>
+        <template v-if="!edge.isDefault">
+          <div class="wf-hint">
+            字段只列主表（含标签页），不含子表列。
+          </div>
+          <div
+            class="filter-trigger"
+            :class="{
+              'is-placeholder': !hasFilters,
+              'is-disabled': disabled,
+            }"
+            @click="openFilterDialog"
+          >
+            {{ hasFilters ? '已添加筛选条件' : '添加过滤条件' }}
+          </div>
+        </template>
       </template>
       <el-button class="wf-props-delete" type="danger" plain :disabled="disabled" @click="onDelete">
         删除连线
       </el-button>
     </div>
+    <FormOptionFilterDialog
+      v-model="filterVisible"
+      :app-id="appId"
+      :option-filters="optionFiltersFromEdge"
+      :source-fields="conditionFields"
+      :form-fields="conditionFields"
+      description="添加过滤条件来限定这条分支何时生效"
+      @confirm="onFilterConfirm"
+    />
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import FormFilterConditions from '../form-design/FormFilterConditions.vue'
+import FormOptionFilterDialog from '../form-design/FormOptionFilterDialog.vue'
+import { hasOptionFilters } from '../form-design/optionFilters.js'
 import { flattenFields } from '../form-design/tabsField.js'
 
 const props = defineProps({
@@ -44,39 +53,32 @@ const props = defineProps({
   formFields: { type: Array, default: () => [] },
   disabled: { type: Boolean, default: false },
 })
-const emit = defineEmits(['change', 'move', 'delete'])
+const emit = defineEmits(['change', 'delete'])
+
+const filterVisible = ref(false)
 
 const conditionFields = computed(() =>
   flattenFields(props.formFields).filter((field) => field.type !== 'subform'),
 )
 
-// 条件组件是就地改传进去的对象，所以这里自己存一份，改完再写回连线。
-// 换连线时才重建，避免写回后又被覆盖。
-const filterModel = ref(modelFromEdge())
+const optionFiltersFromEdge = computed(() => whenToOptionFilters(props.edge?.when))
 
-watch(() => props.edge?.key, resetFilterModel)
+const hasFilters = computed(() => hasOptionFilters(optionFiltersFromEdge.value))
 
-watch(filterModel, saveFilters, { deep: true })
-
-function modelFromEdge() {
+function whenToOptionFilters(when) {
+  if (!when?.items?.length) return null
   return {
-    match: props.edge?.when?.logic === 'any' ? 'any' : 'all',
-    conditions: (props.edge?.when?.items || []).map((item) => ({ ...item })),
+    match: when.logic === 'any' ? 'any' : 'all',
+    conditions: when.items.map((item) => ({ ...item })),
   }
 }
 
-function resetFilterModel() {
-  filterModel.value = modelFromEdge()
-}
-
-function saveFilters(value) {
-  if (props.disabled || !props.edge || props.edge.isDefault) return
-  patch({
-    when: {
-      logic: value.match === 'any' ? 'any' : 'all',
-      items: (value.conditions || []).map((item) => ({ ...item })),
-    },
-  })
+function optionFiltersToWhen(filters) {
+  if (!filters?.conditions?.length) return undefined
+  return {
+    logic: filters.match === 'any' ? 'any' : 'all',
+    items: filters.conditions.map((item) => ({ ...item })),
+  }
 }
 
 function patch(next) {
@@ -95,12 +97,13 @@ function onDefault(isDefault) {
   })
 }
 
-function moveUp() {
-  emit('move', -1)
+function openFilterDialog() {
+  if (props.disabled || props.edge?.isDefault) return
+  filterVisible.value = true
 }
 
-function moveDown() {
-  emit('move', 1)
+function onFilterConfirm(filters) {
+  patch({ when: optionFiltersToWhen(filters) })
 }
 
 async function onDelete() {
@@ -125,11 +128,33 @@ async function onDelete() {
 <style scoped lang="less">
 @import './workflowProps.less';
 
-.wf-sort {
+.filter-trigger {
   display: flex;
+  align-items: center;
+  width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 32px;
+  color: var(--el-text-color-regular);
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: var(--el-border-radius-base);
 }
 
-.wf-edge-filters.is-disabled {
-  pointer-events: none;
+.filter-trigger:hover {
+  border-color: var(--el-border-color-hover);
+}
+
+.filter-trigger.is-placeholder {
+  color: var(--el-text-color-placeholder);
+}
+
+.filter-trigger.is-disabled {
+  cursor: not-allowed;
+  color: var(--el-text-color-disabled);
+  background: var(--el-fill-color-light);
 }
 </style>
