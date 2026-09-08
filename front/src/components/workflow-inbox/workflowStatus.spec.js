@@ -5,12 +5,30 @@ import {
   canEditWorkflowRecord,
   inboxActionsVisible,
   submitSuccessText,
+  workflowCardStatusClass,
   workflowStatusText,
 } from './workflowStatus.js'
 
 test('状态中文', () => {
   assert.equal(workflowStatusText('running'), '审批中')
   assert.equal(workflowStatusText('approved'), '已通过')
+})
+
+test('流程卡片状态标签样式', () => {
+  assert.equal(
+    workflowCardStatusClass({ status: 'running', statusText: '审批中', kind: 'mine' }),
+    'is-running',
+  )
+  assert.equal(
+    workflowCardStatusClass({ status: 'approved', statusText: '已通过', kind: 'mine' }),
+    'is-approved',
+  )
+  assert.equal(workflowCardStatusClass({ kind: 'todo', statusText: '部门审批' }), 'is-running')
+  assert.equal(workflowCardStatusClass({ kind: 'cc', statusText: '已抄送' }), 'is-cc')
+  assert.equal(
+    workflowCardStatusClass({ kind: 'done', statusText: '已驳回' }),
+    'is-rejected',
+  )
 })
 
 test('已通过只有发起人且有实例能编辑', () => {

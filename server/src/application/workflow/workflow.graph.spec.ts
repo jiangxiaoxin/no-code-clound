@@ -4,6 +4,7 @@ import {
   allowResubmitAfterTerminated,
   nextStay,
   previousApproveNodeKey,
+  resolvePreviousApproveNodeKey,
   validatePublishedGraph,
 } from './workflow.graph';
 
@@ -223,6 +224,26 @@ describe('workflow.graph 抄送', () => {
     expect(
       previousApproveNodeKey(leaveGraph, ['start', 'br1', 'n1'], 'n1'),
     ).toBeNull();
+  });
+
+  it('visited 只有当前节点时，从本轮已通过待办找上一审批节点', () => {
+    const graph: WorkflowGraph = {
+      nodes: [
+        { key: 'start', type: 'start', title: '开始', x: 0, y: 0 },
+        { key: 'n1', type: 'approve', title: '审批', x: 0, y: 1 },
+        { key: 'n2', type: 'approve', title: '审批', x: 0, y: 2 },
+      ],
+      edges: [
+        { key: 'e1', from: 'start', to: 'n1' },
+        { key: 'e2', from: 'n1', to: 'n2' },
+      ],
+    };
+    expect(
+      resolvePreviousApproveNodeKey(graph, ['n2'], 'n2', [
+        { nodeKey: 'n1', round: 1, status: 'done', action: 'approve' },
+        { nodeKey: 'n2', round: 1, status: 'pending', action: null },
+      ], 1),
+    ).toBe('n1');
   });
 
   it('通过部门审批时带上挂着的抄送，主路仍去人事备案', () => {

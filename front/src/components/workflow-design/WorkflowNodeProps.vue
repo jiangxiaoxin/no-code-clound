@@ -50,7 +50,7 @@
           <el-checkbox :model-value="Boolean(node.allowAddSign)" :disabled="disabled" @change="onAllowAddSign" class="same-as-radio">
             允许加签
           </el-checkbox>
-          <p class="wf-action-hint">同意、驳回、退回至上一审批节点、退回至发起人默认就有。上一审批节点没有时，退回至上一审批节点不出现。</p>
+          <!-- <p class="wf-action-hint">同意、驳回、退回至上一审批节点、退回至发起人默认就有。上一审批节点没有时，退回至上一审批节点不出现。</p> -->
         </template>
         <div class="wf-label">字段权限</div>
         <div class="wf-access-table">

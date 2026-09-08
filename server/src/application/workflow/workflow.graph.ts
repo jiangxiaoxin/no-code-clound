@@ -45,6 +45,44 @@ export function previousApproveNodeKey(
   return null;
 }
 
+type ApproveTaskRef = {
+  nodeKey: string;
+  round: number;
+  status: string;
+  action: string | null;
+};
+
+/** visited 不完整时，从本轮已通过的审批待办倒推上一审批节点 */
+export function previousApproveNodeKeyFromTasks(
+  graph: WorkflowGraph,
+  currentNodeKey: string,
+  tasks: ApproveTaskRef[],
+  round: number,
+): string | null {
+  let last: string | null = null;
+  for (const row of tasks) {
+    if (row.round !== round) continue;
+    if (row.status !== 'done' || row.action !== 'approve') continue;
+    if (row.nodeKey === currentNodeKey) continue;
+    const node = nodeByKey(graph, row.nodeKey);
+    if (node?.type === 'approve') last = row.nodeKey;
+  }
+  return last;
+}
+
+export function resolvePreviousApproveNodeKey(
+  graph: WorkflowGraph,
+  visited: string[] | null | undefined,
+  currentNodeKey: string,
+  tasks?: ApproveTaskRef[],
+  round?: number,
+): string | null {
+  const fromVisited = previousApproveNodeKey(graph, visited, currentNodeKey);
+  if (fromVisited) return fromVisited;
+  if (!tasks?.length || round == null) return null;
+  return previousApproveNodeKeyFromTasks(graph, currentNodeKey, tasks, round);
+}
+
 function outgoing(graph: WorkflowGraph, from: string): WorkflowEdge[] {
   return graph.edges
     .filter((edge) => edge.from === from)

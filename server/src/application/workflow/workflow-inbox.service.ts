@@ -10,7 +10,7 @@ import { flattenFields } from '../form-record/flatten-fields';
 import { parseFormSchema } from '../form-schema';
 import { FormRecordStore } from '../form-record/form-record.store';
 import { FormField } from '../form-record/form-record.types';
-import { previousApproveNodeKey, allowResubmitAfterTerminated } from './workflow.graph';
+import { previousApproveNodeKey, allowResubmitAfterTerminated, resolvePreviousApproveNodeKey } from './workflow.graph';
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
@@ -232,7 +232,7 @@ export class WorkflowInboxService {
       })),
       names,
       allowResubmitAfterTerminated: allowResubmit,
-      actions: this.actionsOf(kind, instance, task, allowResubmit),
+      actions: this.actionsOf(kind, instance, task, allowResubmit, tasks),
       fieldAccess:
         kind === 'todo' && task?.nodeKey === 'start'
           ? {}
@@ -251,6 +251,7 @@ export class WorkflowInboxService {
     instance: WorkflowInstance,
     task: WorkflowTask | null,
     allowResubmit = true,
+    tasks: WorkflowTask[] = [],
   ) {
     if (kind === 'todo') {
       const pending = task?.status === 'pending';
@@ -273,10 +274,12 @@ export class WorkflowInboxService {
       const node = instance.graph.nodes.find((item) => item.key === task?.nodeKey);
       const approve = node?.type === 'approve' ? node : undefined;
       const hasPrevious = Boolean(
-        previousApproveNodeKey(
+        resolvePreviousApproveNodeKey(
           instance.graph,
           instance.visitedNodeKeys,
           task?.nodeKey || '',
+          tasks,
+          task?.round,
         ),
       );
       return {

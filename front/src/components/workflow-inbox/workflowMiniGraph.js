@@ -1,3 +1,7 @@
+function startNodeKey(graph) {
+  return (graph?.nodes || []).find((node) => node.type === 'start')?.key || ''
+}
+
 export function resolveHighlightNodeKey({
   currentNodeKey,
   instanceStatus,
@@ -5,6 +9,9 @@ export function resolveHighlightNodeKey({
   visitedNodeKeys,
   allowResubmitAfterTerminated,
 }) {
+  if (instanceStatus === 'draft') {
+    return startNodeKey(graph)
+  }
   const canResubmit = allowResubmitAfterTerminated !== false
   const current = (graph?.nodes || []).find((node) => node.key === currentNodeKey)
   if (currentNodeKey && !(canResubmit && current?.type === 'end')) {

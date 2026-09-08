@@ -32,7 +32,8 @@ let lf = null
 function paint() {
   if (!lf || !props.graph) return
   lf.render(toLogicflowGraph(props.graph))
-  const visited = new Set(props.visitedNodeKeys || [])
+  const isDraft = props.instanceStatus === 'draft'
+  const visited = new Set(isDraft ? [] : props.visitedNodeKeys || [])
   const highlightKey = resolveHighlightNodeKey({
     currentNodeKey: props.currentNodeKey,
     instanceStatus: props.instanceStatus,

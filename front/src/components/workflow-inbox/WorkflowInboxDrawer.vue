@@ -145,6 +145,7 @@
             :loading="acting"
             :disabled="acting"
             @click="onCancel"
+            type="danger"
           >
             撤回
           </el-button>

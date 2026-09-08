@@ -14,7 +14,7 @@ import { WorkflowApproverService, type ResolvedApprovers } from './workflow.appr
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
-import { nextStay, previousApproveNodeKey } from './workflow.graph';
+import { nextStay, resolvePreviousApproveNodeKey } from './workflow.graph';
 import {
   InstanceNote,
   RetryPatch,
@@ -286,7 +286,8 @@ export class WorkflowEngine {
       },
       {
         status: 'draft',
-        currentNodeKey: null,
+        currentNodeKey: 'start',
+        visitedNodeKeys: [],
         retryStep: null,
         errorReason: null,
       },
@@ -523,7 +524,12 @@ export class WorkflowEngine {
       this.claimWhere(instance, fromNodeKey),
       {
         currentNodeKey: stay.nodeKey,
-        visitedNodeKeys: stay.visited,
+        visitedNodeKeys: [
+          ...new Set([
+            ...(instance.visitedNodeKeys ?? []),
+            ...stay.visited,
+          ]),
+        ],
         status: 'running',
         retryStep: null,
         errorReason: null,
@@ -533,7 +539,9 @@ export class WorkflowEngine {
       return instance;
     }
     instance.currentNodeKey = stay.nodeKey;
-    instance.visitedNodeKeys = stay.visited;
+    instance.visitedNodeKeys = [
+      ...new Set([...(instance.visitedNodeKeys ?? []), ...stay.visited]),
+    ];
     instance.status = 'running';
     return this.dispatchApprove(
       instance,
@@ -943,12 +951,18 @@ export class WorkflowEngine {
       input.taskId,
       input.actorId,
     );
+    const roundTasks = await this.taskRepo.find({
+      where: { instanceId: instance.id },
+      order: { createdAt: 'ASC' },
+    });
     const prevKey =
       input.target === 'previous'
-        ? previousApproveNodeKey(
+        ? resolvePreviousApproveNodeKey(
             instance.graph,
             instance.visitedNodeKeys,
             task.nodeKey,
+            roundTasks,
+            task.round,
           )
         : null;
     if (input.target === 'previous' && !prevKey) {

@@ -10,6 +10,29 @@ export function workflowStatusText(status) {
   return WORKFLOW_STATUS_TEXT[status] || ''
 }
 
+/** 流程 inbox 卡片右上角状态标签的样式类 */
+export function workflowCardStatusClass({ status, statusText, kind } = {}) {
+  if (kind === 'cc') return 'is-cc'
+  if (kind === 'todo') return 'is-running'
+
+  if (status === 'draft') return 'is-draft'
+  if (status === 'running') return 'is-running'
+  if (status === 'approved') return 'is-approved'
+  if (status === 'rejected') return 'is-rejected'
+  if (status === 'error') return 'is-error'
+
+  const text = statusText || ''
+  if (text === '已驳回') return 'is-rejected'
+  if (text === '已退回' || text === '已退回发起人') return 'is-return'
+  if (text === '已通过' || text === '已转交' || text === '已提交') return 'is-approved'
+  if (text === '已抄送') return 'is-cc'
+  if (text === '审批中') return 'is-running'
+  if (text === '草稿') return 'is-draft'
+  if (text === '异常') return 'is-error'
+
+  return 'is-draft'
+}
+
 export function canEditWorkflowRecord({
   formKind,
   status,

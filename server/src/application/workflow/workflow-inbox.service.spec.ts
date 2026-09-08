@@ -532,6 +532,69 @@ describe('WorkflowInboxService', () => {
     expect(detail.actions.canResubmit).toBe(false);
   });
 
+  it('visited 只有当前节点时，仍能从已通过待办判断可退回上一节点', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 4,
+      assigneeId: 9,
+      status: 'pending',
+      instanceId: 1,
+      nodeKey: 'n2',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'running',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: {
+        nodes: [
+          { key: 'start', type: 'start', title: '开始' },
+          { key: 'n1', type: 'approve', title: '部门审批' },
+          { key: 'n2', type: 'approve', title: '人事备案' },
+        ],
+      },
+      currentNodeKey: 'n2',
+      visitedNodeKeys: ['n2'],
+      round: 1,
+      errorReason: null,
+      notes: [],
+      hasApproved: true,
+    });
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    taskRepo.find.mockResolvedValue([
+      {
+        id: 3,
+        instanceId: 1,
+        nodeKey: 'n1',
+        round: 1,
+        assigneeId: 21,
+        status: 'done',
+        action: 'approve',
+        createdAt: new Date('2026-01-01'),
+      },
+      {
+        id: 4,
+        instanceId: 1,
+        nodeKey: 'n2',
+        round: 1,
+        assigneeId: 9,
+        status: 'pending',
+        action: null,
+        createdAt: new Date('2026-01-02'),
+      },
+    ]);
+    userRepo.find.mockResolvedValue([
+      { id: 5, displayName: '张三', status: 'active' },
+      { id: 9, displayName: '李四', status: 'active' },
+      { id: 21, displayName: '经理', status: 'active' },
+    ]);
+    const detail = await service.open(9, 'todo', 4);
+    expect(detail.actions.canReturnPrevious).toBe(true);
+  });
+
   it('发起人 start 待办只能提交，字段按发起编辑', async () => {
     taskRepo.findOne.mockResolvedValue({
       id: 8,

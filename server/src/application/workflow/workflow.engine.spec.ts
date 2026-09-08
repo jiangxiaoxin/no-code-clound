@@ -310,7 +310,11 @@ describe('WorkflowEngine', () => {
         id: 1,
         status: expect.anything(),
       }),
-      expect.objectContaining({ status: 'draft' }),
+      expect.objectContaining({
+        status: 'draft',
+        currentNodeKey: 'start',
+        visitedNodeKeys: [],
+      }),
     );
   });
 
@@ -848,9 +852,24 @@ describe('WorkflowEngine 抄送', () => {
     );
     taskRepo.find
       .mockResolvedValueOnce([
-        { assigneeId: 21, status: 'done', action: 'approve' },
+        {
+          nodeKey: 'n1',
+          round: 1,
+          status: 'done',
+          action: 'approve',
+          assigneeId: 21,
+        },
+        {
+          nodeKey: 'n2',
+          round: 1,
+          status: 'pending',
+          action: null,
+          assigneeId: 9,
+        },
       ])
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce([
+        { assigneeId: 21, status: 'done', action: 'approve' },
+      ]);
     userRepo.find.mockResolvedValue([{ id: 21, status: 'active' }]);
     await engine.returnTo({
       taskId: 2,
