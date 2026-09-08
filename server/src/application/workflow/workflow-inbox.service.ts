@@ -190,6 +190,14 @@ export class WorkflowInboxService {
         kind === 'cc' && task
           ? instance.graph.nodes.find((item) => item.key === task.nodeKey)
           : undefined;
+    const startNode = instance.graph.nodes.find((item) => item.type === 'start');
+    const startAccess =
+      startNode?.type === 'start' ? startNode.fieldAccess || {} : {};
+    const initiatorEditable =
+      kind === 'mine' &&
+      (instance.status === 'draft' ||
+        instance.status === 'rejected' ||
+        instance.status === 'error');
     const runtime = await this.definition.getRuntime(instance.formId);
     const allowResubmit = allowResubmitAfterTerminated(runtime.graph);
     return {
@@ -235,9 +243,11 @@ export class WorkflowInboxService {
       actions: this.actionsOf(kind, instance, task, allowResubmit, tasks),
       fieldAccess:
         kind === 'todo' && task?.nodeKey === 'start'
-          ? {}
+          ? startAccess
           : kind === 'todo'
             ? approve?.fieldAccess || {}
+            : initiatorEditable
+              ? startAccess
             : kind === 'cc' && ccNode?.type === 'cc'
               ? ccNode.fieldAccess || {}
               : {},
@@ -592,8 +602,16 @@ function briefKeysOf(
 ) {
   const list = nodes || [];
   const current = list.find((node) => node.key === nodeKey);
-  if (current?.type === 'approve' || current?.type === 'cc') {
+  if (
+    current?.type === 'approve' ||
+    current?.type === 'cc' ||
+    current?.type === 'start'
+  ) {
     return current.briefFieldKeys;
+  }
+  const start = list.find((node) => node.type === 'start');
+  if (start?.type === 'start' && Array.isArray(start.briefFieldKeys)) {
+    return start.briefFieldKeys;
   }
   const approve = list.find((node) => node.type === 'approve');
   return approve?.type === 'approve' ? approve.briefFieldKeys : undefined;

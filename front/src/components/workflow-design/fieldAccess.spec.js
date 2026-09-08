@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   applyDefaultFieldAccessToGraph,
+  gridFieldAccessFromStart,
   resolveFieldAccess,
   withDefaultFieldAccess,
 } from './fieldAccess.js'
@@ -38,10 +39,10 @@ test('补全时不覆盖已配置的可编辑', () => {
   })
 })
 
-test('保存前给审批和抄送节点补上缺省只读，其它节点不动', () => {
+test('保存前给开始、审批和抄送节点补上缺省权限，其它节点不动', () => {
   const graph = {
     nodes: [
-      { key: 'start', type: 'start' },
+      { key: 'start', type: 'start', fieldAccess: {} },
       { key: 'n1', type: 'approve', fieldAccess: {} },
       { key: 'cc1', type: 'cc', fieldAccess: {} },
       { key: 'end', type: 'end' },
@@ -49,7 +50,11 @@ test('保存前给审批和抄送节点补上缺省只读，其它节点不动',
     edges: [],
   }
   const next = applyDefaultFieldAccessToGraph(graph, fields)
-  assert.equal(next.nodes[0].fieldAccess, undefined)
+  assert.deepEqual(next.nodes[0].fieldAccess, {
+    field_reason: 'editable',
+    field_days: 'editable',
+    field_note: 'editable',
+  })
   assert.deepEqual(next.nodes[1].fieldAccess, {
     field_reason: 'readonly',
     field_days: 'readonly',
@@ -60,4 +65,20 @@ test('保存前给审批和抄送节点补上缺省只读，其它节点不动',
     field_days: 'readonly',
     field_note: 'readonly',
   })
+})
+
+test('gridFieldAccessFromStart 未配置时返回空对象表示全部可编辑', () => {
+  assert.deepEqual(gridFieldAccessFromStart({}, fields), {})
+  assert.deepEqual(gridFieldAccessFromStart(undefined, fields), {})
+})
+
+test('gridFieldAccessFromStart 已配置时缺省为可编辑', () => {
+  assert.deepEqual(
+    gridFieldAccessFromStart({ field_reason: 'readonly' }, fields),
+    {
+      field_reason: 'readonly',
+      field_days: 'editable',
+      field_note: 'editable',
+    },
+  )
 })

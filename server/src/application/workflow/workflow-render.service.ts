@@ -13,6 +13,7 @@ import { FormField } from '../form-record/form-record.types';
 import { parseFormSchema } from '../form-schema';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
+import { startWritableKeys } from './workflow.graph';
 import { FieldAccess } from './workflow.types';
 
 @Injectable()
@@ -101,13 +102,23 @@ export class WorkflowRenderService {
     const result = await this.store.query(sourceFormId, built);
     const row = result.items[0]?.data ?? {};
     const data: Record<string, unknown> = {};
-    const initiatorWritable =
+    const initiatorWritableKeys = startWritableKeys(
+      instance.graph,
+      parseFormSchema(form.fields).fields,
+    );
+    const initiatorEditable =
       instance.initiatorId === actorId &&
       (instance.status === 'draft' ||
         instance.status === 'rejected' ||
-        instance.status === 'error');
+        instance.status === 'error' ||
+        (instance.status === 'running' &&
+          instance.currentNodeKey === 'start' &&
+          initiatorWritableKeys !== null));
     for (const mapping of linkage?.fieldMappings || []) {
-      const writable = initiatorWritable || writableKeys.has(mapping.to);
+      const writable =
+        (initiatorEditable &&
+          (!initiatorWritableKeys || initiatorWritableKeys.has(mapping.to))) ||
+        writableKeys.has(mapping.to);
       if (!writable) continue;
       if (mapping.from in row) data[mapping.to] = row[mapping.from];
     }
@@ -115,13 +126,25 @@ export class WorkflowRenderService {
   }
 
   async assertWritable(instanceId: number, actorId: number, fieldKey: string) {
-    const { writableKeys, instance } = await this.requireReader(instanceId, actorId);
-    const initiatorWritable =
+    const { writableKeys, instance, form } = await this.requireReader(instanceId, actorId);
+    const initiatorWritableKeys = startWritableKeys(
+      instance.graph,
+      parseFormSchema(form.fields).fields,
+    );
+    const initiatorEditable =
       instance.initiatorId === actorId &&
       (instance.status === 'draft' ||
         instance.status === 'rejected' ||
-        instance.status === 'error');
-    if (initiatorWritable) return;
+        instance.status === 'error' ||
+        (instance.status === 'running' &&
+          instance.currentNodeKey === 'start' &&
+          initiatorWritableKeys !== null));
+    if (
+      initiatorEditable &&
+      (!initiatorWritableKeys || initiatorWritableKeys.has(fieldKey))
+    ) {
+      return;
+    }
     if (writableKeys.has(fieldKey)) return;
     if (
       instance.initiatorId === actorId &&
@@ -154,6 +177,17 @@ export class WorkflowRenderService {
       for (const [key, access] of Object.entries(node.fieldAccess || {})) {
         if ((access as FieldAccess) === 'editable') writableKeys.add(key);
       }
+    }
+    if (
+      pending &&
+      pending.nodeKey === 'start' &&
+      instance.initiatorId === actorId
+    ) {
+      const startKeys = startWritableKeys(
+        instance.graph,
+        parseFormSchema(form.fields).fields,
+      );
+      if (startKeys) startKeys.forEach((key) => writableKeys.add(key));
     }
     return { instance, form, writableKeys };
   }

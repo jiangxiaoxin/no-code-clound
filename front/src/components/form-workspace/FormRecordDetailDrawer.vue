@@ -31,6 +31,7 @@
             :user-names="record?.userNames || {}"
             :record-id="record?.id || ''"
             :data-source="recordSource"
+            :field-access="gridFieldAccess"
           />
           <div v-if="!editing" class="record-audit">
             <div class="record-audit-row">
@@ -84,6 +85,7 @@
           :user-names="record?.userNames || {}"
           :record-id="record?.id || ''"
           :data-source="recordSource"
+          :field-access="gridFieldAccess"
         />
         <div v-if="!editing" class="record-audit">
           <div class="record-audit-row">
@@ -142,6 +144,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import FormFillGrid from '../form-fill/FormFillGrid.vue'
+import { gridFieldAccessFromStart } from '../workflow-design/fieldAccess.js'
 import { cloneRecordValues, firstRequiredError, buildRecordData } from '../form-fill/fillValues.js'
 import { formatDateTime } from '../../utils/timeValue.js'
 import { appRecordSource } from './recordDataSource.js'
@@ -184,6 +187,9 @@ const recordSource = computed(
     appRecordSource({ appId: props.appId, formId: props.formId }),
 )
 const isWorkflowForm = computed(() => props.formKind === 'workflow')
+const gridFieldAccess = computed(() =>
+  gridFieldAccessFromStart(props.record?.startFieldAccess, props.fields),
+)
 const createdByLabel = computed(() => props.record?.createdByName || '')
 const updatedByLabel = computed(() => props.record?.updatedByName || '')
 const createdAtLabel = computed(() => formatDateTime(props.record?.createdAt))

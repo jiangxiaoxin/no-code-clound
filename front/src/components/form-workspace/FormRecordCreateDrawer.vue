@@ -22,6 +22,7 @@
         :fields="fields"
         :values="values"
         :dict-items-by-code="dictItemsByCode"
+        :field-access="fieldAccess"
       />
     </div>
     <template #footer>
@@ -49,6 +50,7 @@ defineProps({
   saving: { type: Boolean, default: false },
   unpublished: { type: Boolean, default: false },
   workflowEnabled: { type: Boolean, default: false },
+  fieldAccess: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['update:modelValue', 'save', 'closed', 'draft', 'submit'])

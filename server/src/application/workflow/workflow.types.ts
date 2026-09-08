@@ -19,6 +19,8 @@ export type WorkflowNode =
   | (WorkflowNodeBase & {
       type: 'start';
       allowResubmitAfterTerminated?: boolean;
+      fieldAccess?: Record<string, FieldAccess>;
+      briefFieldKeys?: string[];
     })
   | (WorkflowNodeBase & { type: 'end' | 'branch' })
   | (WorkflowNodeBase & {

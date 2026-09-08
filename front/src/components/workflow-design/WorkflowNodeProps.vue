@@ -121,6 +121,49 @@
           />
         </div>
         <p class="wf-action-hint">关闭后，已通过和已驳回的单据不能再改、不能再交。草稿和异常不受影响。</p>
+        <div class="wf-label">字段权限</div>
+        <div class="wf-access-table">
+          <div class="wf-access-header">
+            <span class="wf-access-name" />
+            <div class="wf-access-options">
+              <div class="wf-access-opt">
+                <span class="wf-access-col-title">可编辑</span>
+                <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleAccessAllEditable">
+                  {{ bulkLabel('editable') }}
+                </el-link>
+              </div>
+              <div class="wf-access-opt">
+                <span class="wf-access-col-title">只读</span>
+                <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleAccessAllReadonly">
+                  {{ bulkLabel('readonly') }}
+                </el-link>
+              </div>
+              <div class="wf-access-opt">
+                <span class="wf-access-col-title">不可见</span>
+                <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleAccessAllHidden">
+                  {{ bulkLabel('hidden') }}
+                </el-link>
+              </div>
+            </div>
+            <div class="wf-access-brief">
+              <span class="wf-access-col-title">简报</span>
+              <el-link type="primary" underline="never" :disabled="disabled" @click="onToggleBriefAll">
+                {{ briefBulkLabel }}
+              </el-link>
+            </div>
+          </div>
+          <WorkflowFieldAccessRow
+            v-for="field in accessFields"
+            :key="field.key"
+            :field="field"
+            :model-value="accessOf(field)"
+            :brief="briefOf(field)"
+            :options="accessOptions(field)"
+            :disabled="disabled"
+            @change="onAccess"
+            @brief="onBrief"
+          />
+        </div>
       </template>
       <template v-else-if="node?.type === 'end'">
         <label class="wf-label">节点名称</label>
@@ -244,8 +287,12 @@ function onAllowAddSign(allowAddSign) {
   patch({ allowAddSign: Boolean(allowAddSign) })
 }
 
+function defaultAccessMode() {
+  return props.node?.type === 'start' ? 'editable' : 'readonly'
+}
+
 function accessOf(field) {
-  return resolveFieldAccess(props.node?.fieldAccess, field.key)
+  return resolveFieldAccess(props.node?.fieldAccess, field.key, defaultAccessMode())
 }
 
 function accessOptions(field) {
@@ -332,10 +379,11 @@ function bulkLabel(mode) {
 function toggleAccessAll(mode) {
   const eligible = fieldsForMode(mode)
   const next = { ...(props.node.fieldAccess || {}) }
+  const fallback = defaultAccessMode()
   if (allSetTo(mode)) {
     for (const field of eligible) {
       if (accessOf(field) === mode) {
-        next[field.key] = 'readonly'
+        next[field.key] = fallback
       }
     }
   } else {

@@ -38,6 +38,7 @@
       :saving="saving"
       :unpublished="workflowUnpublished"
       :workflow-enabled="workflowEnabled"
+      :field-access="startFieldAccess"
       @save="onCreate"
       @draft="onCreateDraft"
       @submit="onCreateSubmit"
@@ -69,6 +70,7 @@ import { normalizeRecordActions } from '../../utils/recordActions'
 import FormRecordList from './FormRecordList.vue'
 import FormRecordCreateDrawer from './FormRecordCreateDrawer.vue'
 import FormRecordDetailDrawer from './FormRecordDetailDrawer.vue'
+import { gridFieldAccessFromStart } from '../workflow-design/fieldAccess.js'
 
 const props = defineProps({
   appId: { type: Number, required: true },
@@ -96,6 +98,9 @@ const workflowUnpublished = computed(
 )
 const workflowEnabled = computed(
   () => form.value?.formKind === 'workflow' && Boolean(form.value?.workflowEnabled),
+)
+const startFieldAccess = computed(() =>
+  gridFieldAccessFromStart(form.value?.startFieldAccess, fields.value),
 )
 const recordSource = computed(() =>
   appRecordSource({ appId: props.appId, formId: props.formId }),

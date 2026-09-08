@@ -1,11 +1,79 @@
 import { flattenFields } from '../form-record/flatten-fields';
 import { FormField } from '../form-record/form-record.types';
 import {
+  FieldAccess,
   WorkflowEdge,
   WorkflowEdgeCondition,
   WorkflowGraph,
   WorkflowNode,
 } from './workflow.types';
+
+const ACCESS_MODES = new Set<FieldAccess>(['editable', 'readonly', 'hidden']);
+const SKIP_FIELD_TYPES = new Set(['relate-subform', 'divider', 'tabs']);
+
+export function startNodeOf(graph?: WorkflowGraph | null) {
+  const node = graph?.nodes?.find((item) => item.type === 'start');
+  return node?.type === 'start' ? node : undefined;
+}
+
+export function resolveStartFieldAccess(
+  fieldAccess: Record<string, FieldAccess> | undefined,
+  key: string,
+): FieldAccess {
+  if (!fieldAccess || !Object.keys(fieldAccess).length) return 'editable';
+  const value = fieldAccess[key];
+  return ACCESS_MODES.has(value) ? value : 'editable';
+}
+
+export function prepareStartPersistInput(
+  data: Record<string, unknown>,
+  fields: FormField[] | null | undefined,
+  graph: WorkflowGraph | null | undefined,
+  existing?: Record<string, unknown> | null,
+): { data: Record<string, unknown>; requiredKeys: string[] | 'all' } {
+  const fieldAccess = startNodeOf(graph)?.fieldAccess;
+  if (!fieldAccess || !Object.keys(fieldAccess).length) {
+    return { data, requiredKeys: 'all' };
+  }
+  const flat = flattenFields(fields ?? []).filter(
+    (field) => field.key && !SKIP_FIELD_TYPES.has(field.type),
+  );
+  const picked: Record<string, unknown> = {};
+  for (const field of flat) {
+    const key = field.key!;
+    const access = resolveStartFieldAccess(fieldAccess, key);
+    if (access === 'hidden') continue;
+    if (access === 'editable' && key in data) {
+      picked[key] = data[key];
+      continue;
+    }
+    if (existing && key in existing) {
+      picked[key] = existing[key];
+      continue;
+    }
+    if (key in data) picked[key] = data[key];
+  }
+  const requiredKeys = flat
+    .filter((field) => resolveStartFieldAccess(fieldAccess, field.key!) === 'editable')
+    .map((field) => field.key!);
+  return { data: picked, requiredKeys: requiredKeys.length ? requiredKeys : [] };
+}
+
+export function startWritableKeys(
+  graph: WorkflowGraph | null | undefined,
+  fields: FormField[] | null | undefined,
+): Set<string> | null {
+  const fieldAccess = startNodeOf(graph)?.fieldAccess;
+  if (!fieldAccess || !Object.keys(fieldAccess).length) return null;
+  const keys = new Set<string>();
+  for (const field of flattenFields(fields ?? [])) {
+    if (!field.key || SKIP_FIELD_TYPES.has(field.type)) continue;
+    if (resolveStartFieldAccess(fieldAccess, field.key) === 'editable') {
+      keys.add(field.key);
+    }
+  }
+  return keys;
+}
 
 export type NextStay =
   | { kind: 'approve'; nodeKey: string; visited: string[]; ccNodeKeys: string[] }

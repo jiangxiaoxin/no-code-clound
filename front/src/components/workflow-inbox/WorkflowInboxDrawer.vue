@@ -192,7 +192,7 @@ import {
   inboxActionsVisible,
   submitSuccessText,
 } from './workflowStatus.js'
-import { withDefaultFieldAccess } from '../workflow-design/fieldAccess.js'
+import { withDefaultFieldAccess, gridFieldAccessFromStart } from '../workflow-design/fieldAccess.js'
 import WorkflowActionPicker from './WorkflowActionPicker.vue'
 import WorkflowMiniGraph from './WorkflowMiniGraph.vue'
 import WorkflowProgressList from './WorkflowProgressList.vue'
@@ -234,12 +234,14 @@ const dictItemsByCode = computed(() =>
   ),
 )
 const gridFieldAccess = computed(() => {
-  if ((props.kind !== 'todo' && props.kind !== 'cc') || !detail.value) return {}
-  if (detail.value.actions?.canResubmit) return {}
-  return withDefaultFieldAccess(
-    detail.value.fieldAccess,
-    detail.value.form?.fields || [],
-  )
+  if ((props.kind !== 'todo' && props.kind !== 'cc' && props.kind !== 'mine') || !detail.value) {
+    return {}
+  }
+  const raw = detail.value.fieldAccess
+  if (detail.value.actions?.canResubmit || props.kind === 'mine') {
+    return gridFieldAccessFromStart(raw, detail.value.form?.fields || [])
+  }
+  return withDefaultFieldAccess(raw, detail.value.form?.fields || [])
 })
 const formDisabled = computed(() => {
   if (!detail.value || detail.value.recordMissing) return true

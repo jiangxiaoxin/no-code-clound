@@ -28,6 +28,7 @@ import { WorkflowInstance } from './workflow/workflow-instance.entity';
 import { WorkflowTask } from './workflow/workflow-task.entity';
 import { WorkflowVersion } from './workflow/workflow-version.entity';
 import { mergeFormConfig, normalizeFormConfig } from './form-config';
+import { startNodeOf } from './workflow/workflow.graph';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
 import { assertSerialSchema } from './form-record/serial-number';
 
@@ -222,9 +223,13 @@ export class ApplicationService {
     const enabled = await this.workflowVersionRepo.findOne({
       where: { formId, enabled: true },
     });
+    const startAccess = startNodeOf(enabled?.graph)?.fieldAccess;
     return {
       ...this.toFormDetail(form),
       ...this.toWorkflowFlags(Boolean(def?.hasBeenEnabled), Boolean(enabled)),
+      ...(startAccess && Object.keys(startAccess).length
+        ? { startFieldAccess: startAccess }
+        : {}),
     };
   }
 

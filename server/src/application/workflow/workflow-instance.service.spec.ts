@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
+import { FormRecordStore } from '../form-record/form-record.store';
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
@@ -18,6 +19,7 @@ describe('WorkflowInstanceService', () => {
   const taskRepo = { findOne: jest.fn() };
   const formRepo = { findOne: jest.fn(), findOneOrFail: jest.fn() };
   const persist = { persist: jest.fn() };
+  const store = { findById: jest.fn() };
   const engine = {
     ensureDraft: jest.fn(),
     submit: jest.fn(),
@@ -53,6 +55,7 @@ describe('WorkflowInstanceService', () => {
     });
     engine.completeTask.mockResolvedValue({ waitingOthers: false });
     definition.getRuntime.mockResolvedValue({ graph: {} });
+    store.findById.mockResolvedValue({ data: {} });
     const module = await Test.createTestingModule({
       providers: [
         WorkflowInstanceService,
@@ -60,6 +63,7 @@ describe('WorkflowInstanceService', () => {
         { provide: getRepositoryToken(WorkflowTask), useValue: taskRepo },
         { provide: getRepositoryToken(AppForm), useValue: formRepo },
         { provide: FormRecordPersistService, useValue: persist },
+        { provide: FormRecordStore, useValue: store },
         { provide: WorkflowEngine, useValue: engine },
         { provide: AppAccessService, useValue: access },
         { provide: WorkflowDefinitionService, useValue: definition },

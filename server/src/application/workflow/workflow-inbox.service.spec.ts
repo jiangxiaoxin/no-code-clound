@@ -612,7 +612,12 @@ describe('WorkflowInboxService', () => {
       recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
       graph: {
         nodes: [
-          { key: 'start', type: 'start', title: '开始' },
+          {
+            key: 'start',
+            type: 'start',
+            title: '开始',
+            fieldAccess: { field_reason: 'editable', field_days: 'readonly' },
+          },
           { key: 'n1', type: 'approve', title: '部门审批' },
         ],
       },
@@ -632,7 +637,10 @@ describe('WorkflowInboxService', () => {
     expect(detail.actions.canApprove).toBe(false);
     expect(detail.actions.canReject).toBe(false);
     expect(detail.actions.readOnly).toBe(false);
-    expect(detail.fieldAccess).toEqual({});
+    expect(detail.fieldAccess).toEqual({
+      field_reason: 'editable',
+      field_days: 'readonly',
+    });
   });
 
   it('start 待办卡片标题是待发起人修改', async () => {

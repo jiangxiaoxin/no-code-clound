@@ -14,7 +14,7 @@ import { WorkflowDefinitionService } from '../workflow/workflow-definition.servi
 import { WorkflowEngine } from '../workflow/workflow.engine';
 import { WorkflowInstance } from '../workflow/workflow-instance.entity';
 import { WorkflowTask } from '../workflow/workflow-task.entity';
-import { allowResubmitAfterTerminated } from '../workflow/workflow.graph';
+import { allowResubmitAfterTerminated, prepareStartPersistInput, startNodeOf } from '../workflow/workflow.graph';
 import { InstanceStatus } from '../workflow/workflow.types';
 import {
   FormRecordPersistService,
@@ -65,6 +65,7 @@ export type FormRecordView = {
     nextNodeTitle?: string;
     workflowHint?: string;
     allowResubmitAfterTerminated?: boolean;
+    startFieldAccess?: Record<string, 'editable' | 'readonly' | 'hidden'>;
     canConfigure?: boolean;
     workflowProgress?: {
       graph: WorkflowInstance['graph'];
@@ -140,8 +141,11 @@ export class FormRecordService {
     const doc = await this.persist.persist({
       form,
       actorId,
-      data,
-      requiredKeys: 'all',
+      ...prepareStartPersistInput(
+        data,
+        parseFormSchema(form.fields).fields,
+        runtime.graph,
+      ),
     });
     const recordId = doc._id.toHexString();
     let submitted: WorkflowInstance | null = null;
@@ -234,7 +238,11 @@ export class FormRecordService {
     const doc = await this.store.findById(formId, recordId);
     if (!doc) throw new NotFoundException('记录不存在');
     const view = await this.attachProgress(
-      await this.toRecordView(doc, form),
+      await this.attachStartFieldAccess(
+        await this.toRecordView(doc, form),
+        form,
+        doc,
+      ),
       form,
       doc,
     );
@@ -302,9 +310,13 @@ export class FormRecordService {
       const doc = await this.persist.persist({
         form,
         actorId,
-        data,
         recordId,
-        requiredKeys: 'all',
+        ...prepareStartPersistInput(
+          data,
+          parseFormSchema(form.fields).fields,
+          runtime.graph,
+          existing?.data,
+        ),
       });
       const submitted = await this.engine.resubmitApproved({
         form,
@@ -328,9 +340,13 @@ export class FormRecordService {
       const doc = await this.persist.persist({
         form,
         actorId,
-        data,
         recordId,
-        requiredKeys: 'all',
+        ...prepareStartPersistInput(
+          data,
+          parseFormSchema(form.fields).fields,
+          runtime.graph,
+          existing?.data,
+        ),
       });
       let submitted: WorkflowInstance | null = null;
       if (intent === 'submit') {
@@ -644,6 +660,36 @@ export class FormRecordService {
     if (!unique.length) return new Map<number, WorkflowInstance>();
     const rows = await this.instanceRepo.find({ where: { id: In(unique) } });
     return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  private async attachStartFieldAccess(
+    view: FormRecordView,
+    form: AppForm,
+    doc: FormRecordDoc,
+  ): Promise<FormRecordView> {
+    if (form.formKind !== 'workflow') return view;
+    const status = doc.workflowStatus as InstanceStatus | undefined;
+    const editable =
+      !status ||
+      status === 'draft' ||
+      status === 'rejected' ||
+      status === 'error' ||
+      status === 'approved';
+    if (!editable) return view;
+    const runtime = await this.definition.getRuntime(form.id);
+    if (!runtime.enabled) return view;
+    let graph = runtime.graph;
+    if (doc.workflowInstanceId) {
+      const inst = await this.instanceRepo.findOne({
+        where: { id: doc.workflowInstanceId },
+      });
+      if (inst) graph = inst.graph;
+    }
+    const access = startNodeOf(graph)?.fieldAccess;
+    if (access && Object.keys(access).length) {
+      view.startFieldAccess = access;
+    }
+    return view;
   }
 
   private async attachProgress(

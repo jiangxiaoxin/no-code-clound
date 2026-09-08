@@ -3,6 +3,7 @@ import { WorkflowGraph } from './workflow.types';
 import {
   allowResubmitAfterTerminated,
   nextStay,
+  prepareStartPersistInput,
   previousApproveNodeKey,
   resolvePreviousApproveNodeKey,
   validatePublishedGraph,
@@ -278,5 +279,49 @@ describe('workflow.graph 抄送', () => {
         edges: [],
       }),
     ).toBe(false);
+  });
+
+  it('prepareStartPersistInput 未配置时保留全部字段', () => {
+    const fields: FormField[] = [
+      { key: 'field_reason', type: 'textarea', title: '事由' },
+    ];
+    const graph: WorkflowGraph = {
+      nodes: [{ key: 'start', type: 'start', title: '开始', x: 0, y: 0 }],
+      edges: [],
+    };
+    expect(
+      prepareStartPersistInput({ field_reason: '事假' }, fields, graph),
+    ).toEqual({ data: { field_reason: '事假' }, requiredKeys: 'all' });
+  });
+
+  it('prepareStartPersistInput 只落库可编辑字段', () => {
+    const fields: FormField[] = [
+      { key: 'field_reason', type: 'textarea', title: '事由' },
+      { key: 'field_days', type: 'number', title: '天数' },
+    ];
+    const graph: WorkflowGraph = {
+      nodes: [
+        {
+          key: 'start',
+          type: 'start',
+          title: '开始',
+          x: 0,
+          y: 0,
+          fieldAccess: { field_reason: 'editable', field_days: 'readonly' },
+        },
+      ],
+      edges: [],
+    };
+    expect(
+      prepareStartPersistInput(
+        { field_reason: '事假', field_days: 3 },
+        fields,
+        graph,
+        { field_days: 1 },
+      ),
+    ).toEqual({
+      data: { field_reason: '事假', field_days: 1 },
+      requiredKeys: ['field_reason'],
+    });
   });
 });

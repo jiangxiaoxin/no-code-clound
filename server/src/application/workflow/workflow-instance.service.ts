@@ -8,6 +8,8 @@ import { Repository } from 'typeorm';
 import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
+import { FormRecordStore } from '../form-record/form-record.store';
+import { parseFormSchema } from '../form-schema';
 import { AddSignTaskDto } from './dto/add-sign-task.dto';
 import { CompleteTaskDto } from './dto/complete-task.dto';
 import { ReturnTaskDto } from './dto/return-task.dto';
@@ -16,7 +18,7 @@ import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
-import { allowResubmitAfterTerminated } from './workflow.graph';
+import { allowResubmitAfterTerminated, prepareStartPersistInput } from './workflow.graph';
 import { InstanceStatus } from './workflow.types';
 
 const EDITABLE: InstanceStatus[] = ['draft', 'rejected', 'error'];
@@ -31,6 +33,7 @@ export class WorkflowInstanceService {
     @InjectRepository(AppForm)
     private readonly formRepo: Repository<AppForm>,
     private readonly persist: FormRecordPersistService,
+    private readonly store: FormRecordStore,
     private readonly engine: WorkflowEngine,
     private readonly access: AppAccessService,
     private readonly definition: WorkflowDefinitionService,
@@ -44,13 +47,7 @@ export class WorkflowInstanceService {
     const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
     await this.assertTerminatedEditable(instance);
     const form = await this.requireForm(instance.formId);
-    await this.persist.persist({
-      form,
-      actorId,
-      recordId: instance.recordId,
-      data,
-      requiredKeys: 'all',
-    });
+    await this.persistAsInitiator(instance, form, actorId, data);
     await this.engine.ensureDraft({
       form,
       recordId: instance.recordId,
@@ -66,13 +63,7 @@ export class WorkflowInstanceService {
     const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
     await this.assertTerminatedEditable(instance);
     const form = await this.requireForm(instance.formId);
-    await this.persist.persist({
-      form,
-      actorId,
-      recordId: instance.recordId,
-      data,
-      requiredKeys: 'all',
-    });
+    await this.persistAsInitiator(instance, form, actorId, data);
     const updated = await this.engine.submit({
       form,
       recordId: instance.recordId,
@@ -191,14 +182,28 @@ export class WorkflowInstanceService {
       throw new NotFoundException('单据不存在');
     }
     const form = await this.requireForm(instance.formId);
+    await this.persistAsInitiator(instance, form, actorId, data);
+    return this.engine.resubmitStart({ taskId, actorId });
+  }
+
+  private async persistAsInitiator(
+    instance: WorkflowInstance,
+    form: AppForm,
+    actorId: number,
+    data: Record<string, unknown>,
+  ) {
+    const existing = await this.store.findById(instance.formId, instance.recordId);
     await this.persist.persist({
       form,
       actorId,
       recordId: instance.recordId,
-      data,
-      requiredKeys: 'all',
+      ...prepareStartPersistInput(
+        data,
+        parseFormSchema(form.fields).fields,
+        instance.graph,
+        existing?.data,
+      ),
     });
-    return this.engine.resubmitStart({ taskId, actorId });
   }
 
   private async requireInitiator(

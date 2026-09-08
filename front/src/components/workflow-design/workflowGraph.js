@@ -105,6 +105,10 @@ export function toProductGraph(raw) {
         return {
           ...base,
           allowResubmitAfterTerminated: props.allowResubmitAfterTerminated !== false,
+          fieldAccess: props.fieldAccess || {},
+          briefFieldKeys: Array.isArray(props.briefFieldKeys)
+            ? props.briefFieldKeys.filter((key) => typeof key === 'string' && key)
+            : undefined,
         }
       }
       return base
