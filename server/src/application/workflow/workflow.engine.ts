@@ -298,7 +298,7 @@ export class WorkflowEngine {
     const instance = await this.requireInstance(input.instanceId);
     await this.taskRepo.update(
       { instanceId: instance.id, status: 'pending' },
-      { status: 'cancelled', cancelReason: '发起人撤回' },
+      this.cancelledFields('发起人撤回'),
     );
     await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
       workflowStatus: 'draft',
@@ -443,7 +443,7 @@ export class WorkflowEngine {
           round: instance.round,
           status: 'pending',
         },
-        { status: 'cancelled', cancelReason: '单据状态已变化，待办自动撤回' },
+        this.cancelledFields('单据状态已变化，待办自动撤回'),
       );
       if (after) {
         await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
@@ -775,10 +775,18 @@ export class WorkflowEngine {
     }
   }
 
+  private cancelledFields(cancelReason: string) {
+    return {
+      status: 'cancelled' as const,
+      cancelReason,
+      finishedAt: new Date(),
+    };
+  }
+
   private async cancelAllPending(instanceId: number, cancelReason: string) {
     await this.taskRepo.update(
       { instanceId, status: 'pending' },
-      { status: 'cancelled', cancelReason },
+      this.cancelledFields(cancelReason),
     );
   }
 
@@ -789,7 +797,7 @@ export class WorkflowEngine {
   ) {
     await this.taskRepo.update(
       { instanceId, nodeKey, status: 'pending' },
-      { status: 'cancelled', cancelReason },
+      this.cancelledFields(cancelReason),
     );
   }
 
@@ -812,7 +820,7 @@ export class WorkflowEngine {
       if (!disabled.has(task.assigneeId)) continue;
       await this.taskRepo.update(
         { id: task.id, status: 'pending' },
-        { status: 'cancelled', cancelReason: '审批人已停用' },
+        this.cancelledFields('审批人已停用'),
       );
     }
   }
@@ -996,7 +1004,7 @@ export class WorkflowEngine {
         : '退回至发起人';
     await this.taskRepo.update(
       { instanceId: instance.id, status: 'pending' },
-      { status: 'cancelled', cancelReason },
+      this.cancelledFields(cancelReason),
     );
     const nextRound = instance.round + 1;
     if (input.target === 'previous' && prevKey) {

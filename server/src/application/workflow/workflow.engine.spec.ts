@@ -186,7 +186,11 @@ describe('WorkflowEngine', () => {
     });
     expect(taskRepo.update).toHaveBeenCalledWith(
       expect.objectContaining({ nodeKey: 'n1', status: 'pending' }),
-      expect.objectContaining({ status: 'cancelled', cancelReason: '或签其他人已通过' }),
+      expect.objectContaining({
+        status: 'cancelled',
+        cancelReason: '或签其他人已通过',
+        finishedAt: expect.any(Date),
+      }),
     );
     expect(store.setWorkflowMeta).toHaveBeenCalledWith(
       12,
@@ -291,7 +295,10 @@ describe('WorkflowEngine', () => {
     expect(persist.persist).not.toHaveBeenCalled();
     expect(taskRepo.update).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ cancelReason: '会签节点已驳回' }),
+      expect.objectContaining({
+        cancelReason: '会签节点已驳回',
+        finishedAt: expect.any(Date),
+      }),
     );
   });
 
@@ -505,6 +512,7 @@ describe('WorkflowEngine', () => {
       expect.objectContaining({
         status: 'cancelled',
         cancelReason: '发起人再次提交',
+        finishedAt: expect.any(Date),
       }),
     );
   });

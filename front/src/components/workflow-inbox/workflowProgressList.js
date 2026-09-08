@@ -1,4 +1,4 @@
-import { formatDateTime } from '../../utils/timeValue.js'
+import { asDate, formatDateTime } from '../../utils/timeValue.js'
 
 function formatNoteText(text, names = {}) {
   if (!text) return text
@@ -58,6 +58,43 @@ function taskComment(task) {
   return ''
 }
 
+function timeMs(value) {
+  const parsed = asDate(value)
+  return parsed ? parsed.getTime() : 0
+}
+
+function maxDoneFinishedAt(task, tasks) {
+  let latest = null
+  let latestMs = 0
+  for (const other of tasks || []) {
+    if (other.nodeKey !== task.nodeKey || other.round !== task.round) continue
+    if (other.status !== 'done' || !other.finishedAt) continue
+    const ms = timeMs(other.finishedAt)
+    if (ms > latestMs) {
+      latestMs = ms
+      latest = other.finishedAt
+    }
+  }
+  return latest
+}
+
+function taskSortAt(task, tasks) {
+  if (task.finishedAt) return task.finishedAt
+  // 旧数据取消时没写 finishedAt，会落成加签创建时间，排到驳回前面
+  if (task.status === 'cancelled') {
+    const fromDone = maxDoneFinishedAt(task, tasks)
+    if (fromDone) return fromDone
+  }
+  return task.createdAt || ''
+}
+
+function rowRank(row) {
+  if (row.kind === 'note') return 1
+  if (row.status === 'cancelled') return 3
+  if (row.status === 'pending') return 2
+  return 1
+}
+
 export function buildProgressRows(progress, formatTime = formatDateTime) {
   const data = progress || {}
   const titles = Object.fromEntries(
@@ -78,10 +115,12 @@ export function buildProgressRows(progress, formatTime = formatDateTime) {
       task.nodeKey === 'start' && task.status === 'pending'
         ? '待发起人修改'
         : titles[task.nodeKey] || task.nodeKey
+    const sortAt = taskSortAt(task, data.tasks)
     list.push({
       kind: 'task',
-      time: formatTime(task.finishedAt || task.createdAt),
-      sort: task.finishedAt || task.createdAt || '',
+      time: formatTime(sortAt),
+      sort: sortAt,
+      status: task.status,
       assigneeName: task.assigneeName || '审批人',
       nodeTitle,
       nodeKey: task.nodeKey,
@@ -89,5 +128,9 @@ export function buildProgressRows(progress, formatTime = formatDateTime) {
       comment: taskComment(task),
     })
   }
-  return list.sort((a, b) => String(a.sort).localeCompare(String(b.sort)))
+  return list.sort((a, b) => {
+    const diff = timeMs(a.sort) - timeMs(b.sort)
+    if (diff !== 0) return diff
+    return rowRank(a) - rowRank(b)
+  })
 }

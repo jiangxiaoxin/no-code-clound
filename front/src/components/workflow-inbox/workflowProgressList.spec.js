@@ -110,3 +110,90 @@ test('加签系统说明把用户 id 显示为人名', () => {
   )
   assert.equal(rows[0].text, 'jiang1 加签 jiang3：你也审批一下')
 })
+
+test('或签加签后驳回：先加签、再驳回、最后才是被取消', () => {
+  const rows = buildProgressRows(
+    {
+      graph: {
+        nodes: [
+          { key: 'start', type: 'start', title: '开始' },
+          { key: 'n1', type: 'approve', title: '审批' },
+        ],
+      },
+      names: { '4': 'jiang1', '6': 'jiang2' },
+      notes: [
+        {
+          at: '2026-09-08T07:14:42.000Z',
+          text: '4 加签 6：你也来看看',
+        },
+      ],
+      tasks: [
+        {
+          nodeKey: 'n1',
+          round: 1,
+          assigneeName: 'jiang2',
+          status: 'cancelled',
+          cancelReason: '或签其他人已驳回',
+          createdAt: '2026-09-08T07:14:42.000Z',
+        },
+        {
+          nodeKey: 'start',
+          round: 1,
+          assigneeName: 'jiang4',
+          status: 'done',
+          action: 'submit',
+          finishedAt: '2026-09-08T07:13:49.000Z',
+        },
+        {
+          nodeKey: 'n1',
+          round: 1,
+          assigneeName: 'jiang1',
+          status: 'done',
+          action: 'reject',
+          comment: '我不同意。看别人的意见吧',
+          finishedAt: '2026-09-08T07:15:06.000Z',
+        },
+      ],
+    },
+    formatTime,
+  )
+  assert.equal(rows.length, 4)
+  assert.equal(rows[0].statusText, '已提交')
+  assert.equal(rows[1].kind, 'note')
+  assert.equal(rows[1].text, 'jiang1 加签 jiang2：你也来看看')
+  assert.equal(rows[2].assigneeName, 'jiang1')
+  assert.equal(rows[2].statusText, '驳回')
+  assert.equal(rows[3].assigneeName, 'jiang2')
+  assert.equal(rows[3].statusText, '未处理（已取消）')
+})
+
+test('取消与驳回同一时刻时驳回排在已取消前面', () => {
+  const at = '2026-09-08T07:15:06.000Z'
+  const rows = buildProgressRows(
+    {
+      graph: { nodes: [{ key: 'n1', type: 'approve', title: '审批' }] },
+      tasks: [
+        {
+          nodeKey: 'n1',
+          round: 1,
+          assigneeName: 'jiang2',
+          status: 'cancelled',
+          cancelReason: '或签其他人已驳回',
+          finishedAt: at,
+          createdAt: '2026-09-08T07:14:42.000Z',
+        },
+        {
+          nodeKey: 'n1',
+          round: 1,
+          assigneeName: 'jiang1',
+          status: 'done',
+          action: 'reject',
+          finishedAt: at,
+        },
+      ],
+    },
+    formatTime,
+  )
+  assert.equal(rows[0].statusText, '驳回')
+  assert.equal(rows[1].statusText, '未处理（已取消）')
+})
