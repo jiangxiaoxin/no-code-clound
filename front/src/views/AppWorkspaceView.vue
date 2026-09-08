@@ -46,8 +46,9 @@
           :props="{ label: 'name', children: 'children' }" @node-click="onNodeClick">
           <template #default="{ data }">
             <div class="tree-node">
-              <el-icon>
+              <el-icon :class="treeNodeIconClass(data)">
                 <Folder v-if="data.nodeType === 'group'" />
+                <Share v-else-if="data.formKind === 'workflow'" />
                 <Document v-else />
               </el-icon>
               <el-text truncated>{{ data.name }}</el-text>
@@ -127,6 +128,7 @@ import {
   Plus,
   Search,
   Setting,
+  Share,
 } from '@element-plus/icons-vue'
 import {
   convertFormKindApi,
@@ -251,6 +253,12 @@ function toFormNode(form) {
     workflowEnabled: Boolean(form.workflowEnabled),
     nodeType: 'form',
   }
+}
+
+function treeNodeIconClass(data) {
+  if (data.nodeType === 'group') return 'is-group'
+  if (data.formKind === 'workflow') return 'is-form-workflow'
+  return 'is-form-normal'
 }
 
 function findFormNode(id) {
@@ -660,7 +668,16 @@ watch([formId, inboxKind], () => {
   padding: 4px 4px 4px 0;
 
   >.el-icon {
+    flex-shrink: 0;
     color: var(--el-text-color-secondary);
+
+    &.is-form-normal {
+      color: var(--el-color-primary);
+    }
+
+    &.is-form-workflow {
+      color: var(--el-color-warning);
+    }
   }
 
   .el-text {
