@@ -72,9 +72,11 @@ export type FormRecordView = {
       currentNodeKey: string | null;
       notes: WorkflowInstance['notes'];
       errorReason: string | null;
+      names: Record<string, string>;
       tasks: {
         id: number;
         nodeKey: string;
+        round: number;
         assigneeId: number;
         assigneeName: string;
         assigneeDisabled: boolean;
