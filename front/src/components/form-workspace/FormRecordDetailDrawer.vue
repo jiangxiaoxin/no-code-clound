@@ -32,6 +32,7 @@
             :record-id="record?.id || ''"
             :data-source="recordSource"
             :field-access="gridFieldAccess"
+            :workflow-form="isWorkflowForm"
           />
           <div v-if="!editing" class="record-audit">
             <div class="record-audit-row">
@@ -86,6 +87,7 @@
           :record-id="record?.id || ''"
           :data-source="recordSource"
           :field-access="gridFieldAccess"
+          :workflow-form="isWorkflowForm"
         />
         <div v-if="!editing" class="record-audit">
           <div class="record-audit-row">
@@ -263,7 +265,9 @@ function cancelEdit() {
 }
 
 async function persistDetail(intent) {
-  const err = firstRequiredError(props.fields, detailValues)
+  const err = firstRequiredError(props.fields, detailValues, {
+    workflowForm: isWorkflowForm.value,
+  })
   if (err) {
     ElMessage.warning(err.message)
     gridRef.value?.revealField(err.key)

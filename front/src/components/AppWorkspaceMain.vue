@@ -38,6 +38,7 @@
         :saving="saving"
         :unpublished="workflowUnpublished"
         :workflow-enabled="workflowEnabled"
+        :field-access="startFieldAccess"
         @cancel="resetValues"
         @save="onSave"
         @draft="onDraft"
@@ -72,6 +73,7 @@ import { isSelectType as isSelectField } from './form-design/fieldTypes'
 import { walkFormFields } from './form-fill/subformField.js'
 import FormRecordCreateTab from './form-workspace/FormRecordCreateTab.vue'
 import FormRecordManage from './form-workspace/FormRecordManage.vue'
+import { gridFieldAccessFromStart } from './workflow-design/fieldAccess.js'
 import { readWorkspaceTabOrder } from './form-workspace/workspaceTabOrder.js'
 import { useUserStore } from '../stores/user'
 import { submitSuccessText } from './workflow-inbox/workflowStatus.js'
@@ -114,6 +116,7 @@ function setTab(next) {
 const schemaLoading = ref(false)
 const saving = ref(false)
 const fields = ref([])
+const formDetail = ref(null)
 const values = reactive({})
 const dictItemsByCode = ref({})
 const workspaceTabOrder = ref([])
@@ -143,6 +146,9 @@ const workflowUnpublished = computed(
 )
 const workflowEnabled = computed(
   () => props.form?.formKind === 'workflow' && Boolean(props.form?.workflowEnabled),
+)
+const startFieldAccess = computed(() =>
+  gridFieldAccessFromStart(formDetail.value?.startFieldAccess, fields.value),
 )
 
 function resetValues() {
@@ -178,6 +184,7 @@ const dictCodes = computed(() => {
 async function loadSchema() {
   const session = loadSession.value
   if (!props.form?.id || !props.appId) {
+    formDetail.value = null
     fields.value = []
     resetValues()
     return
@@ -186,10 +193,12 @@ async function loadSchema() {
   try {
     const detail = await getFormApi(props.appId, props.form.id)
     if (session !== loadSession.value) return
+    formDetail.value = detail
     fields.value = Array.isArray(detail?.fields) ? detail.fields : []
     resetValues()
   } catch {
     if (session !== loadSession.value) return
+    formDetail.value = null
     fields.value = []
     resetValues()
   } finally {
@@ -243,7 +252,9 @@ async function saveRecord(intent) {
     ElMessage.warning('这张表单还没有配置流程，暂时不能填报')
     return
   }
-  const err = firstRequiredError(fields.value, values)
+  const err = firstRequiredError(fields.value, values, {
+    workflowForm: workflowEnabled.value,
+  })
   if (err) {
     ElMessage.warning(err.message)
     createTabRef.value?.revealField(err.key)

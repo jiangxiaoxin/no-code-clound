@@ -145,6 +145,7 @@ const props = defineProps({
   linkageItemsByKey: { type: Object, default: () => ({}) },
   userNames: { type: Object, default: () => ({}) },
   deptNames: { type: Object, default: () => ({}) },
+  workflowForm: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -161,7 +162,9 @@ const fillDeptNames = computed(() => ({
 import { isSchemaVisible } from './fillValues.js'
 
 const children = computed(() =>
-  (Array.isArray(props.field.fields) ? props.field.fields : []).filter(isSchemaVisible),
+  (Array.isArray(props.field.fields) ? props.field.fields : []).filter((field) =>
+    props.workflowForm ? true : isSchemaVisible(field),
+  ),
 )
 const fillTips = computed(() => fillInfluencerTips(children.value))
 
@@ -169,7 +172,7 @@ const locked = computed(
   () =>
     props.disabled ||
     Boolean(props.field.disabled) ||
-    (props.updating && props.field.editable === false),
+    (!props.workflowForm && props.updating && props.field.editable === false),
 )
 
 const frozenCols = computed(() => {
@@ -490,7 +493,11 @@ function canWriteChild(child) {
   if (props.disabled) {
     return false
   }
-  if (props.updating && (props.field.editable === false || child.editable === false)) {
+  if (
+    !props.workflowForm &&
+    props.updating &&
+    (props.field.editable === false || child.editable === false)
+  ) {
     return false
   }
   return true

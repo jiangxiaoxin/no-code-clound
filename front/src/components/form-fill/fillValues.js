@@ -41,8 +41,10 @@ export function isSchemaVisible(field) {
   return field?.visible !== false
 }
 
-export function isFillable(field) {
-  return Boolean(field?.key) && !SKIP_TYPES.has(field.type) && isSchemaVisible(field)
+export function isFillable(field, { workflowForm = false } = {}) {
+  if (!Boolean(field?.key) || SKIP_TYPES.has(field.type)) return false
+  if (workflowForm) return true
+  return isSchemaVisible(field)
 }
 
 export function isListColumn(field) {
@@ -257,10 +259,10 @@ export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
   return data
 }
 
-export function firstRequiredError(fields, values) {
+export function firstRequiredError(fields, values, { workflowForm = false } = {}) {
   for (const field of flattenFields(fields)) {
     if (field.type === 'subform') {
-      if (!isSchemaVisible(field)) continue
+      if (!workflowForm && !isSchemaVisible(field)) continue
       const required = subformRowsRequiredError(field, values[field.key])
       if (required) {
         // 直接return，提前拦截，不要每个field 都去处理一遍，节省性能
@@ -278,7 +280,11 @@ export function firstRequiredError(fields, values) {
     // 关联数据、选择数据存的是源数据 id，不走普通填报校验，必填要单独判
     if (field.type === 'relate' || field.type === 'data') {
       const id = values[field.key]
-      if (isSchemaVisible(field) && field.required && (typeof id !== 'string' || !id)) {
+      if (
+        (workflowForm || isSchemaVisible(field)) &&
+        field.required &&
+        (typeof id !== 'string' || !id)
+      ) {
         return {
           message: `请填写「${field.title || '未命名'}」`,
           key: field.key,
@@ -286,7 +292,7 @@ export function firstRequiredError(fields, values) {
       }
       continue
     }
-    if (!isFillable(field) || !field.required) continue
+    if (!isFillable(field, { workflowForm }) || !field.required) continue
     const missing =
       field.type === 'address'
         ? !isAddressValueReady(field, values[field.key])

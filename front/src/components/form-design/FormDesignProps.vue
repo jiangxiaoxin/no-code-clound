@@ -30,7 +30,7 @@
       <el-form-item :label="field.type === 'divider' ? '标题' : '字段标题'">
         <el-input v-model="field.title" maxlength="32" />
       </el-form-item>
-      <el-form-item label="显示设置">
+      <el-form-item v-if="!workflowForm" label="显示设置">
         <div class="required-row">
           <span>是否可见</span>
           <el-switch :model-value="field.visible !== false" @change="onVisibleChange" />
@@ -66,7 +66,7 @@
             <span>是否禁用</span>
             <el-switch v-model="field.disabled" />
           </div>
-          <div class="required-row">
+          <div v-if="!workflowForm" class="required-row">
             <span>是否可修改</span>
             <el-switch :model-value="field.editable !== false" @change="onEditableChange" />
           </div>
@@ -1116,6 +1116,7 @@ const props = defineProps({
   formId: { type: Number, required: true },
   columns: { type: Number, default: 1 },
   parentSubform: { type: Object, default: null },
+  workflowForm: { type: Boolean, default: false },
 })
 
 const emit = defineEmits([

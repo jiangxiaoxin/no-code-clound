@@ -26,6 +26,7 @@
         :field="selectedField"
         :fields="fields"
         :parent-subform="parentSubform"
+        :workflow-form="workflowForm"
         :app-id="appId"
         :form-id="formId"
         @update:width="setFieldWidth"
@@ -118,6 +119,7 @@ import {
 const props = defineProps({
   appId: { type: Number, required: true },
   formId: { type: Number, required: true },
+  workflowForm: { type: Boolean, default: false },
   initialFields: { type: Array, default: null },
   initialColumns: { type: Number, default: 1 },
 })

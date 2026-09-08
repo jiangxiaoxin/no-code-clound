@@ -1,7 +1,7 @@
 <template>
   <div class="fill-grid">
     <template v-for="field in fields" :key="field.key">
-      <div v-if="isTabsField(field) && isSchemaVisible(field)" class="fill-tabs">
+      <div v-if="isTabsField(field) && fieldShown(field)" class="fill-tabs">
         <el-tabs :model-value="activePaneId" @tab-change="onTabChange">
           <el-tab-pane
             v-for="pane in field.panes"
@@ -27,6 +27,7 @@
                 :dept-names="fillDeptNames"
                 :record-id="recordId"
                 :data-source="dataSource"
+                :workflow-form="workflowForm"
                 @fill="onFill"
               />
             </div>
@@ -34,7 +35,7 @@
         </el-tabs>
       </div>
       <FormFillField
-        v-else-if="isSchemaVisible(field) && accessOf(field) !== 'hidden'"
+        v-else-if="fieldShown(field) && accessOf(field) !== 'hidden'"
         :app-id="appId"
         :field="field"
         :fill-tip="fillTips[field.key]"
@@ -49,6 +50,7 @@
         :dept-names="fillDeptNames"
         :record-id="recordId"
         :data-source="dataSource"
+        :workflow-form="workflowForm"
         @fill="onFill"
       />
     </template>
@@ -95,6 +97,7 @@ const props = defineProps({
   deptNames: { type: Object, default: () => ({}) },
   recordId: { type: String, default: '' },
   fieldAccess: { type: Object, default: () => ({}) },
+  workflowForm: { type: Boolean, default: false },
   dataSource: { type: Object, default: null },
   lockSubform: { type: Boolean, default: false },
 })
@@ -300,6 +303,11 @@ function hasFieldFilterRefs() {
   })
 }
 
+function fieldShown(field) {
+  if (props.workflowForm) return true
+  return isSchemaVisible(field)
+}
+
 function accessOf(field) {
   const map = props.fieldAccess
   if (!map || !Object.keys(map).length) return ''
@@ -314,7 +322,7 @@ function isFieldDisabled(field) {
 
 function visiblePaneFields(pane) {
   return (pane.fields || []).filter(
-    (field) => isSchemaVisible(field) && accessOf(field) !== 'hidden',
+    (field) => fieldShown(field) && accessOf(field) !== 'hidden',
   )
 }
 
@@ -352,7 +360,12 @@ function canWriteLinkageValue(field) {
   if (props.disabled) return false
   const access = accessOf(field)
   if (access === 'readonly' || access === 'hidden') return false
-  if (props.updating && field.editable === false && access !== 'editable') {
+  if (
+    !props.workflowForm &&
+    props.updating &&
+    field.editable === false &&
+    access !== 'editable'
+  ) {
     return false
   }
   return true

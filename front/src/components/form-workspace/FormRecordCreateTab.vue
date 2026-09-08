@@ -12,6 +12,8 @@
           :fields="fields"
           :values="values"
           :dict-items-by-code="dictItemsByCode"
+          :field-access="fieldAccess"
+          :workflow-form="workflowEnabled"
         />
       </div>
       <div v-if="unpublished" class="wf-unpublished">
@@ -44,6 +46,7 @@ defineProps({
   saving: { type: Boolean, default: false },
   unpublished: { type: Boolean, default: false },
   workflowEnabled: { type: Boolean, default: false },
+  fieldAccess: { type: Object, default: () => ({}) },
 })
 
 const emit = defineEmits(['cancel', 'save', 'draft', 'submit'])

@@ -255,7 +255,9 @@ async function createRecord(intent) {
     ElMessage.warning('这张表单还没有配置流程，暂时不能填报')
     return
   }
-  const err = firstRequiredError(fields.value, values)
+  const err = firstRequiredError(fields.value, values, {
+    workflowForm: workflowEnabled.value,
+  })
   if (err) {
     ElMessage.warning(err.message)
     createDrawerRef.value?.revealField(err.key)

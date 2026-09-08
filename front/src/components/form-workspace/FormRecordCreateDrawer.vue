@@ -23,6 +23,7 @@
         :values="values"
         :dict-items-by-code="dictItemsByCode"
         :field-access="fieldAccess"
+        :workflow-form="workflowEnabled"
       />
     </div>
     <template #footer>

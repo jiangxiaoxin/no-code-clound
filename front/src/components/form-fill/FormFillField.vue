@@ -253,6 +253,7 @@
       :dict-items-by-code="dictItemsByCode"
       :user-names="userNames"
       :dept-names="deptNames"
+      :workflow-form="workflowForm"
       @update:model-value="onUpdateModelValue"
     />
     <FormRelateSubform
@@ -307,6 +308,7 @@ const props = defineProps({
   deptNames: { type: Object, default: () => ({}) },
   recordId: { type: String, default: '' },
   dataSource: { type: Object, default: null },
+  workflowForm: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['update:modelValue', 'fill', 'fill-rows'])
@@ -339,7 +341,7 @@ const isDisabled = computed(
   () =>
     props.disabled ||
     Boolean(props.field.disabled) ||
-    (props.updating && props.field.editable === false),
+    (!props.workflowForm && props.updating && props.field.editable === false),
 )
 
 function commitValue(value) {

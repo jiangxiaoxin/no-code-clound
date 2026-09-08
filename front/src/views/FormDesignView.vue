@@ -44,6 +44,7 @@
       v-if="!loading && page === 'design' && form"
       :app-id="appId"
       :form-id="formId"
+      :workflow-form="isWorkflowForm"
       :initial-fields="Array.isArray(form.fields) ? form.fields : []"
       :initial-columns="form.columns"
       @saved="onSaved"

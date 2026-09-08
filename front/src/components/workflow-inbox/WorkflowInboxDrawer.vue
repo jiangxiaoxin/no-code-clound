@@ -28,6 +28,7 @@
               :field-access="gridFieldAccess"
               :data-source="inboxSource"
               :lock-subform="lockSubform"
+              :workflow-form="true"
             />
           </el-tab-pane>
           <el-tab-pane label="流程" name="progress" lazy class="wf-pane-process">
@@ -376,7 +377,9 @@ function onDraft() {
 }
 
 function onSubmit() {
-  const err = firstRequiredError(detail.value?.form?.fields || [], values)
+  const err = firstRequiredError(detail.value?.form?.fields || [], values, {
+    workflowForm: true,
+  })
   if (err) {
     ElMessage.warning(err.message)
     gridRef.value?.revealField(err.key)
@@ -468,7 +471,9 @@ async function onReturnStart() {
 }
 
 function onResubmit() {
-  const err = firstRequiredError(detail.value?.form?.fields || [], values)
+  const err = firstRequiredError(detail.value?.form?.fields || [], values, {
+    workflowForm: true,
+  })
   if (err) {
     ElMessage.warning(err.message)
     gridRef.value?.revealField(err.key)
