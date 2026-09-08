@@ -213,6 +213,7 @@ const draftIds = ref([])
 const pickerPage = ref(1)
 const pickerTotal = ref(0)
 let userQuerySeq = 0
+let nameQuerySeq = 0
 
 const showRoles = computed(
   () => normalizeMemberScope(props.field.memberScope) !== 'dept_field',
@@ -471,19 +472,28 @@ async function loadOrg() {
   roles.value = roleRows || []
 }
 
-async function hydrateDraft() {
+async function hydrateSelectedNames() {
   const ids = selectedIds.value
-  if (!ids.length) {
-    draftIds.value = []
-    return
-  }
+  if (!ids.length) return []
+  const seq = ++nameQuerySeq
   const named = usersFromResult(await listOrgUsersApi({ ids: ids.join(',') }))
+  if (seq !== nameQuerySeq) return named
   rememberUserNames(named)
   extraUserNames.value = dropMissingMemberNames(
     extraUserNames.value,
     ids,
     named.map((user) => user.id),
   )
+  return named
+}
+
+async function hydrateDraft() {
+  const ids = selectedIds.value
+  if (!ids.length) {
+    draftIds.value = []
+    return
+  }
+  const named = await hydrateSelectedNames()
   const scope = normalizeMemberScope(props.field.memberScope)
   if (scope === 'dept_field' && !deptFieldRootId()) {
     draftIds.value = []
@@ -552,6 +562,15 @@ onMounted(() => {
     pruneByDeptField()
   }
 })
+
+watch(
+  () => selectedIds.value.join(','),
+  (key) => {
+    if (!key) return
+    hydrateSelectedNames()
+  },
+  { immediate: true },
+)
 
 watch(
   () => props.recordValues?.[props.field.sourceDeptFieldKey],

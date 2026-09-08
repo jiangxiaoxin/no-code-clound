@@ -547,6 +547,7 @@ watch(
   flex: 0 1 auto;
   max-height: 45%;
   overflow: auto;
+  margin-top: 24px;
 }
 
 .wf-missing,

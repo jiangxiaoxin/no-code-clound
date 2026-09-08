@@ -2,6 +2,10 @@
   <div class="wf-design">
     <div class="wf-toolbar">
       <div class="wf-toolbar-left">
+        
+        <span class="wf-version">{{ versionText }}</span>
+      </div>
+      <div class="wf-toolbar-actions">
         <WorkflowVersionMenu
           :versions="versions"
           :viewing-id="viewingId"
@@ -9,9 +13,6 @@
           @add="onAddVersion"
           @manage="onOpenManage"
         />
-        <span class="wf-version">{{ versionText }}</span>
-      </div>
-      <div class="wf-toolbar-actions">
         <el-tooltip placement="bottom-end" :show-after="200" popper-class="wf-save-publish-tip">
           <template #content>
             <div class="wf-save-publish-tip">
@@ -578,6 +579,11 @@ watch(
 .wf-toolbar-actions {
   display: flex;
   align-items: center;
+  gap: 12px;
+
+  :deep(.el-button) {
+    margin-left: 0 !important; // el-button 自己会带默认的margin-left
+  }
 }
 
 .wf-toolbar-tip {
@@ -588,7 +594,6 @@ watch(
 }
 
 .wf-version {
-  margin-left: 32px;
   color: var(--el-text-color-regular);
   font-weight: bold;
   font-size: 14px;
