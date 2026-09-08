@@ -259,8 +259,19 @@ export function buildRecordData(fields, values, { clearEmpty = false } = {}) {
   return data
 }
 
-export function firstRequiredError(fields, values, { workflowForm = false } = {}) {
+function skipRequiredByAccess(field, fieldAccess) {
+  if (!fieldAccess || !Object.keys(fieldAccess).length) return false
+  const access = fieldAccess[field?.key]
+  return access === 'hidden' || access === 'readonly'
+}
+
+export function firstRequiredError(
+  fields,
+  values,
+  { workflowForm = false, fieldAccess } = {},
+) {
   for (const field of flattenFields(fields)) {
+    if (skipRequiredByAccess(field, fieldAccess)) continue
     if (field.type === 'subform') {
       if (!workflowForm && !isSchemaVisible(field)) continue
       const required = subformRowsRequiredError(field, values[field.key])

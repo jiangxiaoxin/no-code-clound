@@ -267,6 +267,7 @@ function cancelEdit() {
 async function persistDetail(intent) {
   const err = firstRequiredError(props.fields, detailValues, {
     workflowForm: isWorkflowForm.value,
+    fieldAccess: gridFieldAccess.value,
   })
   if (err) {
     ElMessage.warning(err.message)
