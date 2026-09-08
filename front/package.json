@@ -23,5 +23,9 @@
     "@vitejs/plugin-vue": "^6.0.8",
     "less": "^4.9.0",
     "vite": "^8.2.0"
+  },
+  "allowScripts": {
+    "@logicflow/core@2.2.5": true,
+    "vue-demi@0.14.10": true
   }
 }
