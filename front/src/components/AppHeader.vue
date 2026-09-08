@@ -210,6 +210,8 @@ watch(
   border: 0;
   border-radius: 6px;
   cursor: pointer;
+  gap: 2px;
+  position: relative;
 }
 
 .header-nav-item.is-active,
@@ -226,6 +228,10 @@ watch(
   line-height: 18px;
   background: var(--el-color-danger);
   border-radius: 9px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: translate(50%, -50%);
 }
 
 .app-header :deep(.el-tooltip__trigger) {
