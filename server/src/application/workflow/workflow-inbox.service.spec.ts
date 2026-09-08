@@ -287,7 +287,14 @@ describe('WorkflowInboxService', () => {
     taskRepo.createQueryBuilder.mockReturnValue(chain);
     await service.query(21, { kind: 'done', page: 1, pageSize: 20 });
     expect(chain.andWhere).toHaveBeenCalledWith('task.action IN (:...actions)', {
-      actions: ['approve', 'reject'],
+      actions: [
+        'approve',
+        'reject',
+        'transfer',
+        'returnPrevious',
+        'returnStart',
+        'resubmit',
+      ],
     });
   });
 
@@ -379,5 +386,178 @@ describe('WorkflowInboxService', () => {
     await expect(service.open(9, 'cc', 3)).rejects.toBeInstanceOf(
       NotFoundException,
     );
+  });
+
+  it('第一个审批节点待办没有转交、加签、退回上一节点', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 3,
+      assigneeId: 21,
+      status: 'pending',
+      instanceId: 1,
+      nodeKey: 'n1',
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'running',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: {
+        nodes: [
+          { key: 'start', type: 'start', title: '开始' },
+          {
+            key: 'n1',
+            type: 'approve',
+            title: '部门审批',
+            fieldAccess: { field_reason: 'editable' },
+          },
+        ],
+      },
+      currentNodeKey: 'n1',
+      visitedNodeKeys: ['start', 'n1'],
+      round: 1,
+      errorReason: null,
+      notes: [],
+      hasApproved: false,
+    });
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    taskRepo.find.mockResolvedValue([]);
+    userRepo.find.mockResolvedValue([
+      { id: 5, displayName: '张三', status: 'active' },
+      { id: 21, displayName: '经理', status: 'active' },
+    ]);
+    const detail = await service.open(21, 'todo', 3);
+    expect(detail.actions.canApprove).toBe(true);
+    expect(detail.actions.canTransfer).toBe(false);
+    expect(detail.actions.canAddSign).toBe(false);
+    expect(detail.actions.canReturnPrevious).toBe(false);
+    expect(detail.actions.canReturnStart).toBe(false);
+    expect(detail.actions.canResubmit).toBe(false);
+    expect(detail.fieldAccess).toEqual({ field_reason: 'editable' });
+  });
+
+  it('人事备案待办能退回上一节点', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 4,
+      assigneeId: 9,
+      status: 'pending',
+      instanceId: 1,
+      nodeKey: 'n2',
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'running',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: {
+        nodes: [
+          { key: 'start', type: 'start', title: '开始' },
+          { key: 'n1', type: 'approve', title: '部门审批' },
+          {
+            key: 'n2',
+            type: 'approve',
+            title: '人事备案',
+            allowTransfer: true,
+            allowAddSign: true,
+            allowReturnPrevious: true,
+            allowReturnStart: true,
+          },
+        ],
+      },
+      currentNodeKey: 'n2',
+      visitedNodeKeys: ['start', 'n1', 'n2'],
+      round: 1,
+      errorReason: null,
+      notes: [],
+      hasApproved: true,
+    });
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    taskRepo.find.mockResolvedValue([]);
+    userRepo.find.mockResolvedValue([
+      { id: 5, displayName: '张三', status: 'active' },
+      { id: 9, displayName: '李四', status: 'active' },
+    ]);
+    const detail = await service.open(9, 'todo', 4);
+    expect(detail.actions.canTransfer).toBe(true);
+    expect(detail.actions.canAddSign).toBe(true);
+    expect(detail.actions.canReturnPrevious).toBe(true);
+    expect(detail.actions.canReturnStart).toBe(true);
+    expect(detail.actions.canResubmit).toBe(false);
+  });
+
+  it('发起人 start 待办只能提交，字段按发起编辑', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 8,
+      assigneeId: 5,
+      status: 'pending',
+      instanceId: 1,
+      nodeKey: 'start',
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'running',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: {
+        nodes: [
+          { key: 'start', type: 'start', title: '开始' },
+          { key: 'n1', type: 'approve', title: '部门审批' },
+        ],
+      },
+      currentNodeKey: 'start',
+      visitedNodeKeys: ['start'],
+      round: 2,
+      errorReason: null,
+      notes: [],
+      hasApproved: true,
+    });
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    taskRepo.find.mockResolvedValue([]);
+    userRepo.find.mockResolvedValue([{ id: 5, displayName: '张三', status: 'active' }]);
+    const detail = await service.open(5, 'todo', 8);
+    expect(detail.actions.canResubmit).toBe(true);
+    expect(detail.actions.canApprove).toBe(false);
+    expect(detail.actions.canReject).toBe(false);
+    expect(detail.actions.readOnly).toBe(false);
+    expect(detail.fieldAccess).toEqual({});
+  });
+
+  it('start 待办卡片标题是待发起人修改', async () => {
+    const task = {
+      id: 8,
+      instanceId: 1,
+      assigneeId: 5,
+      status: 'pending',
+      nodeKey: 'start',
+      createdAt: new Date(),
+    };
+    taskRepo.createQueryBuilder.mockReturnValue(qb({ items: [task], total: 1 }));
+    instanceRepo.find.mockResolvedValue([
+      {
+        id: 1,
+        appId: 8,
+        formId: 12,
+        recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+        initiatorId: 5,
+        status: 'running',
+        currentNodeKey: 'start',
+        graph: { nodes: [{ key: 'start', type: 'start', title: '开始' }] },
+      },
+    ]);
+    formRepo.find.mockResolvedValue([{ id: 12, name: '请假单', fields: [] }]);
+    appRepo.find.mockResolvedValue([{ id: 8, name: '人事' }]);
+    userRepo.find.mockResolvedValue([{ id: 5, displayName: '张三' }]);
+    store.findById.mockResolvedValue({ data: {} });
+    const result = await service.query(5, { kind: 'todo', page: 1, pageSize: 20 });
+    expect(result.items[0].currentNodeTitle).toBe('待发起人修改');
+    expect(result.items[0].statusText).toBe('待发起人修改');
   });
 });

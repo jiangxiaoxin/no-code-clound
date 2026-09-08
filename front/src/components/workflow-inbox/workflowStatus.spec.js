@@ -79,7 +79,42 @@ test('提交成功提示用节点标题', () => {
 test('待办底部显示通过驳回', () => {
   assert.deepEqual(
     inboxActionsVisible('todo', { canApprove: true, canReject: true }),
-    { approve: true, reject: true },
+    {
+      approve: true,
+      reject: true,
+      transfer: false,
+      addSign: false,
+      returnPrevious: false,
+      returnStart: false,
+      resubmit: false,
+    },
+  )
+})
+
+test('待办底部按标志露出转交加签退回和提交', () => {
+  assert.deepEqual(
+    inboxActionsVisible('todo', {
+      canApprove: true,
+      canReject: true,
+      canTransfer: true,
+      canAddSign: true,
+      canReturnPrevious: true,
+      canReturnStart: true,
+      canResubmit: false,
+    }),
+    {
+      approve: true,
+      reject: true,
+      transfer: true,
+      addSign: true,
+      returnPrevious: true,
+      returnStart: true,
+      resubmit: false,
+    },
+  )
+  assert.equal(
+    inboxActionsVisible('todo', { canResubmit: true }).resubmit,
+    true,
   )
 })
 

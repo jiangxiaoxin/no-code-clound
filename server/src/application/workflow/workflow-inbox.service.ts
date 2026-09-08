@@ -10,6 +10,7 @@ import { flattenFields } from '../form-record/flatten-fields';
 import { parseFormSchema } from '../form-schema';
 import { FormRecordStore } from '../form-record/form-record.store';
 import { FormField } from '../form-record/form-record.types';
+import { previousApproveNodeKey } from './workflow.graph';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
@@ -92,7 +93,14 @@ export class WorkflowInboxService {
     } else {
       qb.andWhere('task.status = :status', { status: 'done' });
       qb.andWhere('task.action IN (:...actions)', {
-        actions: ['approve', 'reject'],
+        actions: [
+          'approve',
+          'reject',
+          'transfer',
+          'returnPrevious',
+          'returnStart',
+          'resubmit',
+        ],
       });
     }
     if (body.appId) qb.andWhere('instance.appId = :appId', { appId: body.appId });
@@ -170,11 +178,16 @@ export class WorkflowInboxService {
     const node = instance.currentNodeKey
       ? instance.graph.nodes.find((item) => item.key === instance.currentNodeKey)
       : undefined;
-    const approve = node?.type === 'approve' ? node : undefined;
-    const ccNode =
-      kind === 'cc' && task
-        ? instance.graph.nodes.find((item) => item.key === task.nodeKey)
-        : undefined;
+      const approve =
+        kind === 'todo' && task?.nodeKey === 'start'
+          ? undefined
+          : node?.type === 'approve'
+            ? node
+            : undefined;
+      const ccNode =
+        kind === 'cc' && task
+          ? instance.graph.nodes.find((item) => item.key === task.nodeKey)
+          : undefined;
     return {
       kind,
       form: {
@@ -215,11 +228,13 @@ export class WorkflowInboxService {
       names,
       actions: this.actionsOf(kind, instance, task),
       fieldAccess:
-        kind === 'todo'
-          ? approve?.fieldAccess || {}
-          : kind === 'cc' && ccNode?.type === 'cc'
-            ? ccNode.fieldAccess || {}
-            : {},
+        kind === 'todo' && task?.nodeKey === 'start'
+          ? {}
+          : kind === 'todo'
+            ? approve?.fieldAccess || {}
+            : kind === 'cc' && ccNode?.type === 'cc'
+              ? ccNode.fieldAccess || {}
+              : {},
       commentRequiredOnApprove: Boolean(approve?.commentRequiredOnApprove),
       commentRequiredOnReject: approve?.commentRequiredOnReject !== false,
     };
@@ -231,9 +246,41 @@ export class WorkflowInboxService {
     task: WorkflowTask | null,
   ) {
     if (kind === 'todo') {
+      const pending = task?.status === 'pending';
+      if (task?.nodeKey === 'start') {
+        return {
+          canApprove: false,
+          canReject: false,
+          canTransfer: false,
+          canAddSign: false,
+          canReturnPrevious: false,
+          canReturnStart: false,
+          canResubmit: pending,
+          canDraft: false,
+          canSubmit: false,
+          canCancel: false,
+          canRetry: false,
+          readOnly: false,
+        };
+      }
+      const node = instance.graph.nodes.find((item) => item.key === task?.nodeKey);
+      const approve = node?.type === 'approve' ? node : undefined;
+      const hasPrevious = Boolean(
+        previousApproveNodeKey(
+          instance.graph,
+          instance.visitedNodeKeys,
+          task?.nodeKey || '',
+        ),
+      );
       return {
-        canApprove: task?.status === 'pending',
-        canReject: task?.status === 'pending',
+        canApprove: pending,
+        canReject: pending,
+        canTransfer: pending && approve?.allowTransfer === true,
+        canAddSign: pending && approve?.allowAddSign === true,
+        canReturnPrevious:
+          pending && approve?.allowReturnPrevious !== false && hasPrevious,
+        canReturnStart: pending && approve?.allowReturnStart === true,
+        canResubmit: false,
         canDraft: false,
         canSubmit: false,
         canCancel: false,
@@ -245,6 +292,11 @@ export class WorkflowInboxService {
       return {
         canApprove: false,
         canReject: false,
+        canTransfer: false,
+        canAddSign: false,
+        canReturnPrevious: false,
+        canReturnStart: false,
+        canResubmit: false,
         canDraft: false,
         canSubmit: false,
         canCancel: false,
@@ -256,6 +308,11 @@ export class WorkflowInboxService {
       return {
         canApprove: false,
         canReject: false,
+        canTransfer: false,
+        canAddSign: false,
+        canReturnPrevious: false,
+        canReturnStart: false,
+        canResubmit: false,
         canDraft: false,
         canSubmit: false,
         canCancel: false,
@@ -266,6 +323,11 @@ export class WorkflowInboxService {
     return {
       canApprove: false,
       canReject: false,
+      canTransfer: false,
+      canAddSign: false,
+      canReturnPrevious: false,
+      canReturnStart: false,
+      canResubmit: false,
       canDraft:
         instance.status === 'draft' ||
         instance.status === 'rejected' ||
@@ -383,12 +445,13 @@ export class WorkflowInboxService {
           kind === 'cc'
             ? '已抄送'
             : kind === 'done'
-            ? task.action === 'reject'
-              ? '已驳回'
-              : '已通过'
+            ? doneStatusText(task.action)
             : titleOf(instance?.graph.nodes, task.nodeKey) ||
               STATUS_TEXT[instance?.status || 'running'],
-        currentNodeTitle: titleOf(instance?.graph.nodes, instance?.currentNodeKey),
+        currentNodeTitle: titleOf(
+          instance?.graph.nodes,
+          instance?.currentNodeKey,
+        ),
         initiatorName: instance ? ctx.users.get(instance.initiatorId) || '' : '',
         time:
           kind === 'done' || kind === 'cc' ? task.finishedAt : task.createdAt,
@@ -485,7 +548,17 @@ function titleOf(
   key: string | null | undefined,
 ) {
   if (!key || !nodes) return '';
+  if (key === 'start') return '待发起人修改';
   return nodes.find((node) => node.key === key)?.title || '';
+}
+
+function doneStatusText(action: string | null | undefined) {
+  if (action === 'reject') return '已驳回';
+  if (action === 'transfer') return '已转交';
+  if (action === 'returnPrevious') return '已退回';
+  if (action === 'returnStart') return '已打回';
+  if (action === 'resubmit') return '已提交';
+  return '已通过';
 }
 
 function briefKeysOf(

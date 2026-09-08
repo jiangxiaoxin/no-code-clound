@@ -25,6 +25,10 @@ export type WorkflowNode =
       commentRequiredOnReject?: boolean;
       fieldAccess: Record<string, FieldAccess>;
       briefFieldKeys?: string[];
+      allowTransfer?: boolean;
+      allowAddSign?: boolean;
+      allowReturnPrevious?: boolean;
+      allowReturnStart?: boolean;
     })
   | (WorkflowNodeBase & {
       type: 'cc';
@@ -69,6 +73,14 @@ export interface RetryPatch {
 
 export type TaskStatus = 'pending' | 'done' | 'cancelled';
 
-export type TaskAction = 'approve' | 'reject' | 'cc';
+export type TaskAction =
+  | 'approve'
+  | 'reject'
+  | 'cc'
+  | 'transfer'
+  | 'addSign'
+  | 'returnPrevious'
+  | 'returnStart'
+  | 'resubmit';
 
 export type InstanceNote = { at: string; text: string };

@@ -64,6 +64,23 @@ test('简报字段进出 LogicFlow 后不丢', () => {
   assert.deepEqual(back.nodes[1].briefFieldKeys, ['field_reason', 'field_days'])
 })
 
+test('审批节点四个操作开关：缺省只开退回上一节点', () => {
+  const product = toProductGraph({
+    nodes: [{
+      id: 'n1',
+      type: 'approve',
+      x: 0,
+      y: 0,
+      properties: { key: 'n1', title: '部门审批', type: 'approve' },
+    }],
+    edges: [],
+  })
+  assert.equal(product.nodes[0].allowTransfer, false)
+  assert.equal(product.nodes[0].allowAddSign, false)
+  assert.equal(product.nodes[0].allowReturnPrevious, true)
+  assert.equal(product.nodes[0].allowReturnStart, false)
+})
+
 test('LogicFlow 锚点样式不进产品图', () => {
   const lf = toLogicflowGraph(product)
   lf.nodes[0].anchors = [{ x: 1, y: 2 }]

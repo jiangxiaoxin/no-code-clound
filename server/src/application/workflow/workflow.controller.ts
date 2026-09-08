@@ -19,9 +19,13 @@ import { mkdirSync } from 'fs';
 import { join, relative, sep } from 'path';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { originalUploadName } from '../upload-filename';
+import { AddSignTaskDto } from './dto/add-sign-task.dto';
 import { CompleteTaskDto } from './dto/complete-task.dto';
 import { InstanceDataDto } from './dto/instance-data.dto';
 import { QueryInboxDto } from './dto/query-inbox.dto';
+import { ResubmitTaskDto } from './dto/resubmit-task.dto';
+import { ReturnTaskDto } from './dto/return-task.dto';
+import { TransferTaskDto } from './dto/transfer-task.dto';
 import { RenderUploadGuard } from './render-upload.guard';
 import { WorkflowInboxService } from './workflow-inbox.service';
 import { WorkflowInstanceService } from './workflow-instance.service';
@@ -86,6 +90,51 @@ export class WorkflowController {
     @Body() dto: CompleteTaskDto,
   ) {
     return this.instances.complete(taskId, req.user.id, dto);
+  }
+
+  @Post('tasks/:taskId/transfer')
+  transferTask(
+    @Req() req: { user: { id: number } },
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() dto: TransferTaskDto,
+  ) {
+    return this.instances.transfer(taskId, req.user.id, dto);
+  }
+
+  @Post('tasks/:taskId/add-sign')
+  addSignTask(
+    @Req() req: { user: { id: number } },
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() dto: AddSignTaskDto,
+  ) {
+    return this.instances.addSign(taskId, req.user.id, dto);
+  }
+
+  @Post('tasks/:taskId/return-previous')
+  returnPreviousTask(
+    @Req() req: { user: { id: number } },
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() dto: ReturnTaskDto,
+  ) {
+    return this.instances.returnPrevious(taskId, req.user.id, dto);
+  }
+
+  @Post('tasks/:taskId/return-start')
+  returnStartTask(
+    @Req() req: { user: { id: number } },
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() dto: ReturnTaskDto,
+  ) {
+    return this.instances.returnStart(taskId, req.user.id, dto);
+  }
+
+  @Post('tasks/:taskId/resubmit')
+  resubmitTask(
+    @Req() req: { user: { id: number } },
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() dto: ResubmitTaskDto,
+  ) {
+    return this.instances.resubmit(taskId, req.user.id, dto.data);
   }
 
   @Post('instances/:instanceId/draft')

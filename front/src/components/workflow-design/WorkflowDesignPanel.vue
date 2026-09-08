@@ -195,6 +195,10 @@ function createNodeConfig(type) {
   if (type === 'approve') {
     properties.signMode = 'any'
     properties.commentRequiredOnApprove = false
+    properties.allowTransfer = false
+    properties.allowAddSign = false
+    properties.allowReturnPrevious = true
+    properties.allowReturnStart = false
   }
   return {
     id: properties.key,

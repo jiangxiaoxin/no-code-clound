@@ -16,6 +16,21 @@ function nodeByKey(graph: WorkflowGraph, key: string): WorkflowNode | undefined 
   return graph.nodes.find((node) => node.key === key);
 }
 
+export function previousApproveNodeKey(
+  graph: WorkflowGraph,
+  visited: string[] | null | undefined,
+  currentNodeKey: string,
+): string | null {
+  const keys = visited || [];
+  const currentIndex = keys.lastIndexOf(currentNodeKey);
+  const before = currentIndex >= 0 ? keys.slice(0, currentIndex) : keys;
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    const node = nodeByKey(graph, before[i]);
+    if (node?.type === 'approve') return node.key;
+  }
+  return null;
+}
+
 function outgoing(graph: WorkflowGraph, from: string): WorkflowEdge[] {
   return graph.edges
     .filter((edge) => edge.from === from)

@@ -2,6 +2,7 @@ import { FormField } from '../form-record/form-record.types';
 import { WorkflowGraph } from './workflow.types';
 import {
   nextStay,
+  previousApproveNodeKey,
   validatePublishedGraph,
 } from './workflow.graph';
 
@@ -211,6 +212,15 @@ describe('workflow.graph 抄送', () => {
     const graph = structuredClone(leaveGraph);
     graph.edges.push({ key: 'extra', from: 'start', to: 'n2' });
     expect(validatePublishedGraph(graph, fields).join('')).toMatch(/主出线/);
+  });
+
+  it('按走过的审批节点倒着找上一站，不看图上别的岔路', () => {
+    expect(
+      previousApproveNodeKey(leaveGraph, ['start', 'br1', 'n1', 'n2'], 'n2'),
+    ).toBe('n1');
+    expect(
+      previousApproveNodeKey(leaveGraph, ['start', 'br1', 'n1'], 'n1'),
+    ).toBeNull();
   });
 
   it('通过部门审批时带上挂着的抄送，主路仍去人事备案', () => {

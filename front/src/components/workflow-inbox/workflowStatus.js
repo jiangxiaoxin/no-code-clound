@@ -50,6 +50,11 @@ export function inboxActionsVisible(kind, actions = {}) {
     return {
       approve: Boolean(actions.canApprove),
       reject: Boolean(actions.canReject),
+      transfer: Boolean(actions.canTransfer),
+      addSign: Boolean(actions.canAddSign),
+      returnPrevious: Boolean(actions.canReturnPrevious),
+      returnStart: Boolean(actions.canReturnStart),
+      resubmit: Boolean(actions.canResubmit),
     }
   }
   if (kind === 'mine') {

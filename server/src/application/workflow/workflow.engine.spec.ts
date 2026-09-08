@@ -25,6 +25,10 @@ const leaveGraph: WorkflowGraph = {
       signMode: 'any',
       commentRequiredOnApprove: false,
       fieldAccess: { field_reason: 'editable', field_days: 'readonly' },
+      allowTransfer: true,
+      allowAddSign: true,
+      allowReturnPrevious: true,
+      allowReturnStart: true,
     },
     {
       key: 'n2',
@@ -36,6 +40,10 @@ const leaveGraph: WorkflowGraph = {
       signMode: 'all',
       commentRequiredOnApprove: false,
       fieldAccess: { field_reason: 'editable' },
+      allowTransfer: true,
+      allowAddSign: true,
+      allowReturnPrevious: true,
+      allowReturnStart: true,
     },
     { key: 'end', type: 'end', title: '结束', x: 0, y: 4 },
   ],
@@ -667,5 +675,204 @@ describe('WorkflowEngine 抄送', () => {
       dataPatch: {},
     });
     expect(ccInserts()).toEqual([]);
+  });
+
+  it('转交成功后操作者完成、目标人待处理、其他人仍待处理', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance());
+    userRepo.find.mockResolvedValue([{ id: 9, status: 'active' }]);
+    taskRepo.find.mockResolvedValue([]);
+    await engine.transfer({
+      taskId: 1,
+      actorId: 21,
+      assigneeId: 9,
+      comment: '请代批',
+    });
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { id: 1, status: 'pending', assigneeId: 21 },
+      expect.objectContaining({ status: 'done', action: 'transfer' }),
+    );
+    expect(taskRepo.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ assigneeId: 9, nodeKey: 'n1', status: 'pending' }),
+    ]);
+  });
+
+  it('不能转交给自己', async () => {
+    await expect(
+      engine.transfer({ taskId: 1, actorId: 21, assigneeId: 21, comment: '' }),
+    ).rejects.toThrow('不能转交给自己');
+  });
+
+  it('加签后操作者仍待处理，被加签人多一条待办', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance());
+    userRepo.find.mockResolvedValue([{ id: 9, status: 'active' }]);
+    taskRepo.find.mockResolvedValue([
+      { assigneeId: 21, status: 'pending' },
+    ]);
+    await engine.addSign({
+      taskId: 1,
+      actorId: 21,
+      assigneeIds: [9],
+      comment: '',
+    });
+    expect(taskRepo.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.objectContaining({ action: 'addSign' }),
+    );
+    expect(taskRepo.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ assigneeId: 9, status: 'pending' }),
+    ]);
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1 },
+      expect.objectContaining({
+        notes: expect.arrayContaining([
+          expect.objectContaining({ text: expect.stringContaining('加签') }),
+        ]),
+      }),
+    );
+  });
+
+  it('人事备案退回部门审批后仍审批中并重派上一轮通过的人', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 2,
+      instanceId: 1,
+      nodeKey: 'n2',
+      assigneeId: 9,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        currentNodeKey: 'n2',
+        visitedNodeKeys: ['start', 'br1', 'n1', 'n2'],
+      }),
+    );
+    taskRepo.find
+      .mockResolvedValueOnce([
+        { assigneeId: 21, status: 'done', action: 'approve' },
+      ])
+      .mockResolvedValueOnce([]);
+    userRepo.find.mockResolvedValue([{ id: 21, status: 'active' }]);
+    await engine.returnTo({
+      taskId: 2,
+      actorId: 9,
+      target: 'previous',
+      comment: '请补事由',
+    });
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1, status: 'running' },
+      expect.objectContaining({
+        currentNodeKey: 'n1',
+        round: 2,
+      }),
+    );
+    expect(store.setWorkflowMeta).toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'running' }),
+    );
+    expect(taskRepo.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ nodeKey: 'n1', assigneeId: 21, round: 2 }),
+    ]);
+  });
+
+  it('第一个审批节点不能退回上一节点', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance());
+    await expect(
+      engine.returnTo({
+        taskId: 1,
+        actorId: 21,
+        target: 'previous',
+        comment: '退',
+      }),
+    ).rejects.toThrow('没有上一审批节点');
+  });
+
+  it('打回发起人后状态仍审批中并派 start 待办', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 2,
+      instanceId: 1,
+      nodeKey: 'n2',
+      assigneeId: 9,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({ currentNodeKey: 'n2', visitedNodeKeys: ['n1', 'n2'] }),
+    );
+    await engine.returnTo({
+      taskId: 2,
+      actorId: 9,
+      target: 'start',
+      comment: '请改日期',
+    });
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1, status: 'running' },
+      expect.objectContaining({
+        currentNodeKey: 'start',
+        round: 2,
+      }),
+    );
+    expect(taskRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeKey: 'start',
+        assigneeId: 5,
+        status: 'pending',
+        round: 2,
+      }),
+    );
+    expect(store.setWorkflowMeta).toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'running' }),
+    );
+  });
+
+  it('发起人提交 start 待办后从开始继续走', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 8,
+      instanceId: 1,
+      nodeKey: 'start',
+      assigneeId: 5,
+      status: 'pending',
+      round: 2,
+    });
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({ currentNodeKey: 'start', visitedNodeKeys: ['start'], round: 2 }),
+    );
+    approver.resolve.mockResolvedValue({ userIds: [21] });
+    await engine.resubmitStart({ taskId: 8, actorId: 5 });
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { id: 8, status: 'pending', assigneeId: 5 },
+      expect.objectContaining({ status: 'done', action: 'resubmit' }),
+    );
+    expect(store.setWorkflowMeta).toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'running' }),
+    );
   });
 });
