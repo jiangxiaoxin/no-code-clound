@@ -78,13 +78,47 @@ function maxDoneFinishedAt(task, tasks) {
   return latest
 }
 
-function taskSortAt(task, tasks) {
+function parseAddSignNote(note) {
+  if (!note?.text) return null
+  const byId = note.text.match(/^(\d+) 加签 ([\d、]+)/)
+  if (byId) {
+    return {
+      at: note.at,
+      targets: byId[2].split('、').map((id) => id.trim()),
+    }
+  }
+  const byName = note.text.match(/^(.+?) 加签 ([^：:]+)/)
+  if (byName) {
+    return {
+      at: note.at,
+      targets: byName[2].split('、').map((name) => name.trim()),
+    }
+  }
+  return null
+}
+
+function addSignNoteAtForTask(task, notes, nameMap) {
+  if (task.status !== 'pending') return null
+  const assigneeKey = task.assigneeId != null ? String(task.assigneeId) : ''
+  const assigneeName = task.assigneeName || nameMap[assigneeKey] || ''
+  for (const note of notes || []) {
+    const parsed = parseAddSignNote(note)
+    if (!parsed) continue
+    if (assigneeKey && parsed.targets.includes(assigneeKey)) return parsed.at
+    if (assigneeName && parsed.targets.includes(assigneeName)) return parsed.at
+  }
+  return null
+}
+
+function taskSortAt(task, tasks, notes, nameMap) {
   if (task.finishedAt) return task.finishedAt
   // 旧数据取消时没写 finishedAt，会落成加签创建时间，排到驳回前面
   if (task.status === 'cancelled') {
     const fromDone = maxDoneFinishedAt(task, tasks)
     if (fromDone) return fromDone
   }
+  const addSignAt = addSignNoteAtForTask(task, notes, nameMap)
+  if (addSignAt) return addSignAt
   return task.createdAt || ''
 }
 
@@ -115,7 +149,7 @@ export function buildProgressRows(progress, formatTime = formatDateTime) {
       task.nodeKey === 'start' && task.status === 'pending'
         ? '待发起人修改'
         : titles[task.nodeKey] || task.nodeKey
-    const sortAt = taskSortAt(task, data.tasks)
+    const sortAt = taskSortAt(task, data.tasks, data.notes, nameMap)
     list.push({
       kind: 'task',
       time: formatTime(sortAt),

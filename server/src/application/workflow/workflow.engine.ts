@@ -940,7 +940,6 @@ export class WorkflowEngine {
       where: { id: task.id, status: 'pending', assigneeId: input.actorId },
     });
     if (!still) throw new ConflictException('这条待办已处理');
-    await this.dispatchTasks(instance, task.nodeKey, toDispatch);
     const relatedUsers = await this.userRepo.find({
       where: { id: In([input.actorId, ...toDispatch]) },
     });
@@ -953,6 +952,7 @@ export class WorkflowEngine {
       `${nameOf(input.actorId)} 加签 ${targetNames}${extra}`,
     );
     await this.instanceRepo.update({ id: instance.id }, { notes });
+    await this.dispatchTasks(instance, task.nodeKey, toDispatch);
   }
 
   async returnTo(input: {

@@ -197,3 +197,60 @@ test('取消与驳回同一时刻时驳回排在已取消前面', () => {
   assert.equal(rows[0].statusText, '驳回')
   assert.equal(rows[1].statusText, '未处理（已取消）')
 })
+
+test('加签后被加签人待处理排在加签说明后面', () => {
+  const rows = buildProgressRows(
+    {
+      graph: {
+        nodes: [
+          { key: 'start', type: 'start', title: '开始' },
+          { key: 'n1', type: 'approve', title: '多人审批' },
+        ],
+      },
+      notes: [
+        {
+          at: '2026-09-08T08:26:35.000Z',
+          text: 'jiang1 加签 jiang3：你也来',
+        },
+      ],
+      tasks: [
+        {
+          nodeKey: 'start',
+          round: 1,
+          assigneeName: 'jiang4',
+          status: 'done',
+          action: 'submit',
+          finishedAt: '2026-09-08T08:26:19.000Z',
+        },
+        {
+          nodeKey: 'n1',
+          round: 1,
+          assigneeName: 'jiang1',
+          status: 'pending',
+          createdAt: '2026-09-08T08:26:19.000Z',
+        },
+        {
+          nodeKey: 'n1',
+          round: 1,
+          assigneeName: 'jiang2',
+          status: 'pending',
+          createdAt: '2026-09-08T08:26:19.000Z',
+        },
+        {
+          nodeKey: 'n1',
+          round: 1,
+          assigneeId: 6,
+          assigneeName: 'jiang3',
+          status: 'pending',
+          createdAt: '2026-09-08T08:26:35.000Z',
+        },
+      ],
+    },
+    formatTime,
+  )
+  const noteIdx = rows.findIndex((row) => row.kind === 'note')
+  const jiang3Idx = rows.findIndex((row) => row.assigneeName === 'jiang3')
+  assert.ok(noteIdx >= 0)
+  assert.ok(jiang3Idx > noteIdx)
+  assert.equal(rows[noteIdx].text, 'jiang1 加签 jiang3：你也来')
+})
