@@ -314,6 +314,7 @@ describe('WorkflowEngine', () => {
       status: 'done',
       round: 1,
     });
+    instanceRepo.findOne.mockResolvedValue(runningInstance());
     taskRepo.update.mockResolvedValue({ affected: 0 });
     await expect(
       engine.completeTask({
@@ -455,7 +456,7 @@ describe('WorkflowEngine', () => {
         comment: '不批',
         dataPatch: {},
       }),
-    ).rejects.toThrow('单据状态已变化');
+    ).rejects.toThrow('这条待办已处理');
   });
 
   it('重试从 mongo 步开始不再改待办', async () => {
@@ -475,6 +476,78 @@ describe('WorkflowEngine', () => {
     expect(taskRepo.update).not.toHaveBeenCalledWith(
       expect.objectContaining({ status: 'pending' }),
       expect.objectContaining({ status: 'done' }),
+    );
+  });
+
+  it('异常后再提交会取消上一轮未处理待办', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({ status: 'error', currentNodeKey: 'n1', round: 1 }),
+    );
+    approver.resolve.mockResolvedValue({ userIds: [21] });
+    await engine.submit({ form, recordId, actorId: 5 });
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { instanceId: 1, status: 'pending' },
+      expect.objectContaining({
+        status: 'cancelled',
+        cancelReason: '发起人再次提交',
+      }),
+    );
+  });
+
+  it('上一轮残留待办不能驳回新一轮', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 99,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 22,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({ round: 2, currentNodeKey: 'n1' }),
+    );
+    taskRepo.update.mockResolvedValue({ affected: 1 });
+    await expect(
+      engine.completeTask({
+        taskId: 99,
+        actorId: 22,
+        action: 'reject',
+        comment: '不批',
+        dataPatch: {},
+      }),
+    ).rejects.toThrow('这条待办已处理');
+    expect(instanceRepo.update).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'rejected' }),
+    );
+    expect(persist.persist).not.toHaveBeenCalled();
+  });
+
+  it('当前节点已推进时旧节点残留待办不能驳回', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 7,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 22,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({ currentNodeKey: 'n2', visitedNodeKeys: ['br1', 'n1', 'n2'] }),
+    );
+    taskRepo.update.mockResolvedValue({ affected: 1 });
+    await expect(
+      engine.completeTask({
+        taskId: 7,
+        actorId: 22,
+        action: 'reject',
+        comment: '不批',
+        dataPatch: {},
+      }),
+    ).rejects.toThrow('这条待办已处理');
+    expect(instanceRepo.update).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ status: 'rejected' }),
     );
   });
 });

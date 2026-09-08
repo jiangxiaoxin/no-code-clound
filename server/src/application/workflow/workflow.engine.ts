@@ -125,6 +125,7 @@ export class WorkflowEngine {
     if (!started.affected) {
       throw new ConflictException('当前状态不能提交');
     }
+    await this.cancelAllPending(instance.id, '发起人再次提交');
     instance.status = 'running';
     instance.round = nextRound;
     instance.hasApproved = false;
@@ -167,6 +168,7 @@ export class WorkflowEngine {
     if (!started.affected) {
       throw new ConflictException('当前状态不能提交');
     }
+    await this.cancelAllPending(instance.id, '发起人再次提交');
     instance.status = 'running';
     instance.graph = runtime.graph;
     instance.definitionVersion = runtime.version;
@@ -186,6 +188,14 @@ export class WorkflowEngine {
   }): Promise<{ waitingOthers: boolean; nextNodeTitle?: string }> {
     const task = await this.taskRepo.findOne({ where: { id: input.taskId } });
     if (!task) throw new NotFoundException('待办不存在');
+    const instance = await this.requireInstance(task.instanceId);
+    if (
+      instance.status !== 'running' ||
+      task.round !== instance.round ||
+      instance.currentNodeKey !== task.nodeKey
+    ) {
+      throw new ConflictException('这条待办已处理');
+    }
     const done = await this.taskRepo.update(
       { id: task.id, status: 'pending', assigneeId: input.actorId },
       {
@@ -196,12 +206,20 @@ export class WorkflowEngine {
       },
     );
     if (!done.affected) throw new ConflictException('这条待办已处理');
-    const instance = await this.requireInstance(task.instanceId);
     const node = findApproveNode(instance.graph, task.nodeKey);
     if (input.action === 'reject') {
-      // 带 status 条件：发起人同时撤回时，只允许一边成功
+      await this.cancelPending(
+        instance.id,
+        task.nodeKey,
+        node.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
+      );
       const rejected = await this.instanceRepo.update(
-        { id: instance.id, status: 'running' },
+        {
+          id: instance.id,
+          status: 'running',
+          currentNodeKey: task.nodeKey,
+          round: instance.round,
+        },
         {
           status: 'rejected',
           currentNodeKey: null,
@@ -209,14 +227,7 @@ export class WorkflowEngine {
           retryStep: null,
         },
       );
-      if (!rejected.affected) {
-        throw new ConflictException('单据状态已变化，请刷新后再看');
-      }
-      await this.cancelPending(
-        instance.id,
-        task.nodeKey,
-        node.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
-      );
+      if (!rejected.affected) throw new ConflictException('这条待办已处理');
       await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
         workflowStatus: 'rejected',
         workflowInstanceId: instance.id,
@@ -733,6 +744,13 @@ export class WorkflowEngine {
       );
       throw err;
     }
+  }
+
+  private async cancelAllPending(instanceId: number, cancelReason: string) {
+    await this.taskRepo.update(
+      { instanceId, status: 'pending' },
+      { status: 'cancelled', cancelReason },
+    );
   }
 
   private async cancelPending(
