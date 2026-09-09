@@ -28,7 +28,7 @@
 - 字典新增、编辑、启停、删除，以及项的维护。
 - 表单设计：单选、复选只选本应用字典；下拉框先选数据源（字典 / 其他表数据），选字典后再选本应用启用字典。
 - 画布在数据源为字典且已选编码时，用启用项渲染预览。
-- 接口鉴权与现有应用目录一致：已登录且为该应用 `ownerId`。
+- 接口鉴权：读需要该应用使用权、写需要配置权（现按 `2026-09-05-permission-design.md` 的应用权限模型；最初设计为应用 `ownerId`）。
 
 ### 本期不实现
 
@@ -38,7 +38,7 @@
 - 按引用计数拦截删除或停用。
 - 字段上同时支持「自定义选项」和「引用字典」。
 - 下拉框「其他表数据」的表选择、字段映射、过滤条件等后续配置。
-- 应用内细粒度权限（目前应用能力都归 owner）。
+- 应用内细粒度权限（当时应用能力都归 owner；现已由应用权限模型接管）。
 - 运行时填报页（当前预览仍是 JSON 配置预览）。
 - 批量导入导出、操作审计。
 
@@ -80,9 +80,9 @@ Dictionary 1 ← dictionary_item → N DictionaryItem
 
 ### 3.5 鉴权跟应用走，不新增组织权限码
 
-本期不增加 `dictionaries.read` 等组织权限。能打开该应用工作台的人（owner）就能管理该应用字典，也能在该应用的表单设计里引用。
+本期不增加 `dictionaries.read` 等组织权限。字典的读跟随应用使用权、写跟随应用配置权（见 `2026-09-05-permission-design.md` §9/§12；原设计为应用 owner）。
 
-与现有 `GET /api/apps/:id/directory` 同一套：JWT + `ownerId === 当前用户`。
+原与 `GET /api/apps/:id/directory` 同一套（JWT + `ownerId === 当前用户`）；现按应用权限模型执行。
 
 ### 3.6 不改动使用者注释和日志
 
@@ -163,11 +163,11 @@ server/src/application/dictionary/
   dto/
 ```
 
-`ApplicationModule` 注册实体、服务和控制器。写操作前 `requireApp(ownerId, appId)`，与分组/表单相同。
+`ApplicationModule` 注册实体、服务和控制器。写操作前校验应用配置权，与分组/表单相同（原为 `requireApp(ownerId, appId)`）。
 
 ## 6. HTTP 接口
 
-前缀 `/api/apps/:appId/dictionaries`。均需 JWT，且当前用户为该应用所有者。`appId` 不存在或不属于当前用户时 `404`（与现有应用接口一致，不暴露他人应用）。
+前缀 `/api/apps/:appId/dictionaries`。均需 JWT，读需使用权、写需配置权。`appId` 不存在或无权限时 `404`（与现有应用接口一致，不暴露他人应用）。
 
 - `GET /api/apps/:appId/dictionaries?keyword=&status=`  
   管理列表，含 `itemCount`。
@@ -272,7 +272,7 @@ server/src/application/dictionary/
 
 - 同一应用内名称、编码唯一；不同应用允许同名同编码。
 - 编码格式；创建后不能改编码。
-- 非 owner 访问返回 `404`。
+- 无权限访问返回 `404`（读需使用权、写需配置权）。
 - 项 `value` 唯一；更新 `items` 事务整体替换。
 - 停用后不出现在 `options`；按编码取项仍返回启用项。
 - 批量按编码取项：缺编码返回空数组；重复编码去重。
@@ -302,7 +302,7 @@ server/src/application/dictionary/
 
 - 入口是应用后台，不是 `/admin`。
 - 字典归属 `applicationId`，默认仅本应用使用。
-- 鉴权复用应用 owner，不新增组织权限码。
+- 鉴权跟随应用权限（读使用权、写配置权），不新增字典专属权限码。
 - 表单引用必须带当前应用 id。
 
 仍保留：字典头 + 字典项、编码创建后不可改、删除/停用不做引用保护。

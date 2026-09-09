@@ -30,7 +30,7 @@
 - 打开表单返回 `fields`；保存设计用独立接口写入。
 - 一份列表接口，返回本应用其他已保存表单及其可选字段（排除当前表单）。
 - 组件库：`select`（下拉单选框）、`select-multiple`（下拉多选框）。
-- 两者数据源仍为 `dictionary` | `table_data`。字典交互与已有下拉单选/多选相同。
+- 数据源有 `dictionary` | `table_data` | `linkage`（数据联动，配置与行为见数据联动规格）。字典交互与已有下拉单选/多选相同。
 - `table_data` 记录 `sourceFormId` + `sourceFieldKey`。
 - 选择器：`div` 模拟 select，下拉层内搜索表单名 + 树（表单 / 字段标题（类型））。
 - 未配选项来源时，画布标题下提示「请配置选项来源」。
@@ -63,7 +63,7 @@ TypeORM `synchronize: false`。只新增脚本 `server/sql/2026-08-23-form-field
 
 「已保存」指 `fields` 不是 `null`，且过滤后至少还有一个可选字段。当前正在设计的表单用查询参数排除。
 
-可选字段类型（仅这些出现在树里）：
+可选字段类型（树里只出现下面这些；字段列表接口如今返回更多类型，由选择器在前端过滤）：
 
 - `input` 单行文本
 - `textarea` 多行文本
@@ -175,7 +175,7 @@ Body：`{ "fields": [] }`。
 
 `select` 与 `select-multiple` 共用：
 
-1. 数据源：`dictionary` / `table_data`。
+1. 数据源：`dictionary` / `table_data` / `linkage`。
 2. 字典：现有字典下拉。
 3. `table_data`：其他表字段选择器（见 5.3）。不出现过滤条件。
 

@@ -30,7 +30,7 @@
 | `province` | `sheng.json` | 一级 |
 | `province-city` | `sheng-shi.json` | 到市级叶子（直辖市/港澳无下级，一级即叶子） |
 | `province-city-district` | `sheng-shi-qu.json` | 到区县叶子 |
-| `province-city-district-detail` | `sheng-shi-qu.json` + 输入框 | 区县叶子 + 详细地址 |
+| `province-city-district-detail` | `sheng-shi-qu.json` + 多行文本框 | 区县叶子 + 详细地址 |
 
 控件按当前格式 **按需动态 `import()`** 对应 JSON（`import('@region/sheng.json')` 等），避免三种格式都打进同一包。不要改 JSON 结构，也不要在 `front/`、`server/` 再留副本。
 
