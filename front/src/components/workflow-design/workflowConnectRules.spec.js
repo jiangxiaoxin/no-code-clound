@@ -70,3 +70,15 @@ test('结束节点不能连出线', () => {
   assert.equal(result.ok, false)
   assert.match(result.message, /结束/)
 })
+
+test('节点不能连接自己', () => {
+  const result = validateCanvasEdge(base, { from: 'a1', to: 'a1', key: 'e1' })
+  assert.equal(result.ok, false)
+  assert.match(result.message, /自己/)
+})
+
+test('不能连回开始节点', () => {
+  const result = validateCanvasEdge(base, { from: 'a1', to: 'start', key: 'e1' })
+  assert.equal(result.ok, false)
+  assert.match(result.message, /开始节点/)
+})

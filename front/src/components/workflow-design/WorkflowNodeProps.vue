@@ -303,6 +303,9 @@ function accessOptions(field) {
     field.type === 'currentUserDept' ||
     field.type === 'serialNumber'
   ) {
+    // 开始节点上这些控件就是发起人自己填的，必须保留可编辑选项，
+    // 否则默认值 editable 会在属性面板里落成一个空选择
+    if (props.node?.type === 'start') return ['editable', 'readonly', 'hidden']
     return ['readonly', 'hidden']
   }
   return ['editable', 'readonly', 'hidden']

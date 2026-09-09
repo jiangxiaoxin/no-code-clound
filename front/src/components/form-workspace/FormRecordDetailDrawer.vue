@@ -292,6 +292,10 @@ async function persistDetail(intent) {
       ElMessage.success('保存成功')
     }
     emit('saved', updated)
+    // 提交会推进流程，顶栏待办角标需要跟着刷新
+    if (isWorkflowForm.value && intent === 'submit') {
+      window.dispatchEvent(new Event('workflow-inbox-changed'))
+    }
     closeDrawer()
   } catch {
     return
@@ -316,6 +320,8 @@ async function onRetry() {
     await retryWorkflowInstanceApi(instanceId)
     ElMessage.success('已重试')
     emit('saved', props.record)
+    // 重试会重新派发待办，顶栏待办角标需要跟着刷新
+    window.dispatchEvent(new Event('workflow-inbox-changed'))
     closeDrawer()
   } catch {
     return

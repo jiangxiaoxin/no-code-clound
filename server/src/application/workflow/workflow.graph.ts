@@ -51,6 +51,8 @@ export function prepareStartPersistInput(
       picked[key] = existing[key];
       continue;
     }
+    // 只读字段没有旧值可兜底时（首次创建、发布后新加字段），不能采纳请求体里的值
+    if (access === 'readonly') continue;
     if (key in data) picked[key] = data[key];
   }
   const requiredKeys = flat

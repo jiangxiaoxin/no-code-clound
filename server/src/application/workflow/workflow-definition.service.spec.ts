@@ -27,6 +27,21 @@ const startGraph = {
   edges: [],
 };
 
+// 自动生成 V1 时，开始节点带「流程终止后可修改后重新提交」的默认开启状态
+const autoV1Graph = {
+  nodes: [
+    {
+      allowResubmitAfterTerminated: true,
+      key: 'start',
+      type: 'start',
+      title: '开始',
+      x: 240,
+      y: 40,
+    },
+  ],
+  edges: [],
+};
+
 const leaveGraph: WorkflowGraph = {
   nodes: [
     { key: 'start', type: 'start', title: '开始', x: 240, y: 40 },
@@ -116,6 +131,12 @@ describe('WorkflowDefinitionService', () => {
     save: jest.fn(async (row) => ({ id: row.id ?? 10, ...row })),
     update: jest.fn(),
     delete: jest.fn(),
+    // enableVersion 用 manager.transaction 包住「先全关再开一行」
+    manager: {
+      transaction: jest.fn(async (cb: (manager: unknown) => Promise<void>) =>
+        cb(versionRepo),
+      ),
+    },
   };
   const formRepo = { findOne: jest.fn() };
   const instanceRepo = { count: jest.fn() };
@@ -160,7 +181,7 @@ describe('WorkflowDefinitionService', () => {
         formId: 12,
         version: 1,
         enabled: false,
-        graph: startGraph,
+        graph: autoV1Graph,
       }),
     );
     expect(detail.versions).toHaveLength(1);
@@ -237,13 +258,21 @@ describe('WorkflowDefinitionService', () => {
       enabled: false,
       graph: leaveGraph,
     });
+    // resetAllMocks 会清掉 manager.transaction 的默认实现，这里手动恢复
+    versionRepo.manager.transaction.mockImplementation(
+      async (cb: (manager: unknown) => Promise<void>) => cb(versionRepo),
+    );
     await service.enableVersion(3, 8, 12, 10);
+    expect(versionRepo.manager.transaction).toHaveBeenCalledTimes(1);
     expect(versionRepo.update).toHaveBeenCalledWith(
+      WorkflowVersion,
       { formId: 12 },
       { enabled: false },
     );
-    expect(versionRepo.save).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 10, enabled: true }),
+    expect(versionRepo.update).toHaveBeenCalledWith(
+      WorkflowVersion,
+      { id: 10 },
+      { enabled: true },
     );
     expect(defRepo.save).toHaveBeenCalledWith(
       expect.objectContaining({ hasBeenEnabled: true }),
@@ -319,7 +348,7 @@ describe('WorkflowDefinitionService', () => {
         formId: 12,
         version: 1,
         enabled: false,
-        graph: startGraph,
+        graph: autoV1Graph,
       }),
     );
   });

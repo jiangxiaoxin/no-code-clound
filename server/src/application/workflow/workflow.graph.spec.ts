@@ -324,4 +324,33 @@ describe('workflow.graph 抄送', () => {
       requiredKeys: ['field_reason'],
     });
   });
+
+  it('prepareStartPersistInput 只读字段没有旧值时不采纳请求体', () => {
+    // 首次创建、发布后新加的字段都没有旧值可兜底，
+    // 此时只读字段不能采纳请求体里的值，否则旧草稿能偷改只读字段
+    const fields: FormField[] = [
+      { key: 'field_reason', type: 'textarea', title: '事由' },
+      { key: 'field_days', type: 'number', title: '天数' },
+    ];
+    const graph: WorkflowGraph = {
+      nodes: [
+        {
+          key: 'start',
+          type: 'start',
+          title: '开始',
+          x: 0,
+          y: 0,
+          fieldAccess: { field_reason: 'editable', field_days: 'readonly' },
+        },
+      ],
+      edges: [],
+    };
+    expect(
+      prepareStartPersistInput(
+        { field_reason: '事假', field_days: 3 },
+        fields,
+        graph,
+      ),
+    ).toEqual({ data: { field_reason: '事假' }, requiredKeys: ['field_reason'] });
+  });
 });

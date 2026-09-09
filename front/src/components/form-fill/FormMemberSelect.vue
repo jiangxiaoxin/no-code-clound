@@ -525,8 +525,12 @@ async function onPickerOpen() {
   pickerPage.value = 1
   pickerTotal.value = 0
   visibleUsers.value = []
-  await loadOrg()
-  await hydrateDraft()
+  try {
+    await loadOrg()
+    await hydrateDraft()
+  } catch {
+    // 错误已由 http 拦截器提示，选人面板保持空列表即可
+  }
 }
 
 async function pruneByDeptField() {
@@ -559,7 +563,8 @@ async function pruneByDeptField() {
 
 onMounted(() => {
   if (normalizeMemberScope(props.field.memberScope) === 'dept_field') {
-    pruneByDeptField()
+    // 组织架构接口失败时跳过修剪，别让未处理的 Promise 异常冒到控制台
+    pruneByDeptField().catch(() => {})
   }
 })
 
@@ -567,7 +572,7 @@ watch(
   () => selectedIds.value.join(','),
   (key) => {
     if (!key) return
-    hydrateSelectedNames()
+    hydrateSelectedNames().catch(() => {})
   },
   { immediate: true },
 )
@@ -575,7 +580,7 @@ watch(
 watch(
   () => props.recordValues?.[props.field.sourceDeptFieldKey],
   () => {
-    pruneByDeptField()
+    pruneByDeptField().catch(() => {})
   },
 )
 </script>

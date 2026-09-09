@@ -88,13 +88,14 @@ export function assertSubformConstraints(
     const rows = Array.isArray(data[field.key])
       ? (data[field.key] as Record<string, unknown>[])
       : [];
-    if (field.required && rows.length === 0) {
+    if (field.required && field.visible !== false && rows.length === 0) {
       throw new BadRequestException(`[${field.title || '未命名'}]不能为空`);
     }
     const children = field.fields ?? [];
     for (const row of rows) {
       for (const child of children) {
-        if (!child.required) {
+        // 不可见子列在填报界面不渲染，不能按必填拦提交
+        if (!child.required || child.visible === false) {
           continue;
         }
         if (isSubformChildEmpty(child, row[child.key])) {
