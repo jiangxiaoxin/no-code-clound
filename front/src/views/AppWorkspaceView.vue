@@ -82,7 +82,7 @@
       </div>
     </el-aside>
     <WorkflowInboxList v-if="inboxKind" class="workspace-inbox" :kind="inboxKind" :app-id="appId"
-      @changed="loadAppTodoCount" />
+      @changed="onInboxChanged" />
     <AppWorkspaceMain v-else :app-id="appId" :form="currentForm" :can-configure="canConfigure" />
   </el-container>
 
@@ -315,12 +315,18 @@ function openInbox(kind) {
   })
 }
 
+function onInboxChanged() {
+  loadAppTodoCount()
+  // 顶栏的待办角标也监听这个事件，一起刷新
+  window.dispatchEvent(new Event('workflow-inbox-changed'))
+}
+
 async function loadAppTodoCount() {
   try {
     const result = await getWorkflowInboxCountApi(appId.value)
     appTodoCount.value = Number(result?.todo) || 0
   } catch {
-    appTodoCount.value = 0
+    // 刷新失败时保留旧数字，闪成 0 会误导
   }
 }
 

@@ -161,8 +161,11 @@ function currentProduct() {
   )
 }
 
+let keySeq = 0
 function nextKey(prefix) {
-  return `${prefix}_${Date.now().toString(36)}`
+  keySeq += 1
+  // 同一毫秒里连点两次会得到相同 key，拼一个自增序号兜底
+  return `${prefix}_${Date.now().toString(36)}_${keySeq}`
 }
 
 function applyGraph(product) {
@@ -263,6 +266,78 @@ function onDeleteSelectedEdge() {
   markDirty()
 }
 
+function onCanvasKeydown(e) {
+  if (!lf || readonly.value) return
+  const target = e.target
+  if (target instanceof HTMLElement) {
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable
+    ) {
+      return
+    }
+    // 焦点不在画布上（弹窗、菜单、页面其他输入区）时不抢键盘；
+    // 点过画布后焦点可能仍停在 body 上，这种情况放行
+    const inCanvas = canvasRef.value?.contains(target)
+    if (!inCanvas && target !== document.body) return
+  }
+  if (document.querySelector('.el-overlay')) return
+  const mod = e.ctrlKey || e.metaKey
+  const key = String(e.key || '').toLowerCase()
+  if (mod && key === 'z' && !e.shiftKey) {
+    e.preventDefault()
+    lf.undo()
+    afterHistoryChange()
+    return
+  }
+  if ((mod && key === 'y') || (mod && key === 'z' && e.shiftKey)) {
+    e.preventDefault()
+    lf.redo()
+    afterHistoryChange()
+    return
+  }
+  if (key === 'backspace' || key === 'delete') {
+    e.preventDefault()
+    deleteByKeyboard()
+  }
+}
+
+function deleteByKeyboard() {
+  if (selectedEdge.value) {
+    lf.deleteEdge(selectedEdge.value.key)
+    selectedEdge.value = null
+    markDirty()
+    return
+  }
+  if (selectedNode.value) {
+    if (selectedNode.value.type === 'start') {
+      ElMessage.warning('开始节点不能删除')
+      return
+    }
+    lf.deleteNode(selectedNode.value.key)
+    selectedNode.value = null
+    markDirty()
+  }
+}
+
+function afterHistoryChange() {
+  // 撤销/重做是直接恢复历史快照，不走 edge:add 校验，
+  // 之前因校验失败被删掉的连线可能跟着回来，这里统一再校验一遍
+  const graph = currentProduct()
+  for (const edge of graph.edges) {
+    const result = validateCanvasEdge(graph, {
+      from: edge.from,
+      to: edge.to,
+      key: edge.key,
+    })
+    if (!result.ok) lf.deleteEdge(edge.key)
+  }
+  selectedNode.value = null
+  selectedEdge.value = null
+  markDirty()
+}
+
 function bindEvents() {
   lf.on('node:click', ({ data }) => {
     selectedEdge.value = null
@@ -325,6 +400,7 @@ function restoreStart(data) {
     y: data.y || 40,
     text: data.text || '开始',
     properties: {
+      ...data.properties,
       key: 'start',
       title: '开始',
       type: 'start',
@@ -341,7 +417,9 @@ function createLf(silent) {
     container: canvasRef.value,
     grid: true,
     stopMoveGraph: false,
-    keyboard: { enabled: !silent },
+    // LogicFlow 自带快捷键改不掉默认行为：复制粘贴会带出重复 key 的节点、
+    // 退格会删掉开始节点再补救。整体关掉，快捷键在组件上自己绑。
+    keyboard: { enabled: false },
     isSilentMode: silent,
     textEdit: false,
   })
@@ -476,8 +554,7 @@ async function onSaveAndEnable() {
     ElMessage.success('已保存并启用')
     await load(viewingId.value)
   } catch (error) {
-    const message = error?.message || error?.response?.data?.message
-    enableErrors.value = Array.isArray(message) ? message : []
+    enableErrors.value = extractEnableErrors(error)
   } finally {
     enabling.value = false
   }
@@ -494,9 +571,16 @@ async function onEnableVersion(versionId) {
     ElMessage.success('已启用')
     await load(versionId)
   } catch (error) {
-    const message = error?.message || error?.response?.data?.message
-    enableErrors.value = Array.isArray(message) ? message : []
+    enableErrors.value = extractEnableErrors(error)
   }
+}
+
+function extractEnableErrors(error) {
+  // axios 报错时 error.message 只是 "Request failed with status code 400"，
+  // 后端校验信息在 response.data.message 里（启用失败时是数组，每条一条）
+  const raw = error?.response?.data?.message ?? error?.message
+  if (Array.isArray(raw)) return raw.map((item) => String(item))
+  return raw ? [String(raw)] : []
 }
 
 async function onEditVersion(versionId) {
@@ -528,6 +612,7 @@ async function onDeleteVersion(versionId) {
 }
 
 onMounted(async () => {
+  document.addEventListener('keydown', onCanvasKeydown)
   createLf(false)
   try {
     await load()
@@ -537,6 +622,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onCanvasKeydown)
   // 只置空不销毁会留下键盘绑定和画布 DOM，来回进出这一页会越来越卡
   lf?.destroy?.()
   lf = null

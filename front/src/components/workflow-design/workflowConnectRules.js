@@ -28,6 +28,14 @@ export function validateCanvasEdge(graph, { from, to, key }) {
   const sourceType = nodeType(graph, from)
   const targetType = nodeType(graph, to)
 
+  if (from === to) {
+    return { ok: false, message: '节点不能连接自己' }
+  }
+
+  if (targetType === 'start') {
+    return { ok: false, message: '不能连回开始节点' }
+  }
+
   if (sourceType === 'cc' || sourceType === 'end') {
     return { ok: false, message: '抄送和结束不能再连出线' }
   }

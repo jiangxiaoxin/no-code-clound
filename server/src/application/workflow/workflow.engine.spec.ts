@@ -889,7 +889,7 @@ describe('WorkflowEngine 抄送', () => {
       comment: '请补事由',
     });
     expect(instanceRepo.update).toHaveBeenCalledWith(
-      { id: 1, status: 'running' },
+      { id: 1, status: 'running', currentNodeKey: 'n2', round: 1 },
       expect.objectContaining({
         currentNodeKey: 'n1',
         round: 2,
@@ -944,7 +944,7 @@ describe('WorkflowEngine 抄送', () => {
       comment: '请改日期',
     });
     expect(instanceRepo.update).toHaveBeenCalledWith(
-      { id: 1, status: 'running' },
+      { id: 1, status: 'running', currentNodeKey: 'n2', round: 1 },
       expect.objectContaining({
         currentNodeKey: 'start',
         round: 2,

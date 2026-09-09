@@ -124,7 +124,7 @@ async function loadCount() {
     const result = await getWorkflowInboxCountApi()
     todoCount.value = Number(result?.todo) || 0
   } catch {
-    todoCount.value = 0
+    // 刷新失败时保留旧数字，闪成 0 会误导
   }
 }
 

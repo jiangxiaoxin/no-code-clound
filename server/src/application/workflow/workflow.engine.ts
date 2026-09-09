@@ -8,8 +8,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, type QueryDeepPartialEntity } from 'typeorm';
 import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
-import { FormRecordPersistService } from '../form-record/form-record.persist';
+import { mergeRecordData } from '../form-record/form-record.coerce';
+import {
+  assertSubformConstraints,
+  FormRecordPersistService,
+} from '../form-record/form-record.persist';
+import { assertRequiredFields } from '../form-record/form-record.required';
 import { FormRecordStore } from '../form-record/form-record.store';
+import { parseFormSchema } from '../form-schema';
 import { WorkflowApproverService, type ResolvedApprovers } from './workflow.approver';
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowInstance } from './workflow-instance.entity';
@@ -88,6 +94,8 @@ export class WorkflowEngine {
     let instance = await this.instanceRepo.findOne({
       where: { formId: input.form.id, recordId: input.recordId },
     });
+    let refreshGraph: WorkflowGraph | null = null;
+    let refreshVersion = 0;
     if (!instance) {
       const runtime = await this.requirePublished(input.form.id);
       instance = await this.instanceRepo.save(
@@ -106,12 +114,20 @@ export class WorkflowEngine {
           notes: [],
         }),
       );
+    } else if (instance.round === 0) {
+      // 草稿第一次提交：按规格钉「当前启用中的那一版」，不能沿用存草稿那天的旧图
+      const runtime = await this.requirePublished(input.form.id);
+      refreshGraph = runtime.graph;
+      refreshVersion = runtime.version;
     }
     const nextRound = instance.round + 1;
     const started = await this.instanceRepo.update(
       { id: instance.id, status: In(['draft', 'rejected', 'error']) },
       {
         status: 'running',
+        ...(refreshGraph
+          ? { graph: refreshGraph, definitionVersion: refreshVersion }
+          : {}),
         round: nextRound,
         hasApproved: false,
         visitedNodeKeys: [],
@@ -120,13 +136,17 @@ export class WorkflowEngine {
         retryStep: null,
         startedAt: new Date(),
         endedAt: null,
-      },
+      } as QueryDeepPartialEntity<WorkflowInstance>,
     );
     if (!started.affected) {
       throw new ConflictException('当前状态不能提交');
     }
     await this.cancelAllPending(instance.id, '发起人再次提交');
     instance.status = 'running';
+    if (refreshGraph) {
+      instance.graph = refreshGraph;
+      instance.definitionVersion = refreshVersion;
+    }
     instance.round = nextRound;
     instance.hasApproved = false;
     instance.visitedNodeKeys = [];
@@ -198,6 +218,31 @@ export class WorkflowEngine {
     ) {
       throw new ConflictException('这条待办已处理');
     }
+    const node = findApproveNode(instance.graph, task.nodeKey);
+    // 审批人把「可编辑必填字段」留空就点通过：必须在消费待办之前拦下，
+    // 否则任务先置 done、写库校验失败会把单据打成异常，待办也被白白吃掉
+    if (input.action === 'approve') {
+      const requiredKeys = Object.entries(node?.fieldAccess || {})
+        .filter(([, access]) => access === 'editable')
+        .map(([key]) => key);
+      if (requiredKeys.length) {
+        const form =
+          (await this.formRepo.findOne({ where: { id: instance.formId } })) ??
+          ({ id: instance.formId } as AppForm);
+        const fields = parseFormSchema(form.fields).fields;
+        const existing = await this.store.findById(
+          instance.formId,
+          instance.recordId,
+        );
+        const merged = mergeRecordData(
+          existing?.data ?? {},
+          input.dataPatch ?? {},
+          fields,
+        );
+        assertRequiredFields(fields, merged, requiredKeys);
+        assertSubformConstraints(fields, merged);
+      }
+    }
     const done = await this.taskRepo.update(
       { id: task.id, status: 'pending', assigneeId: input.actorId },
       {
@@ -208,12 +253,11 @@ export class WorkflowEngine {
       },
     );
     if (!done.affected) throw new ConflictException('这条待办已处理');
-    const node = findApproveNode(instance.graph, task.nodeKey);
     if (input.action === 'reject') {
       await this.cancelPending(
         instance.id,
         task.nodeKey,
-        node.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
+        node?.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
       );
       const rejected = await this.instanceRepo.update(
         {
@@ -343,6 +387,10 @@ export class WorkflowEngine {
             );
             return;
           }
+        } else {
+          // 或签：和正常通过路径一样，推进前把同节点其他人的待办取消掉，
+          // 否则他们手里永远挂着一条点不动的待办
+          await this.cancelPending(instance.id, node.key, '或签其他人已通过');
         }
       }
       await this.instanceRepo.update(
@@ -353,6 +401,16 @@ export class WorkflowEngine {
       return;
     }
     if (instance.retryStep === 'advance') {
+      const advanceNode = instance.currentNodeKey
+        ? findApproveNode(instance.graph, instance.currentNodeKey)
+        : null;
+      if (advanceNode && advanceNode.signMode !== 'all') {
+        await this.cancelPending(
+          instance.id,
+          advanceNode.key,
+          '或签其他人已通过',
+        );
+      }
       await this.advance(instance, instance.currentNodeKey ?? 'start');
       return;
     }
@@ -584,18 +642,30 @@ export class WorkflowEngine {
       const have = new Set(existing.map((row) => row.assigneeId));
       const toInsert = resolved.userIds.filter((id) => !have.has(id));
       if (toInsert.length) {
-        await this.taskRepo.insert(
-          toInsert.map((assigneeId) => ({
-            instanceId: instance.id,
-            nodeKey,
-            round: instance.round,
-            assigneeId,
-            status: 'done' as const,
-            action: 'cc' as const,
-            comment: null,
-            finishedAt: new Date(),
-          })),
-        );
+        try {
+          await this.taskRepo.insert(
+            toInsert.map((assigneeId) => ({
+              instanceId: instance.id,
+              nodeKey,
+              round: instance.round,
+              assigneeId,
+              status: 'done' as const,
+              action: 'cc' as const,
+              comment: null,
+              finishedAt: new Date(),
+            })),
+          );
+        } catch (err) {
+          if (isDuplicateKeyError(err)) {
+            // 并发推进时另一边已经插过同一条抄送，不算失败
+            continue;
+          }
+          // 抄送失败不挡主路（规格 §1）：记一条笔记继续走
+          const text = `节点「${node.title || node.key}」抄送发送失败，请知悉`;
+          if (!(notes || []).some((row) => row.text === text)) {
+            notes = appendNote(notes, text);
+          }
+        }
       }
     }
     if (notes !== instance.notes) {
@@ -881,6 +951,11 @@ export class WorkflowEngine {
     if (existing.some((row) => row.status === 'pending')) {
       throw new BadRequestException('该用户已有待办');
     }
+    // 只拦 pending 会漏掉已处理过的人：dispatchTasks 对 done 行既不复活也不重插，
+    // 会签最后一名待办被这样吃掉后单据会永久卡在「审批中」
+    if (existing.some((row) => row.status === 'done')) {
+      throw new BadRequestException('该用户已在本节点处理过，不能转交');
+    }
     const done = await this.taskRepo.update(
       { id: task.id, status: 'pending', assigneeId: input.actorId },
       {
@@ -932,9 +1007,21 @@ export class WorkflowEngine {
         .filter((row) => row.status === 'pending')
         .map((row) => row.assigneeId),
     );
-    const toDispatch = activeIds.filter((id) => !pendingIds.has(id));
+    const doneIds = new Set(
+      existing
+        .filter((row) => row.status === 'done')
+        .map((row) => row.assigneeId),
+    );
+    // done 行的人加签只会写进度笔记、永远等不来待办，一并拦下
+    const toDispatch = activeIds.filter(
+      (id) => !pendingIds.has(id) && !doneIds.has(id),
+    );
     if (!toDispatch.length) {
-      throw new BadRequestException('所选人员已有待办');
+      throw new BadRequestException(
+        activeIds.some((id) => pendingIds.has(id))
+          ? '所选人员已有待办'
+          : '所选人员已在本节点处理过，不能加签',
+      );
     }
     const still = await this.taskRepo.findOne({
       where: { id: task.id, status: 'pending', assigneeId: input.actorId },
@@ -1002,10 +1089,14 @@ export class WorkflowEngine {
       input.target === 'previous'
         ? `退回至「${prevTitle}」`
         : '退回至发起人';
-    await this.taskRepo.update(
-      { instanceId: instance.id, status: 'pending' },
-      this.cancelledFields(cancelReason),
-    );
+    // 抢占要带上「当前节点+轮次」：两个审批人同时退回时只有一人成功，
+    // 后到者拿到 409；取消他人待办放在抢占成功之后，避免误伤并发赢家刚派出的新待办
+    const claimWhere = {
+      id: instance.id,
+      status: 'running' as const,
+      currentNodeKey: task.nodeKey,
+      round: instance.round,
+    };
     const nextRound = instance.round + 1;
     if (input.target === 'previous' && prevKey) {
       const prevNode = findApproveNode(instance.graph, prevKey);
@@ -1029,8 +1120,8 @@ export class WorkflowEngine {
           ).map((row) => row.id)
         : [];
       if (!active.length) {
-        await this.instanceRepo.update(
-          { id: instance.id, status: 'running' },
+        const stuck = await this.instanceRepo.update(
+          claimWhere,
           {
             status: 'error',
             currentNodeKey: prevKey,
@@ -1040,6 +1131,13 @@ export class WorkflowEngine {
             errorReason: `退回后节点「${prevNode.title}」没有可用的审批人`,
           },
         );
+        if (!stuck.affected) {
+          throw new ConflictException('单据状态已变化，请刷新后再看');
+        }
+        await this.taskRepo.update(
+          { instanceId: instance.id, status: 'pending' },
+          this.cancelledFields(cancelReason),
+        );
         await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
           workflowStatus: 'error',
           workflowInstanceId: instance.id,
@@ -1047,7 +1145,7 @@ export class WorkflowEngine {
         return;
       }
       const claimed = await this.instanceRepo.update(
-        { id: instance.id, status: 'running' },
+        claimWhere,
         {
           currentNodeKey: prevKey,
           visitedNodeKeys: visited,
@@ -1059,6 +1157,10 @@ export class WorkflowEngine {
       if (!claimed.affected) {
         throw new ConflictException('单据状态已变化，请刷新后再看');
       }
+      await this.taskRepo.update(
+        { instanceId: instance.id, status: 'pending' },
+        this.cancelledFields(cancelReason),
+      );
       instance.round = nextRound;
       instance.currentNodeKey = prevKey;
       await this.dispatchTasks(instance, prevKey, active);
@@ -1069,7 +1171,7 @@ export class WorkflowEngine {
       return;
     }
     const claimed = await this.instanceRepo.update(
-      { id: instance.id, status: 'running' },
+      claimWhere,
       {
         currentNodeKey: 'start',
         visitedNodeKeys: ['start'],
@@ -1081,6 +1183,10 @@ export class WorkflowEngine {
     if (!claimed.affected) {
       throw new ConflictException('单据状态已变化，请刷新后再看');
     }
+    await this.taskRepo.update(
+      { instanceId: instance.id, status: 'pending' },
+      this.cancelledFields(cancelReason),
+    );
     await this.taskRepo.insert({
       instanceId: instance.id,
       nodeKey: 'start',
@@ -1106,6 +1212,9 @@ export class WorkflowEngine {
     if (instance.status !== 'running') {
       throw new ConflictException('单据状态已变化，请刷新后再看');
     }
+    if (task.round !== instance.round) {
+      throw new ConflictException('这条待办已处理');
+    }
     if (instance.initiatorId !== input.actorId) {
       throw new NotFoundException('待办不存在');
     }
@@ -1126,10 +1235,16 @@ export class WorkflowEngine {
     const task = await this.taskRepo.findOne({ where: { id: taskId } });
     if (!task) throw new NotFoundException('待办不存在');
     const instance = await this.requireInstance(task.instanceId);
-    if (instance.status !== 'running') {
+    // 与 completeTask 相同的三重守卫：旧轮次残留的僵尸待办不能转交/加签/退回
+    if (
+      instance.status !== 'running' ||
+      task.round !== instance.round ||
+      instance.currentNodeKey !== task.nodeKey
+    ) {
       throw new ConflictException('单据状态已变化，请刷新后再看');
     }
     const node = findApproveNode(instance.graph, task.nodeKey);
+    if (!node) throw new NotFoundException('审批节点不存在');
     if (task.status !== 'pending' || task.assigneeId !== actorId) {
       throw new ConflictException('这条待办已处理');
     }
@@ -1223,4 +1338,13 @@ function truncateVisited(
   const keys = visited || [];
   const index = keys.lastIndexOf(keepThrough);
   return index >= 0 ? keys.slice(0, index + 1) : [keepThrough];
+}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  const error = err as { code?: string; errno?: number } | null;
+  return (
+    error?.code === 'ER_DUP_ENTRY' ||
+    error?.errno === 1062 ||
+    error?.code === '23505'
+  );
 }

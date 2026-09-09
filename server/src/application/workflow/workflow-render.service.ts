@@ -111,9 +111,8 @@ export class WorkflowRenderService {
       (instance.status === 'draft' ||
         instance.status === 'rejected' ||
         instance.status === 'error' ||
-        (instance.status === 'running' &&
-          instance.currentNodeKey === 'start' &&
-          initiatorWritableKeys !== null));
+        // initiatorWritableKeys 为 null 表示这张图没配开始节点字段权限，按全部可编辑处理
+        (instance.status === 'running' && instance.currentNodeKey === 'start'));
     for (const mapping of linkage?.fieldMappings || []) {
       const writable =
         (initiatorEditable &&
@@ -136,9 +135,8 @@ export class WorkflowRenderService {
       (instance.status === 'draft' ||
         instance.status === 'rejected' ||
         instance.status === 'error' ||
-        (instance.status === 'running' &&
-          instance.currentNodeKey === 'start' &&
-          initiatorWritableKeys !== null));
+        // initiatorWritableKeys 为 null 表示这张图没配开始节点字段权限，按全部可编辑处理
+        (instance.status === 'running' && instance.currentNodeKey === 'start'));
     if (
       initiatorEditable &&
       (!initiatorWritableKeys || initiatorWritableKeys.has(fieldKey))

@@ -298,11 +298,15 @@ function onTabChange(name) {
   })
 }
 
+let loadSeq = 0
 async function loadDetail() {
   if (!props.modelValue || !props.itemId) return
+  // 快速切换列表项时，慢的旧响应不能覆盖新打开的单据
+  const seq = ++loadSeq
   loading.value = true
   try {
     const next = await getWorkflowInboxDetailApi(props.kind, props.itemId)
+    if (seq !== loadSeq) return
     detail.value = next
     const data = next.record?.data || {}
     for (const key of Object.keys(values)) {
@@ -310,9 +314,10 @@ async function loadDetail() {
     }
     Object.assign(values, cloneRecordValues(next.form?.fields || [], data))
   } catch {
+    if (seq !== loadSeq) return
     detail.value = null
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
@@ -339,6 +344,17 @@ async function runAction(fn) {
 function onApprove() {
   if (detail.value?.commentRequiredOnApprove && !comment.value.trim()) {
     ElMessage.warning('请填写审批意见')
+    return
+  }
+  // 审批人可改的字段同样受必填约束，先在前端拦一次并跳到对应字段，
+  // 不然要等服务端报 400 才知道没填
+  const err = firstRequiredError(detail.value?.form?.fields || [], values, {
+    workflowForm: true,
+    fieldAccess: gridFieldAccess.value,
+  })
+  if (err) {
+    ElMessage.warning(err.message)
+    gridRef.value?.revealField(err.key)
     return
   }
   return runAction(async () => {

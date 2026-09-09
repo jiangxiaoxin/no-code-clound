@@ -139,7 +139,15 @@ export class WorkflowDefinitionService {
       graph: JSON.parse(JSON.stringify(from.graph)) as WorkflowGraph,
       enabled: false,
     });
-    return this.versionRepo.save(created);
+    try {
+      return await this.versionRepo.save(created);
+    } catch (err) {
+      // 并发「添加新版本」算出同一个号：撞唯一键后取最新号重试一次
+      if (!isDuplicateKeyError(err)) throw err;
+      const fresh = await this.versionRepo.find({ where: { formId } });
+      created.version = Math.max(0, ...fresh.map((row) => row.version)) + 1;
+      return await this.versionRepo.save(created);
+    }
   }
 
   async enableVersion(
@@ -160,9 +168,13 @@ export class WorkflowDefinitionService {
     if (errors.length) {
       throw new BadRequestException(errors);
     }
-    await this.versionRepo.update({ formId }, { enabled: false });
-    row.enabled = true;
-    await this.versionRepo.save(row);
+    // 先全关再开这一行必须在一个事务里：并发启用会出现两行 enabled=true，
+    // 关闭到打开的间隙里 getRuntime 取不到启用版，新提交会被当成「停用期间保存」直接记为已通过
+    await this.versionRepo.manager.transaction(async (manager) => {
+      await manager.update(WorkflowVersion, { formId }, { enabled: false });
+      // 只翻 enabled 位，不整行 save，避免用读到的旧图覆盖并发保存的新图
+      await manager.update(WorkflowVersion, { id: row.id }, { enabled: true });
+    });
     def.hasBeenEnabled = true;
     await this.defRepo.save(def);
     return { ok: true };
@@ -273,4 +285,13 @@ export class WorkflowDefinitionService {
     }
     return errors;
   }
+}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  const error = err as { code?: string; errno?: number } | null;
+  return (
+    error?.code === 'ER_DUP_ENTRY' ||
+    error?.errno === 1062 ||
+    error?.code === '23505'
+  );
 }

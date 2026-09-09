@@ -76,6 +76,31 @@ describe('coerceRecordData', () => {
     ).toThrow('[子表单.物料名称]不能为空');
   });
 
+  it('必填子列被设为不可见后，空行不再拿隐藏必填拦人', () => {
+    // 隐藏列在填报界面不渲染，用户留空的行不能拿它当必填报错
+    const out = coerceRecordData(
+      [
+        {
+          key: 'lines',
+          type: 'subform',
+          title: '子表单',
+          fields: [
+            {
+              key: 'name',
+              type: 'input',
+              title: '物料名称',
+              required: true,
+              visible: false,
+            },
+            { key: 'qty', type: 'number', title: '数量' },
+          ],
+        },
+      ],
+      { lines: [{ name: '', qty: null }] },
+    );
+    expect(out.lines).toEqual([]);
+  });
+
   it('stores image urls as an array', () => {
     expect(
       coerceRecordData(fields, { pics: ['/uploads/a.png'] }),

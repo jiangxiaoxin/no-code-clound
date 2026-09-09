@@ -275,7 +275,9 @@ export class FormRecordService {
     const status = existing.workflowStatus as InstanceStatus | undefined;
     const instance = await this.findInstance(formId, recordId, existing.workflowInstanceId);
 
-    if (status === 'running') {
+    // MySQL 实例行才是真相：Mongo 的 workflowStatus 曾因历史写失败残留旧值时，
+    // 不能放行对一张实际审批中的单据的编辑
+    if (status === 'running' || instance?.status === 'running') {
       throw new BadRequestException(
         '审批中的数据不能编辑，请到「我发起的」撤回或等待审批',
       );
@@ -337,6 +339,10 @@ export class FormRecordService {
       !status
     ) {
       if (instance) this.assertInitiator(instance, actorId);
+      // 已提交过的单（撤回/驳回/异常）按实例钉死的图算字段权限，
+      // 提交时也走那张图；没提交过的草稿才用当前启用版
+      const graphForAccess =
+        instance && instance.round > 0 ? instance.graph : runtime.graph;
       const doc = await this.persist.persist({
         form,
         actorId,
@@ -344,7 +350,7 @@ export class FormRecordService {
         ...prepareStartPersistInput(
           data,
           parseFormSchema(form.fields).fields,
-          runtime.graph,
+          graphForAccess,
           existing?.data,
         ),
       });

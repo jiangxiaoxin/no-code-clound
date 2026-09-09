@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseIntPipe,
   Post,
@@ -77,10 +78,14 @@ export class WorkflowController {
   @Get('inbox/:kind/:id')
   openInbox(
     @Req() req: { user: { id: number } },
-    @Param('kind') kind: 'todo' | 'mine' | 'done' | 'cc',
+    @Param('kind') kind: string,
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.inbox.open(req.user.id, kind, id);
+    // 不校验 kind 会落进 open 的 else 分支，跑出语义错误的默认响应
+    if (!['todo', 'mine', 'done', 'cc'].includes(kind)) {
+      throw new NotFoundException('待办不存在');
+    }
+    return this.inbox.open(req.user.id, kind as 'todo' | 'mine' | 'done' | 'cc', id);
   }
 
   @Post('tasks/:taskId/complete')
