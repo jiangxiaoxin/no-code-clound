@@ -1,0 +1,27 @@
+---
+description: 项目相关的 SQL 迁移脚本统一放在 server/sql/
+alwaysApply: true
+---
+
+# SQL 脚本放在 server/sql/
+
+与项目有关的 SQL（建表、改表、补列、索引、数据补丁）**一律写入 `server/sql/`**，不要散落到 `server/` 根目录、`docs/`、临时 `.mjs` 或其它目录。
+
+## 要求
+
+- 新建或修改迁移脚本：只动 `server/sql/` 下文件；文件名用 `YYYY-MM-DD-简短说明.sql`，与现有脚本风格一致（如 `2026-09-06-workflow-form.sql`）。
+- 需要改已有表结构时，**优先追加新的 dated 脚本**，不要直接改已经跑过的旧脚本（除非使用者明确说可以改历史脚本且库会重建）。
+- 脚本内容用 **UTF-8（无 BOM）**；注释和说明写人话，必要时在 `docs/testcases/README.md` 或专项用例里写「开始前先执行哪几个 `.sql`」。
+- **默认只生成、不执行**：除非使用者用明确语句点名某个 `server/sql/…` 路径，否则不要对目标库运行迁移。
+- 不要用 `server/tmp-run-*.mjs` 之类临时 runner 代替正式脚本；若需要本地一键执行，应指向 `server/sql/` 里的文件，而不是把 SQL 嵌在别处。
+
+```text
+# ❌ BAD
+server/patch-workflow.sql
+docs/migration/add-column.sql
+server/tmp-run-foo.mjs 里写一长串 CREATE TABLE
+
+# ✅ GOOD
+server/sql/2026-09-09-workflow-xxx.sql
+docs/testcases/README.md 里写：先执行 server/sql/2026-09-09-workflow-xxx.sql
+```
