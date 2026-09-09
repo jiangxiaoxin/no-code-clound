@@ -1282,6 +1282,29 @@ export class WorkflowEngine {
     instance.retryStep = 'dispatch';
   }
 
+  // 打开详情时顺手取消「僵尸待办」，判定与待办列表/角标的过滤条件同源。
+  // 例外：异常单在当前节点等待重试的待办是活的（重试后要靠它数会签人数），不能取消。
+  async cancelStaleTodoTask(
+    instance: WorkflowInstance,
+    task: WorkflowTask,
+  ): Promise<{
+    status: 'cancelled';
+    cancelReason: string;
+    finishedAt: Date;
+  } | null> {
+    const fresh =
+      task.round === instance.round &&
+      instance.currentNodeKey === task.nodeKey &&
+      (instance.status === 'running' || instance.status === 'error');
+    if (fresh) return null;
+    const fields = this.cancelledFields('单据状态已变化，待办自动撤回');
+    const healed = await this.taskRepo.update(
+      { id: task.id, status: 'pending' },
+      fields,
+    );
+    return healed.affected ? fields : null;
+  }
+
   private async requireInstance(id: number) {
     const instance = await this.instanceRepo.findOne({ where: { id } });
     if (!instance) throw new NotFoundException('单据不存在');

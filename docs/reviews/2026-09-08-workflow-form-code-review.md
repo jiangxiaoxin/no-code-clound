@@ -16,7 +16,7 @@
 
 ## 怎么验证的
 
-- 后端全量单测：**38 个测试文件、431 条全部通过**（`cd server && npx jest`）。其中 13 条是本轮新增的回归用例（`workflow.review-bugs-0908.spec.ts`、`form-record.persist.constraints.spec.ts`、`workflow.graph.spec.ts` 与 `form-record.coerce.spec.ts` 各有补充），每条对应本文一个问题。
+- 后端全量单测：**38 个测试文件、441 条全部通过**（`cd server && npx jest`）。其中 23 条是本轮新增的回归用例（`workflow.review-bugs-0908.spec.ts`、`workflow-inbox.service.spec.ts`、`form-record.persist.constraints.spec.ts`、`workflow.graph.spec.ts` 与 `form-record.coerce.spec.ts` 各有补充），每条对应本文一个问题。
 - 前端单测：**221 条全部通过**（`cd front && node --test "src/**/*.spec.js"`），含连线规则 3 条新用例。
 - 引擎、版本服务、渲染服务逐行复读；`transfer`/`addSign`/`returnTo`/`retry` 的并发时序手工推演；LogicFlow 键盘行为查了 `node_modules` 里 mousetrap 的源码确认「自定义快捷键无法覆盖默认行为」。
 - 手工测试用例按 AGENTS.md 约定同步更新三处（专项、组合、README）。
@@ -183,12 +183,24 @@
 
 **修复：** `workflow.controller.ts` 的 `openInbox` 对 `kind` 做白名单校验，非法值返回 404「待办不存在」，不再把任意字符串透传给查询。
 
+### 25. 僵尸待办不再出现在列表和角标里（2026-09-09 追加，收尾存疑第 2 条）
+
+**界面上会看到什么（修复前）：** 历史遗留的僵尸待办一直挂在某人的【我的待办】列表和顶栏角标里，点【同意】被 409 拦下，提示「请刷新后再看」但刷新也弄不走它。
+
+**为什么：** 待办列表和角标计数只按 `status = pending` 查（`workflow-inbox.service.ts` 的 `query`/`count`），不校验轮次和当前节点；操作侧守卫只保证点不动，查询侧不拦。
+
+**怎么修：** 两层，都是随部署自动生效、不需要任何人工脚本——
+- **查询侧过滤**：`query` 与 `count` 共用 `filterFreshTodo`，待办必须「单据审批中 + 轮次一致 + 当前节点一致」才出现在列表和角标里，判定与服务端操作守卫同源。退回发起人的重新提交待办天然被覆盖（退回后实例仍是审批中、当前节点就是开始节点）；异常单等待重试的待办会被临时隐藏，重试翻回审批中后重新出现。
+- **惰性自愈**：打开待办详情时（`open`）发现待办落在旧轮次或别的节点，顺手把它取消（条件更新防并发，取消原因「单据状态已变化，待办自动撤回」），进度时间线同步显示。**例外**：异常单在当前节点等待重试的会签待办不能取消——重试续跑时要靠它数「还有人没批」。
+
+**测试：** `workflow.review-bugs-0908.spec.ts` +7（取消方法各分支，含异常单例外）、`workflow-inbox.service.spec.ts` +3（列表过滤、角标过滤、打开详情顺手取消）。
+
 ---
 
 ## 没修、存疑或需要产品确认的
 
 1. **隐藏字段的全量数据仍会下发给审批人/抄送人**：详情接口为了渲染完整表单结构，把整条记录数据都带下去了，前端只是不渲染隐藏字段。恶意用户用开发者工具能看到。规格对「隐藏字段是否允许看值」没有明确说法，需要产品拍板后再改接口（改动面：详情按 fieldAccess 裁剪 data）。
-2. **收件箱查询侧不做僵尸待办过滤**：第 2 条修的是操作侧守卫；历史遗留的僵尸待办在列表里仍可能出现，但任何操作都会被 409 拦下，且发起人下次提交时 `cancelAllPending` 会清掉。批量清洗历史数据需要一次性脚本，未纳入本轮。
+2. ~~**收件箱查询侧不做僵尸待办过滤**~~：**已于 2026-09-09 修复，见第 25 条**——列表和角标按轮次/节点过滤，打开详情时旧待办被顺手取消，随部署自动生效，无需一次性清洗脚本。
 3. **重试 dispatch 分支的窄窗口**：翻转状态成功与派单之间若进程崩溃，单据会是「审批中但零待办」；概率极低且下一次打开详情的兜底检查会修正，暂不加表级锁。
 4. **会签写回重试用原始 dataPatch**：`retryPatch` 存的是通过时前端提交的原始补丁；入口处实例服务已按字段权限过滤过 dataPatch，重试直接补写不会越权，维持现状。
 5. **画布 Ctrl+C/V 复制粘贴被移除（已确认为预期行为，2026-09-09）**：修第 15 条后画布不再支持复制粘贴。产品已确认：画布**不允许**用复制粘贴快捷键，这不是缺口，无需补「复制节点」功能；该行为由回归用例 B-27 锁定（见 `docs/testcases/2026-09-08-workflow-supplement-test-cases.md` §8 与 README「不要测」）。
@@ -197,7 +209,7 @@
 
 ## 修复涉及的文件
 
-- 服务端：`server/src/application/workflow/workflow.engine.ts`（第 1/2/3/4/5/11/12 条）、`workflow.graph.ts`（6）、`workflow-render.service.ts`（7）、`workflow-definition.service.ts`（9/10）、`workflow.controller.ts`（24）、`form-record/form-record.persist.ts` + `form-record.coerce.ts`（8）、`form-record/form-record.service.ts`（13）
+- 服务端：`server/src/application/workflow/workflow.engine.ts`（第 1/2/3/4/5/11/12/25 条）、`workflow-inbox.service.ts`（25）、`workflow.graph.ts`（6）、`workflow-render.service.ts`（7）、`workflow-definition.service.ts`（9/10）、`workflow.controller.ts`（24）、`form-record/form-record.persist.ts` + `form-record.coerce.ts`（8）、`form-record/form-record.service.ts`（13）
 - 前端：`front/src/components/workflow-design/WorkflowDesignPanel.vue`（15/16/18/23）、`workflowConnectRules.js`（17）、`front/src/components/workflow-inbox/WorkflowInboxDrawer.vue`（14/19）、`front/src/views/AppWorkspaceView.vue`（20/21）、`front/src/components/form-workspace/FormRecordDetailDrawer.vue`（20）、`front/src/components/AppHeader.vue`（21）、`front/src/components/form-fill/FormMemberSelect.vue`（22）、`front/src/components/workflow-design/WorkflowNodeProps.vue`（23）
-- 新增测试：`workflow.review-bugs-0908.spec.ts`（7 条）、`form-record.persist.constraints.spec.ts`（3 条）、`workflow.graph.spec.ts` +1、`form-record.coerce.spec.ts` +1、`workflowConnectRules.spec.js` +3
-- 手工用例：`docs/testcases/2026-09-08-workflow-supplement-test-cases.md`（B-22～B-30）、组合用例与 README 同步更新
+- 新增测试：`workflow.review-bugs-0908.spec.ts`（14 条）、`workflow-inbox.service.spec.ts` +3、`form-record.persist.constraints.spec.ts`（3 条）、`workflow.graph.spec.ts` +1、`form-record.coerce.spec.ts` +1、`workflowConnectRules.spec.js` +3
+- 手工用例：`docs/testcases/2026-09-08-workflow-supplement-test-cases.md`（B-22～B-31）、README 同步更新

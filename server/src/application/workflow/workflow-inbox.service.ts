@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Department } from '../../admin/department/department.entity';
 import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
@@ -90,6 +90,7 @@ export class WorkflowInboxService {
       .take(pageSize);
     if (kind === 'todo') {
       qb.andWhere('task.status = :status', { status: 'pending' });
+      this.filterFreshTodo(qb);
     } else if (kind === 'cc') {
       qb.andWhere('task.action = :action', { action: 'cc' });
     } else {
@@ -121,8 +122,17 @@ export class WorkflowInboxService {
       .innerJoin(WorkflowInstance, 'instance', 'instance.id = task.instanceId')
       .where('task.assigneeId = :userId', { userId })
       .andWhere('task.status = :status', { status: 'pending' });
+    this.filterFreshTodo(qb);
     if (appId) qb.andWhere('instance.appId = :appId', { appId });
     return { todo: await qb.getCount() };
+  }
+
+  // 僵尸待办过滤：与操作守卫同一判定（见 WorkflowEngine.cancelStaleTodoTask）。
+  // 异常单等待重试的待办这里也会被隐藏（操作侧本来就 409），重试翻回审批中会重新出现。
+  private filterFreshTodo(qb: SelectQueryBuilder<WorkflowTask>) {
+    qb.andWhere('instance.status = :running', { running: 'running' });
+    qb.andWhere('task.round = instance.round');
+    qb.andWhere('instance.currentNodeKey = task.nodeKey');
   }
 
   async open(userId: number, kind: 'todo' | 'mine' | 'done' | 'cc', id: number) {
@@ -149,6 +159,10 @@ export class WorkflowInboxService {
       }
       instance = await this.instanceRepo.findOne({ where: { id: task.instanceId } });
       if (!instance) throw new NotFoundException('单据不存在');
+      if (kind === 'todo' && task.status === 'pending') {
+        const healed = await this.engine.cancelStaleTodoTask(instance, task);
+        if (healed) Object.assign(task, healed);
+      }
     }
     const form = await this.formRepo.findOne({ where: { id: instance.formId } });
     if (!form) throw new NotFoundException('表单不存在');

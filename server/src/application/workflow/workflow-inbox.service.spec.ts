@@ -33,7 +33,7 @@ describe('WorkflowInboxService', () => {
   const departmentRepo = { find: jest.fn() };
   const store = { findById: jest.fn() };
   const dictionary = { listEnabledItemsByApp: jest.fn() };
-  const engine = { markStuckByDisabledApprovers: jest.fn() };
+  const engine = { markStuckByDisabledApprovers: jest.fn(), cancelStaleTodoTask: jest.fn() };
   const definition = { getRuntime: jest.fn() };
 
   function qb(result: { items: unknown[]; total: number }) {
@@ -92,6 +92,7 @@ describe('WorkflowInboxService', () => {
     departmentRepo.find.mockResolvedValue([]);
     dictionary.listEnabledItemsByApp.mockResolvedValue([]);
     definition.getRuntime.mockResolvedValue({ graph: {} });
+    engine.cancelStaleTodoTask.mockResolvedValue(null);
     const module = await Test.createTestingModule({
       providers: [
         WorkflowInboxService,
@@ -672,5 +673,95 @@ describe('WorkflowInboxService', () => {
     const result = await service.query(5, { kind: 'todo', page: 1, pageSize: 20 });
     expect(result.items[0].currentNodeTitle).toBe('待发起人修改');
     expect(result.items[0].statusText).toBe('待发起人修改');
+  });
+
+  it('todo 列表把轮次或节点已落后的僵尸待办过滤掉', async () => {
+    const chain = qb({ items: [], total: 0 });
+    taskRepo.createQueryBuilder.mockReturnValue(chain);
+    await service.query(21, { kind: 'todo', page: 1, pageSize: 20 });
+    expect(chain.andWhere).toHaveBeenCalledWith('task.status = :status', {
+      status: 'pending',
+    });
+    expect(chain.andWhere).toHaveBeenCalledWith('instance.status = :running', {
+      running: 'running',
+    });
+    expect(chain.andWhere).toHaveBeenCalledWith('task.round = instance.round');
+    expect(chain.andWhere).toHaveBeenCalledWith(
+      'instance.currentNodeKey = task.nodeKey',
+    );
+  });
+
+  it('待办角标计数用同一套过滤，列表与角标一致', async () => {
+    const chain = qb({ items: [], total: 0 });
+    taskRepo.createQueryBuilder.mockReturnValue(chain);
+    await service.count(21);
+    expect(chain.andWhere).toHaveBeenCalledWith('task.status = :status', {
+      status: 'pending',
+    });
+    expect(chain.andWhere).toHaveBeenCalledWith('instance.status = :running', {
+      running: 'running',
+    });
+    expect(chain.andWhere).toHaveBeenCalledWith('task.round = instance.round');
+    expect(chain.andWhere).toHaveBeenCalledWith(
+      'instance.currentNodeKey = task.nodeKey',
+    );
+  });
+
+  it('打开旧轮次的 todo 待办时顺手取消，详情只读且进度显示取消', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 3,
+      assigneeId: 21,
+      status: 'pending',
+      instanceId: 1,
+      nodeKey: 'n1',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'running',
+      appId: 8,
+      formId: 12,
+      recordId: 'aaaaaaaaaaaaaaaaaaaaaaaa',
+      graph: { nodes: [{ key: 'n2', type: 'approve', title: '总监审批' }] },
+      currentNodeKey: 'n2',
+      visitedNodeKeys: ['start', 'n1', 'n2'],
+      round: 2,
+      errorReason: null,
+      notes: [],
+      hasApproved: true,
+    });
+    engine.cancelStaleTodoTask.mockResolvedValue({
+      status: 'cancelled',
+      cancelReason: '单据状态已变化，待办自动撤回',
+      finishedAt: new Date(),
+    });
+    taskRepo.find.mockResolvedValue([
+      {
+        id: 3,
+        nodeKey: 'n1',
+        round: 1,
+        assigneeId: 21,
+        status: 'cancelled',
+        action: null,
+        cancelReason: '单据状态已变化，待办自动撤回',
+        createdAt: new Date(),
+      },
+    ]);
+    formRepo.findOne.mockResolvedValue({ id: 12, name: '请假单', fields: [] });
+    store.findById.mockResolvedValue({ data: {} });
+    userRepo.find.mockResolvedValue([
+      { id: 5, displayName: '张三', status: 'active' },
+      { id: 21, displayName: '经理', status: 'active' },
+    ]);
+
+    const detail = await service.open(21, 'todo', 3);
+    expect(engine.cancelStaleTodoTask).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.objectContaining({ id: 3 }),
+    );
+    expect(detail.actions.canApprove).toBe(false);
+    const row = detail.tasks.find((item) => item.id === 3);
+    expect(row?.status).toBe('cancelled');
   });
 });

@@ -265,6 +265,90 @@ describe('评审问题复现：workflow.engine 转交/加签/必填（2026-09-08
     expect(startedCall).toBeTruthy();
     expect(startedCall![1]).not.toHaveProperty('graph');
   });
+
+  it('【僵尸待办】打开详情时旧轮次的待办被顺手取消', async () => {
+    const healed = await engine.cancelStaleTodoTask(
+      runningInstance({ round: 2 }),
+      pendingTask({ round: 1 }),
+    );
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { id: 11, status: 'pending' },
+      expect.objectContaining({
+        status: 'cancelled',
+        cancelReason: '单据状态已变化，待办自动撤回',
+      }),
+    );
+    expect(healed).toEqual(
+      expect.objectContaining({
+        status: 'cancelled',
+        cancelReason: '单据状态已变化，待办自动撤回',
+      }),
+    );
+  });
+
+  it('【僵尸待办】单据已不在运行状态时待办也被顺手取消', async () => {
+    await engine.cancelStaleTodoTask(
+      runningInstance({ status: 'approved' }),
+      pendingTask(),
+    );
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { id: 11, status: 'pending' },
+      expect.objectContaining({ status: 'cancelled' }),
+    );
+  });
+
+  it('【僵尸待办】单据已走到别的节点时待办也被顺手取消', async () => {
+    await engine.cancelStaleTodoTask(
+      runningInstance({ currentNodeKey: 'n2' }),
+      pendingTask(),
+    );
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { id: 11, status: 'pending' },
+      expect.objectContaining({ status: 'cancelled' }),
+    );
+  });
+
+  it('【僵尸待办】轮次节点都吻合的有效待办不会被误取消', async () => {
+    const healed = await engine.cancelStaleTodoTask(
+      runningInstance(),
+      pendingTask(),
+    );
+    expect(healed).toBeNull();
+    expect(taskRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('【僵尸待办】条件更新没抢到（已被并发处理）时不报生效', async () => {
+    taskRepo.update.mockResolvedValue({ affected: 0 });
+    const healed = await engine.cancelStaleTodoTask(
+      runningInstance({ round: 2 }),
+      pendingTask({ round: 1 }),
+    );
+    expect(healed).toBeNull();
+  });
+
+  it('【僵尸待办】异常单在当前节点等待重试的会签待办是活的，不能被顺手取消', async () => {
+    const healed = await engine.cancelStaleTodoTask(
+      runningInstance({ status: 'error', retryStep: 'mongo' }),
+      pendingTask(),
+    );
+    expect(healed).toBeNull();
+    expect(taskRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('【僵尸待办】异常单上落在其他节点的待办仍会被顺手取消', async () => {
+    await engine.cancelStaleTodoTask(
+      runningInstance({
+        status: 'error',
+        retryStep: 'mongo',
+        currentNodeKey: 'n2',
+      }),
+      pendingTask(),
+    );
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { id: 11, status: 'pending' },
+      expect.objectContaining({ status: 'cancelled' }),
+    );
+  });
 });
 
 describe('评审问题复现：workflow.render 旧图在开始节点可编辑（2026-09-08 轮）', () => {
