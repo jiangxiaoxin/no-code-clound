@@ -76,6 +76,31 @@ describe('coerceRecordData', () => {
     ).toThrow('[子表单.物料名称]不能为空');
   });
 
+  it('drops empty subform row when the only required child is hidden', () => {
+    expect(
+      coerceRecordData(
+        [
+          {
+            key: 'lines',
+            type: 'subform',
+            title: '子表单',
+            fields: [
+              {
+                key: 'name',
+                type: 'input',
+                title: '内部备注',
+                required: true,
+                visible: false,
+              },
+              { key: 'qty', type: 'number' },
+            ],
+          },
+        ],
+        { lines: [{ name: '', qty: null }] },
+      ),
+    ).toEqual({ lines: [] });
+  });
+
   it('stores image urls as an array', () => {
     expect(
       coerceRecordData(fields, { pics: ['/uploads/a.png'] }),

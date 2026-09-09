@@ -29,7 +29,6 @@ export function prepareStartPersistInput(
   data: Record<string, unknown>,
   fields: FormField[] | null | undefined,
   graph: WorkflowGraph | null | undefined,
-  existing?: Record<string, unknown> | null,
 ): { data: Record<string, unknown>; requiredKeys: string[] | 'all' } {
   const fieldAccess = startNodeOf(graph)?.fieldAccess;
   if (!fieldAccess || !Object.keys(fieldAccess).length) {
@@ -42,15 +41,7 @@ export function prepareStartPersistInput(
   for (const field of flat) {
     const key = field.key!;
     const access = resolveStartFieldAccess(fieldAccess, key);
-    if (access === 'hidden') continue;
-    if (access === 'editable' && key in data) {
-      picked[key] = data[key];
-      continue;
-    }
-    if (existing && key in existing) {
-      picked[key] = existing[key];
-      continue;
-    }
+    if (access !== 'editable') continue;
     if (key in data) picked[key] = data[key];
   }
   const requiredKeys = flat
