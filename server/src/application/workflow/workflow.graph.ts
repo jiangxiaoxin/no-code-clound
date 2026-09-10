@@ -208,14 +208,84 @@ function asNumber(value: unknown): number | null {
 
 function asText(value: unknown): string {
   if (value == null) return '';
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isNaN(t) ? '' : String(t);
+  }
   if (Array.isArray(value)) return value.map((item) => String(item)).join(',');
   return String(value);
 }
 
+function toInstant(value: unknown): number | null {
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isNaN(t) ? null : t;
+  }
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const wall = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/,
+  );
+  if (wall) {
+    return new Date(
+      Number(wall[1]),
+      Number(wall[2]) - 1,
+      Number(wall[3]),
+      Number(wall[4] || 0),
+      Number(wall[5] || 0),
+      Number(wall[6] || 0),
+    ).getTime();
+  }
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function compareOrdered(left: unknown, right: unknown, op: string): boolean {
+  const ln = asNumber(left);
+  const rn = asNumber(right);
+  if (ln != null && rn != null) {
+    if (op === 'gt') return ln > rn;
+    if (op === 'gte') return ln >= rn;
+    if (op === 'lt') return ln < rn;
+    if (op === 'lte') return ln <= rn;
+    if (op === 'eq') return ln === rn;
+    if (op === 'ne') return ln !== rn;
+  }
+  const lt = toInstant(left);
+  const rt = toInstant(right);
+  if (lt != null && rt != null) {
+    if (op === 'gt') return lt > rt;
+    if (op === 'gte') return lt >= rt;
+    if (op === 'lt') return lt < rt;
+    if (op === 'lte') return lt <= rt;
+    if (op === 'eq') return lt === rt;
+    if (op === 'ne') return lt !== rt;
+  }
+  const ls = asText(left);
+  const rs = asText(right);
+  if (op === 'gt') return ls > rs;
+  if (op === 'gte') return ls >= rs;
+  if (op === 'lt') return ls < rs;
+  if (op === 'lte') return ls <= rs;
+  if (op === 'eq') return ls === rs;
+  if (op === 'ne') return ls !== rs;
+  return false;
+}
+
+function resolveRight(
+  item: { value?: unknown; valueType?: string },
+  data: Record<string, unknown>,
+): unknown {
+  if (item.valueType === 'field' && typeof item.value === 'string' && item.value) {
+    return data[item.value];
+  }
+  return item.value;
+}
+
 function matchItem(
-  item: { key: string; op: string; value?: unknown },
+  item: { key: string; op: string; value?: unknown; valueType?: string },
   data: Record<string, unknown>,
 ): boolean {
+  if (item.valueType === 'dynamic') return false;
   if (item.value != null && typeof item.value === 'object' && !Array.isArray(item.value)) {
     const kind = (item.value as { kind?: string }).kind;
     if (kind === 'dynamic') return false;
@@ -224,30 +294,29 @@ function matchItem(
   const op = item.op;
   if (op === 'empty') return isEmptyValue(left);
   if (op === 'nempty') return !isEmptyValue(left);
+  const right = resolveRight(item, data);
+  if (op === 'between') {
+    if (!Array.isArray(right) || right.length < 2) return false;
+    if (isEmptyValue(left) || isEmptyValue(right[0]) || isEmptyValue(right[1])) {
+      return false;
+    }
+    return (
+      compareOrdered(left, right[0], 'gte') && compareOrdered(left, right[1], 'lte')
+    );
+  }
   if (op === 'eq') {
-    if (Array.isArray(left)) return left.map(String).includes(asText(item.value));
-    return asText(left) === asText(item.value);
+    if (Array.isArray(left)) return left.map(String).includes(asText(right));
+    return compareOrdered(left, right, 'eq');
   }
   if (op === 'ne') {
-    if (Array.isArray(left)) return !left.map(String).includes(asText(item.value));
-    return asText(left) !== asText(item.value);
+    if (Array.isArray(left)) return !left.map(String).includes(asText(right));
+    return compareOrdered(left, right, 'ne');
   }
-  if (op === 'contains') return asText(left).includes(asText(item.value));
-  if (op === 'ncontains') return !asText(left).includes(asText(item.value));
-  const ln = asNumber(left);
-  const rn = asNumber(item.value);
-  if (ln != null && rn != null) {
-    if (op === 'gt') return ln > rn;
-    if (op === 'gte') return ln >= rn;
-    if (op === 'lt') return ln < rn;
-    if (op === 'lte') return ln <= rn;
+  if (op === 'contains') return asText(left).includes(asText(right));
+  if (op === 'ncontains') return !asText(left).includes(asText(right));
+  if (op === 'gt' || op === 'gte' || op === 'lt' || op === 'lte') {
+    return compareOrdered(left, right, op);
   }
-  const ls = asText(left);
-  const rs = asText(item.value);
-  if (op === 'gt') return ls > rs;
-  if (op === 'gte') return ls >= rs;
-  if (op === 'lt') return ls < rs;
-  if (op === 'lte') return ls <= rs;
   return false;
 }
 

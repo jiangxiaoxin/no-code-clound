@@ -2,6 +2,7 @@ import { FormField } from '../form-record/form-record.types';
 import { WorkflowGraph } from './workflow.types';
 import {
   allowResubmitAfterTerminated,
+  matchEdgeCondition,
   nextStay,
   prepareStartPersistInput,
   previousApproveNodeKey,
@@ -352,5 +353,128 @@ describe('workflow.graph 抄送', () => {
         graph,
       ),
     ).toEqual({ data: { field_reason: '事假' }, requiredKeys: ['field_reason'] });
+  });
+});
+
+function dateRangeGraph(): WorkflowGraph {
+  return {
+    nodes: [
+      { key: 'start', type: 'start', title: '开始', x: 0, y: 0 },
+      { key: 'br1', type: 'branch', title: '按开始日期', x: 0, y: 1 },
+      {
+        key: 'n1',
+        type: 'approve',
+        title: '部门审批',
+        x: 0,
+        y: 2,
+        approver: { userIds: [1], roleIds: [], memberFieldKeys: [] },
+        signMode: 'any',
+        commentRequiredOnApprove: false,
+        fieldAccess: {},
+      },
+      {
+        key: 'n2',
+        type: 'approve',
+        title: '人事备案',
+        x: 0,
+        y: 3,
+        approver: { userIds: [2], roleIds: [], memberFieldKeys: [] },
+        signMode: 'any',
+        commentRequiredOnApprove: false,
+        fieldAccess: {},
+      },
+      { key: 'end', type: 'end', title: '结束', x: 0, y: 4 },
+    ],
+    edges: [
+      { key: 'e1', from: 'start', to: 'br1' },
+      {
+        key: 'e2',
+        from: 'br1',
+        to: 'n1',
+        title: '本月',
+        sort: 1,
+        when: {
+          logic: 'all',
+          items: [
+            {
+              key: 'field_start',
+              op: 'between',
+              value: ['2026-09-01', '2026-09-30'],
+            },
+          ],
+        },
+      },
+      { key: 'e3', from: 'br1', to: 'n2', sort: 2, isDefault: true },
+      { key: 'e4', from: 'n1', to: 'end' },
+      { key: 'e5', from: 'n2', to: 'end' },
+    ],
+  };
+}
+
+describe('workflow.graph 分支条件', () => {
+  it('日期选择范围命中时走条件连线，不要落到其他情况', () => {
+    expect(
+      nextStay(dateRangeGraph(), 'start', { field_start: '2026-09-10' }),
+    ).toMatchObject({ kind: 'approve', nodeKey: 'n1' });
+  });
+
+  it('日期选择范围两端也算命中', () => {
+    expect(
+      nextStay(dateRangeGraph(), 'start', { field_start: '2026-09-01' }),
+    ).toMatchObject({ kind: 'approve', nodeKey: 'n1' });
+    expect(
+      nextStay(dateRangeGraph(), 'start', { field_start: '2026-09-30' }),
+    ).toMatchObject({ kind: 'approve', nodeKey: 'n1' });
+  });
+
+  it('日期不在选择范围内走其他情况', () => {
+    expect(
+      nextStay(dateRangeGraph(), 'start', { field_start: '2026-08-31' }),
+    ).toMatchObject({ kind: 'approve', nodeKey: 'n2' });
+  });
+
+  it('日期时间选择范围按入库的 Date 判断', () => {
+    const when = {
+      logic: 'all' as const,
+      items: [
+        {
+          key: 'field_at',
+          op: 'between',
+          value: ['2026-09-01 00:00:00', '2026-09-30 23:59:59'],
+        },
+      ],
+    };
+    expect(
+      matchEdgeCondition(when, { field_at: new Date(2026, 8, 10, 12, 0, 0) }),
+    ).toBe(true);
+    expect(
+      matchEdgeCondition(when, { field_at: new Date(2026, 7, 31, 23, 59, 59) }),
+    ).toBe(false);
+  });
+
+  it('开始日期等于结束日期按另一列的值比，不要拿字段 key 当字面量', () => {
+    const when = {
+      logic: 'all' as const,
+      items: [
+        {
+          key: 'field_start',
+          op: 'eq',
+          value: 'field_end',
+          valueType: 'field',
+        },
+      ],
+    };
+    expect(
+      matchEdgeCondition(when, {
+        field_start: '2026-09-10',
+        field_end: '2026-09-10',
+      }),
+    ).toBe(true);
+    expect(
+      matchEdgeCondition(when, {
+        field_start: '2026-09-10',
+        field_end: '2026-09-11',
+      }),
+    ).toBe(false);
   });
 });
