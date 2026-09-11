@@ -77,6 +77,9 @@ export class WorkflowInstance {
   startedAt: Date | null;
 
   @Column({ type: 'datetime', precision: 6, nullable: true })
+  dueAt: Date | null;
+
+  @Column({ type: 'datetime', precision: 6, nullable: true })
   endedAt: Date | null;
 
   @CreateDateColumn()

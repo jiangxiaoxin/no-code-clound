@@ -15,6 +15,7 @@ export function emptyDraftGraph() {
         x: 240,
         y: 40,
         allowResubmitAfterTerminated: true,
+        processTimeout: { enabled: false },
       },
     ],
     edges: [],
@@ -43,6 +44,7 @@ export function toLogicflowGraph(product) {
       allowReturnPrevious: node.allowReturnPrevious,
       allowReturnStart: node.allowReturnStart,
       allowResubmitAfterTerminated: node.allowResubmitAfterTerminated,
+      processTimeout: node.processTimeout,
     },
   }))
   const edges = (product?.edges || []).map((edge) => ({
@@ -109,6 +111,7 @@ export function toProductGraph(raw) {
           briefFieldKeys: Array.isArray(props.briefFieldKeys)
             ? props.briefFieldKeys.filter((key) => typeof key === 'string' && key)
             : undefined,
+          processTimeout: props.processTimeout,
         }
       }
       return base

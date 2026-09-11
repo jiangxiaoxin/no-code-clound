@@ -989,4 +989,39 @@ describe('WorkflowEngine 抄送', () => {
       expect.objectContaining({ workflowStatus: 'running' }),
     );
   });
+
+  it('到期自动驳回并取消待办', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        dueAt: new Date(Date.now() - 1000),
+      }),
+    );
+    await expect(engine.expireIfOverdue(1)).resolves.toBe(true);
+    expect(taskRepo.update).toHaveBeenCalledWith(
+      { instanceId: 1, status: 'pending' },
+      expect.objectContaining({
+        status: 'cancelled',
+        cancelReason: '流程已超时',
+      }),
+    );
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1, status: 'running' },
+      expect.objectContaining({ status: 'rejected' }),
+    );
+    expect(store.setWorkflowMeta).toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'rejected' }),
+    );
+  });
+
+  it('未到期不驳回', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        dueAt: new Date(Date.now() + 60_000),
+      }),
+    );
+    await expect(engine.expireIfOverdue(1)).resolves.toBe(false);
+    expect(instanceRepo.update).not.toHaveBeenCalled();
+  });
 });

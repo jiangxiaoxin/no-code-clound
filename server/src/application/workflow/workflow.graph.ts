@@ -2,6 +2,8 @@ import { flattenFields } from '../form-record/flatten-fields';
 import { FormField } from '../form-record/form-record.types';
 import {
   FieldAccess,
+  ProcessTimeout,
+  ProcessTimeoutUnit,
   WorkflowEdge,
   WorkflowEdgeCondition,
   WorkflowGraph,
@@ -14,6 +16,99 @@ const SKIP_FIELD_TYPES = new Set(['relate-subform', 'divider', 'tabs']);
 export function startNodeOf(graph?: WorkflowGraph | null) {
   const node = graph?.nodes?.find((item) => item.type === 'start');
   return node?.type === 'start' ? node : undefined;
+}
+
+const TIMEOUT_UNITS = new Set<ProcessTimeoutUnit>(['minute', 'hour', 'day']);
+const ABSOLUTE_RE =
+  /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/;
+
+export function normalizeProcessTimeout(
+  raw?: ProcessTimeout | null,
+): ProcessTimeout {
+  const input: Partial<ProcessTimeout> =
+    raw && typeof raw === 'object' ? raw : {};
+  const mode = input.mode === 'absolute' ? 'absolute' : 'duration';
+  const duration = Number(input.duration);
+  const durationUnit = TIMEOUT_UNITS.has(input.durationUnit as ProcessTimeoutUnit)
+    ? (input.durationUnit as ProcessTimeoutUnit)
+    : 'hour';
+  return {
+    enabled: Boolean(input.enabled),
+    mode,
+    absoluteAt: typeof input.absoluteAt === 'string' ? input.absoluteAt : '',
+    duration: Number.isInteger(duration) && duration > 0 ? duration : 1,
+    durationUnit,
+  };
+}
+
+export function processTimeoutErrors(raw?: ProcessTimeout | null): string[] {
+  const input: Partial<ProcessTimeout> =
+    raw && typeof raw === 'object' ? raw : {};
+  if (!input.enabled) return [];
+  const mode = input.mode === 'absolute' ? 'absolute' : 'duration';
+  if (mode === 'absolute') {
+    if (!parseAbsoluteAt(input.absoluteAt)) {
+      return ['开始节点已开启流程超时，请填写截止时间（年月日时分秒）'];
+    }
+    return [];
+  }
+  const duration = Number(input.duration);
+  if (!Number.isInteger(duration) || duration < 1) {
+    return ['开始节点已开启流程超时，请填写有效时长'];
+  }
+  if (!TIMEOUT_UNITS.has(input.durationUnit as ProcessTimeoutUnit)) {
+    return ['开始节点已开启流程超时，请选择时长单位'];
+  }
+  return [];
+}
+
+export function parseAbsoluteAt(value?: string | null): Date | null {
+  if (typeof value !== 'string' || !value) return null;
+  const match = ABSOLUTE_RE.exec(value);
+  if (!match) return null;
+  const [, y, m, d, hh, mm, ss] = match;
+  const date = new Date(
+    Number(y),
+    Number(m) - 1,
+    Number(d),
+    Number(hh),
+    Number(mm),
+    Number(ss),
+  );
+  if (
+    date.getFullYear() !== Number(y) ||
+    date.getMonth() !== Number(m) - 1 ||
+    date.getDate() !== Number(d) ||
+    date.getHours() !== Number(hh) ||
+    date.getMinutes() !== Number(mm) ||
+    date.getSeconds() !== Number(ss)
+  ) {
+    return null;
+  }
+  return date;
+}
+
+export function resolveProcessDueAt(
+  graph: WorkflowGraph | null | undefined,
+  startedAt: Date,
+): Date | null {
+  const start = startNodeOf(graph);
+  const timeout = normalizeProcessTimeout(start?.processTimeout);
+  if (!timeout.enabled) return null;
+  if (timeout.mode === 'absolute') {
+    return parseAbsoluteAt(timeout.absoluteAt);
+  }
+  const duration = timeout.duration;
+  if (duration == null || !Number.isInteger(duration) || duration < 1) {
+    return null;
+  }
+  const ms =
+    timeout.durationUnit === 'day'
+      ? duration * 24 * 60 * 60 * 1000
+      : timeout.durationUnit === 'hour'
+        ? duration * 60 * 60 * 1000
+        : duration * 60 * 1000;
+  return new Date(startedAt.getTime() + ms);
 }
 
 export function resolveStartFieldAccess(
@@ -400,6 +495,9 @@ export function validatePublishedGraph(
     errors.push('必须恰好有一个开始节点');
   } else if (mainOutgoing(graph, starts[0].key).length !== 1) {
     errors.push('开始必须有且仅有一条主出线');
+  }
+  if (starts.length === 1 && starts[0].type === 'start') {
+    errors.push(...processTimeoutErrors(starts[0].processTimeout));
   }
   if (!approves.length) errors.push('至少需要一个审批节点');
   if (!ends.length) errors.push('至少需要一个结束节点');

@@ -406,6 +406,7 @@ function restoreStart(data) {
       type: 'start',
       allowResubmitAfterTerminated:
         data.properties?.allowResubmitAfterTerminated !== false,
+      processTimeout: data.properties?.processTimeout,
     },
   })
   ElMessage.warning('开始节点不能删除')

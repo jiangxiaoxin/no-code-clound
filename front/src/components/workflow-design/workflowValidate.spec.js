@@ -152,3 +152,18 @@ test('四个来源都空不能发布', () => {
   const errors = validatePublishedGraph(graph, fields)
   assert.equal(errors.some((item) => item.includes('没有审批人')), true)
 })
+
+test('开始节点开启超时但没填截止时间不能启用', () => {
+  const graph = {
+    ...leaveGraph,
+    nodes: [
+      {
+        ...leaveGraph.nodes[0],
+        processTimeout: { enabled: true, mode: 'absolute', absoluteAt: '' },
+      },
+      ...leaveGraph.nodes.slice(1),
+    ],
+  }
+  const errors = validatePublishedGraph(graph, fields)
+  assert.equal(errors.some((item) => item.includes('截止时间')), true)
+})

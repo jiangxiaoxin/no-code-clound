@@ -20,7 +20,11 @@ import { WorkflowApproverService, type ResolvedApprovers } from './workflow.appr
 import { WorkflowDefinitionService } from './workflow-definition.service';
 import { WorkflowInstance } from './workflow-instance.entity';
 import { WorkflowTask } from './workflow-task.entity';
-import { nextStay, resolvePreviousApproveNodeKey } from './workflow.graph';
+import {
+  nextStay,
+  resolvePreviousApproveNodeKey,
+  resolveProcessDueAt,
+} from './workflow.graph';
 import {
   InstanceNote,
   RetryPatch,
@@ -121,6 +125,8 @@ export class WorkflowEngine {
       refreshVersion = runtime.version;
     }
     const nextRound = instance.round + 1;
+    const startedAt = new Date();
+    const graphForDue = refreshGraph ?? instance.graph;
     const started = await this.instanceRepo.update(
       { id: instance.id, status: In(['draft', 'rejected', 'error']) },
       {
@@ -134,7 +140,8 @@ export class WorkflowEngine {
         currentNodeKey: null,
         errorReason: null,
         retryStep: null,
-        startedAt: new Date(),
+        startedAt,
+        dueAt: resolveProcessDueAt(graphForDue, startedAt),
         endedAt: null,
       } as QueryDeepPartialEntity<WorkflowInstance>,
     );
@@ -170,6 +177,7 @@ export class WorkflowEngine {
     }
     const runtime = await this.requirePublished(input.form.id);
     const nextRound = instance.round + 1;
+    const startedAt = new Date();
     const started = await this.instanceRepo.update(
       { id: instance.id, status: 'approved' },
       {
@@ -182,7 +190,8 @@ export class WorkflowEngine {
         currentNodeKey: null,
         errorReason: null,
         retryStep: null,
-        startedAt: new Date(),
+        startedAt,
+        dueAt: resolveProcessDueAt(runtime.graph, startedAt),
         endedAt: null,
       } as QueryDeepPartialEntity<WorkflowInstance>,
     );
@@ -210,7 +219,11 @@ export class WorkflowEngine {
   }): Promise<{ waitingOthers: boolean; nextNodeTitle?: string }> {
     const task = await this.taskRepo.findOne({ where: { id: input.taskId } });
     if (!task) throw new NotFoundException('待办不存在');
+    await this.expireIfOverdue(task.instanceId);
     const instance = await this.requireInstance(task.instanceId);
+    if (instance.status === 'rejected' && instance.dueAt) {
+      throw new ConflictException('流程已超时');
+    }
     if (
       instance.status !== 'running' ||
       task.round !== instance.round ||
@@ -1303,6 +1316,38 @@ export class WorkflowEngine {
       fields,
     );
     return healed.affected ? fields : null;
+  }
+
+  async expireIfOverdue(instanceId: number): Promise<boolean> {
+    const instance = await this.instanceRepo.findOne({
+      where: { id: instanceId },
+    });
+    if (
+      !instance ||
+      instance.status !== 'running' ||
+      !instance.dueAt ||
+      instance.dueAt.getTime() > Date.now()
+    ) {
+      return false;
+    }
+    await this.cancelAllPending(instance.id, '流程已超时');
+    const notes = appendNote(instance.notes, '流程已超时，系统自动驳回');
+    const expired = await this.instanceRepo.update(
+      { id: instance.id, status: 'running' },
+      {
+        status: 'rejected',
+        currentNodeKey: null,
+        endedAt: new Date(),
+        retryStep: null,
+        notes,
+      },
+    );
+    if (!expired.affected) return false;
+    await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+      workflowStatus: 'rejected',
+      workflowInstanceId: instance.id,
+    });
+    return true;
   }
 
   private async requireInstance(id: number) {

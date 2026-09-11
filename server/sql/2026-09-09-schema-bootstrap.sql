@@ -270,6 +270,7 @@ CREATE TABLE `workflow_instance` (
   `retryActorId` int NULL,
   `notes` json NULL,
   `startedAt` datetime(6) NULL,
+  `dueAt` datetime(6) NULL,
   `endedAt` datetime(6) NULL,
   `createdAt` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `updatedAt` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),

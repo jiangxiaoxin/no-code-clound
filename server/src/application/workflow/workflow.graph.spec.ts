@@ -6,7 +6,9 @@ import {
   nextStay,
   prepareStartPersistInput,
   previousApproveNodeKey,
+  processTimeoutErrors,
   resolvePreviousApproveNodeKey,
+  resolveProcessDueAt,
   validatePublishedGraph,
 } from './workflow.graph';
 
@@ -514,5 +516,52 @@ describe('workflow.graph 分支条件', () => {
         field_end: '2026-09-11',
       }),
     ).toBe(false);
+  });
+
+  it('未开启流程超时时不限制办理时间', () => {
+    expect(processTimeoutErrors(undefined)).toEqual([]);
+    expect(resolveProcessDueAt(leaveGraph, new Date('2026-09-11T02:00:00'))).toBeNull();
+  });
+
+  it('有效时长按提交时间往后加', () => {
+    const graph: WorkflowGraph = {
+      ...leaveGraph,
+      nodes: [
+        {
+          ...leaveGraph.nodes[0],
+          type: 'start',
+          processTimeout: {
+            enabled: true,
+            mode: 'duration',
+            duration: 2,
+            durationUnit: 'hour',
+          },
+        },
+        ...leaveGraph.nodes.slice(1),
+      ],
+    };
+    const started = new Date(2026, 8, 11, 10, 0, 0);
+    expect(resolveProcessDueAt(graph, started)).toEqual(
+      new Date(2026, 8, 11, 12, 0, 0),
+    );
+  });
+
+  it('开启超时但没填截止时间不能启用', () => {
+    const graph: WorkflowGraph = {
+      ...leaveGraph,
+      nodes: [
+        {
+          ...leaveGraph.nodes[0],
+          type: 'start',
+          processTimeout: { enabled: true, mode: 'absolute', absoluteAt: '' },
+        },
+        ...leaveGraph.nodes.slice(1),
+      ],
+    };
+    expect(
+      validatePublishedGraph(graph, fields).some((item) =>
+        item.includes('截止时间'),
+      ),
+    ).toBe(true);
   });
 });

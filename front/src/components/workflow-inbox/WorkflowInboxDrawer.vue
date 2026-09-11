@@ -43,6 +43,7 @@
                   detail.allowResubmitAfterTerminated !== false
                 "
               />
+              <p v-if="dueHint" class="wf-due">{{ dueHint }}</p>
               <p v-if="detail.instance?.errorReason" class="wf-error">
                 {{ detail.instance.errorReason }}
               </p>
@@ -193,6 +194,7 @@ import {
   inboxActionsVisible,
   submitSuccessText,
 } from './workflowStatus.js'
+import { formatDateTime } from '../../utils/timeValue.js'
 import { withDefaultFieldAccess, gridFieldAccessFromStart } from '../workflow-design/fieldAccess.js'
 import WorkflowActionPicker from './WorkflowActionPicker.vue'
 import WorkflowMiniGraph from './WorkflowMiniGraph.vue'
@@ -217,6 +219,13 @@ const gridRef = ref(null)
 const graphRef = ref(null)
 const pickerVisible = ref(false)
 const pickerMode = ref('transfer')
+
+const dueHint = computed(() => {
+  const instance = detail.value?.instance
+  if (!instance?.dueAt || instance.status !== 'running') return ''
+  const text = formatDateTime(instance.dueAt)
+  return text ? `请于 ${text} 前完成` : ''
+})
 
 const title = computed(() => {
   if (props.kind === 'todo') return '我的待办'
@@ -579,6 +588,12 @@ watch(
   max-height: 45%;
   overflow: auto;
   margin-top: 24px;
+}
+
+.wf-due {
+  margin: 0 0 12px;
+  color: var(--el-color-warning);
+  line-height: 1.5;
 }
 
 .wf-missing,

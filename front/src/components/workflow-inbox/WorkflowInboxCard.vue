@@ -5,6 +5,7 @@
       <span class="wf-card-status" :class="statusClass">{{ card.statusText }}</span>
     </div>
     <div class="wf-card-summary">{{ card.summary }}</div>
+    <div v-if="dueHint" class="wf-card-due">{{ dueHint }}</div>
     <div class="wf-card-meta">
       <span v-if="showApp">{{ card.appName }}</span>
       <span>{{ card.initiatorName }}</span>
@@ -26,6 +27,12 @@ const props = defineProps({
 const emit = defineEmits(['open'])
 
 const timeLabel = computed(() => formatDateTime(props.card.time))
+
+const dueHint = computed(() => {
+  if (props.card.status !== 'running' || !props.card.dueAt) return ''
+  const text = formatDateTime(props.card.dueAt)
+  return text ? `请于 ${text} 前完成` : ''
+})
 
 const statusClass = computed(() =>
   workflowCardStatusClass({
@@ -104,6 +111,11 @@ function onOpen() {
 .wf-card-status.is-cc {
   color: var(--el-color-info);
   background: var(--el-color-info-light-9);
+}
+
+.wf-card-due {
+  color: var(--el-color-warning);
+  font-size: 12px;
 }
 
 .wf-card-meta,

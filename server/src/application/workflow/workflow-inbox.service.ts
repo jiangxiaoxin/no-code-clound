@@ -143,6 +143,11 @@ export class WorkflowInboxService {
       if (!instance || instance.initiatorId !== userId) {
         throw new NotFoundException('单据不存在');
       }
+      await this.engine.expireIfOverdue(instance.id);
+      const refreshed = await this.instanceRepo.findOne({
+        where: { id: instance.id },
+      });
+      if (refreshed) instance = refreshed;
     } else {
       task = await this.taskRepo.findOne({ where: { id } });
       if (!task || task.assigneeId !== userId) {
@@ -159,6 +164,11 @@ export class WorkflowInboxService {
       }
       instance = await this.instanceRepo.findOne({ where: { id: task.instanceId } });
       if (!instance) throw new NotFoundException('单据不存在');
+      await this.engine.expireIfOverdue(instance.id);
+      const refreshed = await this.instanceRepo.findOne({
+        where: { id: instance.id },
+      });
+      if (refreshed) instance = refreshed;
       if (kind === 'todo' && task.status === 'pending') {
         const healed = await this.engine.cancelStaleTodoTask(instance, task);
         if (healed) Object.assign(task, healed);
@@ -237,6 +247,7 @@ export class WorkflowInboxService {
         initiatorId: instance.initiatorId,
         hasApproved: instance.hasApproved,
         definitionVersion: instance.definitionVersion,
+        dueAt: instance.dueAt,
       },
       tasks: tasks.map((row) => ({
         id: row.id,
@@ -436,6 +447,7 @@ export class WorkflowInboxService {
         initiatorName: ctx.users.get(instance.initiatorId) || '',
         time: instance.updatedAt,
         recordMissing: missing,
+        dueAt: instance.dueAt,
       };
     });
   }
@@ -505,6 +517,7 @@ export class WorkflowInboxService {
         time:
           kind === 'done' || kind === 'cc' ? task.finishedAt : task.createdAt,
         recordMissing: missing,
+        dueAt: instance?.dueAt ?? null,
       };
     });
   }

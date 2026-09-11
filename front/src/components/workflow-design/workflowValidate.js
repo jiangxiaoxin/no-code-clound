@@ -1,3 +1,5 @@
+import { processTimeoutErrors } from './processTimeout.js'
+
 function flattenFields(fields) {
   const out = []
   for (const field of fields || []) {
@@ -96,6 +98,9 @@ export function validatePublishedGraph(graph, formFields) {
     errors.push('必须恰好有一个开始节点')
   } else if (mainOutgoing(graph, starts[0].key).length !== 1) {
     errors.push('开始必须有且仅有一条主出线')
+  }
+  if (starts.length === 1) {
+    errors.push(...processTimeoutErrors(starts[0].processTimeout))
   }
   if (!approves.length) errors.push('至少需要一个审批节点')
   if (!ends.length) errors.push('至少需要一个结束节点')

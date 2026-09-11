@@ -121,6 +121,55 @@
           />
         </div>
         <p class="wf-action-hint">关闭后，已通过和已驳回的单据不能再改、不能再交。草稿和异常不受影响。</p>
+        <div class="wf-switch-row">
+          <label class="wf-label">开启流程超时</label>
+          <el-switch
+            :model-value="timeoutEnabled"
+            :disabled="disabled"
+            @change="onTimeoutEnabled"
+          />
+        </div>
+        <p class="wf-action-hint">关闭时不限制办理时间。开启后针对整张流程计时，不是单个节点。</p>
+        <template v-if="timeoutEnabled">
+          <el-radio-group
+            :model-value="timeoutMode"
+            :disabled="disabled"
+            @change="onTimeoutMode"
+          >
+            <el-radio value="duration">有效时长</el-radio>
+            <el-radio value="absolute">指定截止时间</el-radio>
+          </el-radio-group>
+          <div v-if="timeoutMode === 'duration'" class="wf-timeout-duration">
+            <el-input-number
+              :model-value="timeoutDuration"
+              :min="1"
+              :precision="0"
+              :disabled="disabled"
+              @update:model-value="onTimeoutDuration"
+
+            />
+            <el-select
+              :model-value="timeoutUnit"
+              :disabled="disabled"
+              class="wf-timeout-unit"
+              @change="onTimeoutUnit"
+            >
+              <el-option label="分钟" value="minute" />
+              <el-option label="小时" value="hour" />
+              <el-option label="天" value="day" />
+            </el-select>
+          </div>
+          <el-date-picker
+            v-else
+            :model-value="timeoutAbsoluteAt"
+            type="datetime"
+            format="YYYY-MM-DD HH:mm:ss"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="选择截止时间"
+            :disabled="disabled"
+            @update:model-value="onTimeoutAbsoluteAt"
+          />
+        </template>
         <div class="wf-label">字段权限</div>
         <div class="wf-access-table">
           <div class="wf-access-header">
@@ -185,6 +234,7 @@ import { listOrgRolesApi } from '../../api/org'
 import FormMemberSelect from '../form-fill/FormMemberSelect.vue'
 import { flattenFields } from '../form-design/tabsField.js'
 import { resolveFieldAccess } from './fieldAccess.js'
+import { emptyProcessTimeout, normalizeProcessTimeout } from './processTimeout.js'
 import RolePicker from './RolePicker.vue'
 import WorkflowFieldAccessRow from './WorkflowFieldAccessRow.vue'
 
@@ -224,6 +274,45 @@ function onTitle(title) {
 
 function onAllowResubmitAfterTerminated(value) {
   patch({ allowResubmitAfterTerminated: value })
+}
+
+const timeout = computed(() =>
+  normalizeProcessTimeout(props.node?.processTimeout || emptyProcessTimeout()),
+)
+const timeoutEnabled = computed(() => timeout.value.enabled)
+const timeoutMode = computed(() => timeout.value.mode)
+const timeoutDuration = computed(() => timeout.value.duration)
+const timeoutUnit = computed(() => timeout.value.durationUnit)
+const timeoutAbsoluteAt = computed(() => timeout.value.absoluteAt || '')
+
+function patchTimeout(next) {
+  patch({
+    processTimeout: {
+      ...timeout.value,
+      ...next,
+    },
+  })
+}
+
+function onTimeoutEnabled(value) {
+  patchTimeout({ enabled: Boolean(value) })
+}
+
+function onTimeoutMode(value) {
+  patchTimeout({ mode: value === 'absolute' ? 'absolute' : 'duration' })
+}
+
+function onTimeoutDuration(value) {
+  const n = Number(value)
+  patchTimeout({ duration: Number.isInteger(n) && n > 0 ? n : 1 })
+}
+
+function onTimeoutUnit(value) {
+  patchTimeout({ durationUnit: value })
+}
+
+function onTimeoutAbsoluteAt(value) {
+  patchTimeout({ absoluteAt: value || '' })
 }
 
 function onUserIds(userIds) {
@@ -532,5 +621,22 @@ onMounted(loadRoles)
   font-size: 12px;
   color: var(--el-text-color-secondary);
   line-height: 1.5;
+}
+
+.wf-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wf-timeout-duration {
+  display: flex;
+  align-items: center;
+}
+
+.wf-timeout-unit {
+  min-width: 96px;
+  margin-left: 8px;
+  flex: 1;
 }
 </style>

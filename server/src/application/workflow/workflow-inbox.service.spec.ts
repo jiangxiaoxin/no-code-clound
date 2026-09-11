@@ -33,7 +33,11 @@ describe('WorkflowInboxService', () => {
   const departmentRepo = { find: jest.fn() };
   const store = { findById: jest.fn() };
   const dictionary = { listEnabledItemsByApp: jest.fn() };
-  const engine = { markStuckByDisabledApprovers: jest.fn(), cancelStaleTodoTask: jest.fn() };
+  const engine = {
+    markStuckByDisabledApprovers: jest.fn(),
+    cancelStaleTodoTask: jest.fn(),
+    expireIfOverdue: jest.fn(),
+  };
   const definition = { getRuntime: jest.fn() };
 
   function qb(result: { items: unknown[]; total: number }) {
@@ -93,6 +97,7 @@ describe('WorkflowInboxService', () => {
     dictionary.listEnabledItemsByApp.mockResolvedValue([]);
     definition.getRuntime.mockResolvedValue({ graph: {} });
     engine.cancelStaleTodoTask.mockResolvedValue(null);
+    engine.expireIfOverdue.mockResolvedValue(false);
     const module = await Test.createTestingModule({
       providers: [
         WorkflowInboxService,

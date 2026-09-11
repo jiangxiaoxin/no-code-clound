@@ -45,6 +45,7 @@
 | 9 | `2026-09-07-dept-leader.sql` | 部门负责人 |
 | 10 | `2026-09-07-workflow-retry-patch.sql` | 流程重试补写字段 |
 | 11 | `2026-09-07-workflow-version.sql` | 流程版本表；迁移旧 `draftGraph`/`publishedGraph` 并删列 |
+| 12 | `2026-09-11-workflow-process-timeout.sql` | 流程实例 `dueAt`（整单超时截止时间） |
 
 增量脚本里带 `START TRANSACTION` 的，失败会整体回滚；执行前请备份。
 

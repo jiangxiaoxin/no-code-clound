@@ -108,6 +108,31 @@ test('开始节点终止后再交开关进出 LogicFlow 后不丢，缺省为开
   assert.equal(missing.nodes[0].allowResubmitAfterTerminated, true)
 })
 
+test('开始节点流程超时进出 LogicFlow 后不丢', () => {
+  const withTimeout = {
+    ...product,
+    nodes: [
+      {
+        ...product.nodes[0],
+        processTimeout: {
+          enabled: true,
+          mode: 'duration',
+          duration: 3,
+          durationUnit: 'day',
+        },
+      },
+      product.nodes[1],
+    ],
+  }
+  const back = toProductGraph(toLogicflowGraph(withTimeout))
+  assert.deepEqual(back.nodes[0].processTimeout, {
+    enabled: true,
+    mode: 'duration',
+    duration: 3,
+    durationUnit: 'day',
+  })
+})
+
 test('LogicFlow 锚点样式不进产品图', () => {
   const lf = toLogicflowGraph(product)
   lf.nodes[0].anchors = [{ x: 1, y: 2 }]

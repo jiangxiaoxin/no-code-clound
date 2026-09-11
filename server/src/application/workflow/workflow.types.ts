@@ -15,12 +15,24 @@ export type WorkflowNodeBase = {
   y: number;
 };
 
+export type ProcessTimeoutUnit = 'minute' | 'hour' | 'day';
+export type ProcessTimeoutMode = 'absolute' | 'duration';
+
+export type ProcessTimeout = {
+  enabled: boolean;
+  mode: ProcessTimeoutMode;
+  absoluteAt?: string;
+  duration?: number;
+  durationUnit?: ProcessTimeoutUnit;
+};
+
 export type WorkflowNode =
   | (WorkflowNodeBase & {
       type: 'start';
       allowResubmitAfterTerminated?: boolean;
       fieldAccess?: Record<string, FieldAccess>;
       briefFieldKeys?: string[];
+      processTimeout?: ProcessTimeout;
     })
   | (WorkflowNodeBase & { type: 'end' | 'branch' })
   | (WorkflowNodeBase & {

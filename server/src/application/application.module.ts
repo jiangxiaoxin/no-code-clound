@@ -36,6 +36,7 @@ import { WorkflowEngine } from './workflow/workflow.engine';
 import { WorkflowInboxService } from './workflow/workflow-inbox.service';
 import { WorkflowInstanceService } from './workflow/workflow-instance.service';
 import { WorkflowRenderService } from './workflow/workflow-render.service';
+import { WorkflowTimeoutService } from './workflow/workflow-timeout.service';
 import { WorkflowDefinition } from './workflow/workflow-definition.entity';
 import { WorkflowInstance } from './workflow/workflow-instance.entity';
 import { WorkflowTask } from './workflow/workflow-task.entity';
@@ -89,6 +90,7 @@ import { WorkflowVersion } from './workflow/workflow-version.entity';
     WorkflowInboxService,
     WorkflowInstanceService,
     WorkflowRenderService,
+    WorkflowTimeoutService,
   ],
   exports: [AppAccessAdminService],
 })
