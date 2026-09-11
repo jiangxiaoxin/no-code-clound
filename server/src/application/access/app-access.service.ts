@@ -130,10 +130,17 @@ export class AppAccessService {
     });
   }
 
+  async targetsHit(
+    userId: number,
+    targets: { type: string; targetId: number }[],
+  ): Promise<boolean> {
+    return this.scopeHit(userId, targets);
+  }
+
   /** 范围行保留但目标停用 / 删除时不命中（权限规格 §7.2、§12.1） */
   private async scopeHit(
     userId: number,
-    scopes: AppAccessScope[],
+    scopes: { type: string; targetId: number }[],
   ): Promise<boolean> {
     if (scopes.some((s) => s.type === 'user' && s.targetId === userId)) {
       const user = await this.userRepo.findOne({ where: { id: userId } });

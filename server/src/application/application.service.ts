@@ -11,6 +11,7 @@ import { AppFormConfig } from './app-form-config.entity';
 import { AppGroup } from './app-group.entity';
 import { Application } from './application.entity';
 import { AppAccessService } from './access/app-access.service';
+import { FormDataAccessService } from './form-data-access.service';
 import { AppConfigurator } from './access/app-configurator.entity';
 import { AppAccessScope } from './access/app-access-scope.entity';
 import { Dictionary } from './dictionary/dictionary.entity';
@@ -28,6 +29,7 @@ import { WorkflowInstance } from './workflow/workflow-instance.entity';
 import { WorkflowTask } from './workflow/workflow-task.entity';
 import { WorkflowVersion } from './workflow/workflow-version.entity';
 import { mergeFormConfig, normalizeFormConfig } from './form-config';
+import { normalizeFormViewers } from './form-data-access';
 import { startNodeOf } from './workflow/workflow.graph';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
 import { assertSerialSchema } from './form-record/serial-number';
@@ -102,6 +104,7 @@ export class ApplicationService {
     private readonly workflowTaskRepo: Repository<WorkflowTask>,
     private readonly formRecordStore: FormRecordStore,
     private readonly access: AppAccessService,
+    private readonly formData: FormDataAccessService,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -217,8 +220,10 @@ export class ApplicationService {
   }
 
   async getForm(ownerId: number, appId: number, formId: number) {
-    await this.access.requireUse(ownerId, appId);
+    const access = await this.access.getAccess(ownerId, appId);
+    if (!access.canUse) throw new NotFoundException('应用不存在');
     const form = await this.requireForm(appId, formId);
+    await this.formData.assertCanViewForm(ownerId, access, formId);
     const def = await this.workflowDefinitionRepo.findOne({ where: { formId } });
     const enabled = await this.workflowVersionRepo.findOne({
       where: { formId, enabled: true },
@@ -266,11 +271,17 @@ export class ApplicationService {
     excludeFormId?: number,
     include?: string,
   ): Promise<{ id: number; name: string; fields: OptionField[] }[]> {
-    await this.access.requireUse(ownerId, appId);
+    const access = await this.access.getAccess(ownerId, appId);
+    if (!access.canUse) throw new NotFoundException('应用不存在');
     const forms = await this.formRepo.find({
       where: { applicationId: appId },
       order: { createdAt: 'DESC' },
     });
+    const visible = await this.formData.filterVisibleFormIds(
+      ownerId,
+      access,
+      forms.map((form) => form.id),
+    );
     const exclude =
       Number.isInteger(excludeFormId) && (excludeFormId as number) > 0
         ? excludeFormId
@@ -280,6 +291,7 @@ export class ApplicationService {
 
     const result: { id: number; name: string; fields: OptionField[] }[] = [];
     for (const form of forms) {
+      if (!visible.has(form.id)) continue;
       if (exclude != null && form.id === exclude) {
         continue;
       }
@@ -297,10 +309,18 @@ export class ApplicationService {
   }
 
   async getFormConfig(ownerId: number, appId: number, formId: number) {
-    await this.access.requireUse(ownerId, appId);
+    const access = await this.access.getAccess(ownerId, appId);
+    if (!access.canUse) throw new NotFoundException('应用不存在');
     await this.requireForm(appId, formId);
+    await this.formData.assertCanViewForm(ownerId, access, formId);
     const row = await this.formConfigRepo.findOne({ where: { formId } });
-    return this.toFormConfig(row?.config);
+    const config = this.toFormConfig(row?.config);
+    return {
+      ...config,
+      formViewers: await this.formData.decorateViewers(
+        normalizeFormViewers(config.formViewers),
+      ),
+    };
   }
 
   async saveFormConfig(
@@ -334,8 +354,14 @@ export class ApplicationService {
       where: { applicationId: id },
       order: { createdAt: 'DESC' },
     });
+    const visible = await this.formData.filterVisibleFormIds(
+      ownerId,
+      access,
+      forms.map((form) => form.id),
+    );
+    const visibleForms = forms.filter((form) => visible.has(form.id));
 
-    const formIds = forms.map((form) => form.id);
+    const formIds = visibleForms.map((form) => form.id);
     const defs = formIds.length
       ? await this.workflowDefinitionRepo.find({
           where: { formId: In(formIds) },
@@ -353,7 +379,7 @@ export class ApplicationService {
       ReturnType<ApplicationService['toFormItem']>[]
     >();
     const rootForms: ReturnType<ApplicationService['toFormItem']>[] = [];
-    for (const form of forms) {
+    for (const form of visibleForms) {
       const item = {
         ...this.toFormItem(form),
         ...this.toWorkflowFlags(

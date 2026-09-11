@@ -5,6 +5,7 @@ import { AppAccessAdminService } from './access/app-access-admin.service';
 import { AppAccessController } from './access/app-access.controller';
 import { AppAccessScope } from './access/app-access-scope.entity';
 import { AppAccessService } from './access/app-access.service';
+import { FormDataAccessService } from './form-data-access.service';
 import { AppConfigurator } from './access/app-configurator.entity';
 import { AppForm } from './app-form.entity';
 import { AppFormConfig } from './app-form-config.entity';
@@ -75,6 +76,7 @@ import { WorkflowVersion } from './workflow/workflow-version.entity';
   providers: [
     AppAccessService,
     AppAccessAdminService,
+    FormDataAccessService,
     ApplicationService,
     DictionaryService,
     FormRecordStore,

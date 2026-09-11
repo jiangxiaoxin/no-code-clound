@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { AppAccessService } from '../access/app-access.service';
+import { FormDataAccessService } from '../form-data-access.service';
 import { AppForm } from '../app-form.entity';
 import { AppFormConfig } from '../app-form-config.entity';
 import { normalizeRecordActions } from '../form-config';
@@ -103,6 +104,7 @@ export class FormRecordService {
     private readonly store: FormRecordStore,
     private readonly dictionaryService: DictionaryService,
     private readonly access: AppAccessService,
+    private readonly formData: FormDataAccessService,
     private readonly persist: FormRecordPersistService,
     private readonly definition: WorkflowDefinitionService,
     private readonly engine: WorkflowEngine,
@@ -119,7 +121,7 @@ export class FormRecordService {
     data: Record<string, unknown>,
     intent?: 'draft' | 'submit',
   ): Promise<FormRecordView> {
-    const form = await this.requireForm(actorId, appId, formId);
+    const { form } = await this.requireForm(actorId, appId, formId);
     if (form.formKind !== 'workflow') {
       const doc = await this.persist.persist({ form, actorId, data });
       return this.toRecordView(doc, form);
@@ -167,7 +169,7 @@ export class FormRecordService {
     formId: number,
     body: RecordQueryBody,
   ) {
-    const form = await this.requireForm(ownerId, appId, formId);
+    const { form, access } = await this.requireForm(ownerId, appId, formId);
     const fields = this.readFields(form);
     const built = buildRecordQuery(fields, {
       ...body,
@@ -192,6 +194,15 @@ export class FormRecordService {
           )
         : body.groups,
     });
+    const rowFilter = await this.formData.rowMongoFilter(
+      ownerId,
+      access,
+      formId,
+      form.formKind,
+    );
+    if (rowFilter) {
+      built.filter = andMongoFilter(built.filter, rowFilter);
+    }
     const { items, total } = await this.store.query(formId, built);
     const names = await this.loadUserNames(items, fields);
     const userNames = this.userNamesRecord(names);
@@ -235,8 +246,16 @@ export class FormRecordService {
       where: { id: formId, applicationId: appId },
     });
     if (!form) throw new NotFoundException('表单不存在');
+    await this.formData.assertCanViewForm(ownerId, access, formId);
     const doc = await this.store.findById(formId, recordId);
     if (!doc) throw new NotFoundException('记录不存在');
+    await this.formData.assertCanViewRecord(
+      ownerId,
+      access,
+      formId,
+      doc,
+      form.formKind,
+    );
     const view = await this.attachProgress(
       await this.attachStartFieldAccess(
         await this.toRecordView(doc, form),
@@ -258,8 +277,17 @@ export class FormRecordService {
     data: Record<string, unknown>,
     intent?: 'draft' | 'submit',
   ): Promise<FormRecordView> {
-    const form = await this.requireForm(actorId, appId, formId);
+    const { form, access } = await this.requireForm(actorId, appId, formId);
     await this.assertActionAllowed(formId, 'edit');
+    const existing = await this.store.findById(formId, recordId);
+    if (!existing) throw new NotFoundException('记录不存在');
+    await this.formData.assertCanViewRecord(
+      actorId,
+      access,
+      formId,
+      existing,
+      form.formKind,
+    );
     if (form.formKind !== 'workflow') {
       const doc = await this.persist.persist({ form, actorId, data, recordId });
       return this.toRecordView(doc, form);
@@ -270,8 +298,6 @@ export class FormRecordService {
         '这张表单还没有配置流程，启用流程之后才能使用',
       );
     }
-    const existing = await this.store.findById(formId, recordId);
-    if (!existing) throw new NotFoundException('记录不存在');
     const status = existing.workflowStatus as InstanceStatus | undefined;
     const instance = await this.findInstance(formId, recordId, existing.workflowInstanceId);
 
@@ -376,10 +402,17 @@ export class FormRecordService {
     formId: number,
     recordId: string,
   ): Promise<{ ok: true }> {
-    const form = await this.requireForm(ownerId, appId, formId);
+    const { form, access } = await this.requireForm(ownerId, appId, formId);
     await this.assertActionAllowed(formId, 'delete');
     const existing = await this.store.findById(formId, recordId);
     if (!existing) throw new NotFoundException('记录不存在');
+    await this.formData.assertCanViewRecord(
+      ownerId,
+      access,
+      formId,
+      existing,
+      form.formKind,
+    );
     if (form.formKind === 'workflow') {
       const status = existing.workflowStatus as InstanceStatus | undefined;
       const instance = await this.findInstance(
@@ -413,7 +446,7 @@ export class FormRecordService {
     appId: number,
     formId: number,
   ): Promise<{ buffer: Buffer; filename: string }> {
-    const form = await this.requireForm(ownerId, appId, formId);
+    const { form } = await this.requireForm(ownerId, appId, formId);
     await this.assertActionAllowed(formId, 'downloadTemplate');
     const fields = importableFields(this.readFields(form));
     const workbook = new ExcelJS.Workbook();
@@ -452,7 +485,7 @@ export class FormRecordService {
     if (!file.originalname?.toLowerCase().endsWith('.xlsx')) {
       throw new BadRequestException('请上传 xlsx 文件');
     }
-    const form = await this.requireForm(ownerId, appId, formId);
+    const { form } = await this.requireForm(ownerId, appId, formId);
     await this.assertActionAllowed(formId, 'import');
     const fields = this.readFields(form);
     const workbook = new ExcelJS.Workbook();
@@ -532,12 +565,14 @@ export class FormRecordService {
   }
 
   private async requireForm(ownerId: number, appId: number, formId: number) {
-    await this.access.requireUse(ownerId, appId);
+    const access = await this.access.getAccess(ownerId, appId);
+    if (!access.canUse) throw new NotFoundException('应用不存在');
     const form = await this.formRepo.findOne({
       where: { id: formId, applicationId: appId },
     });
     if (!form) throw new NotFoundException('表单不存在');
-    return form;
+    await this.formData.assertCanViewForm(ownerId, access, form.id);
+    return { form, access };
   }
 
   // 表单发布页的整表开关之前只有前端在执行：这里补上服务端拦截，直接调接口也拦
@@ -806,6 +841,15 @@ export class FormRecordService {
     }
     return view;
   }
+}
+
+function andMongoFilter(
+  base: Record<string, unknown>,
+  extra: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!extra || !Object.keys(extra).length) return base;
+  if (!base || !Object.keys(base).length) return extra;
+  return { $and: [base, extra] };
 }
 
 function collectMemberIds(

@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { ObjectId } from 'mongodb';
 import { AppAccessService } from '../access/app-access.service';
+import { FormDataAccessService } from '../form-data-access.service';
 import { AppForm } from '../app-form.entity';
 import { AppFormConfig } from '../app-form-config.entity';
 import { User } from '../../user/user.entity';
@@ -25,6 +26,11 @@ describe('FormRecordService', () => {
     requireConfigure: jest.fn(),
     requireOwner: jest.fn(),
     getAccess: jest.fn(),
+  };
+  const formData = {
+    assertCanViewForm: jest.fn(),
+    assertCanViewRecord: jest.fn(),
+    rowMongoFilter: jest.fn(),
   };
   const userRepo = { find: jest.fn() };
   const store = {
@@ -75,6 +81,9 @@ describe('FormRecordService', () => {
     jest.resetAllMocks();
     access.requireUse.mockResolvedValue(ownedApp);
     formConfigRepo.findOne.mockResolvedValue(null);
+    formData.assertCanViewForm.mockResolvedValue(undefined);
+    formData.assertCanViewRecord.mockResolvedValue(undefined);
+    formData.rowMongoFilter.mockResolvedValue(null);
     access.getAccess.mockResolvedValue({
       app: ownedApp,
       canUse: true,
@@ -90,6 +99,7 @@ describe('FormRecordService', () => {
           useValue: formConfigRepo,
         },
         { provide: AppAccessService, useValue: access },
+        { provide: FormDataAccessService, useValue: formData },
         { provide: getRepositoryToken(User), useValue: userRepo },
         { provide: FormRecordStore, useValue: store },
         { provide: DictionaryService, useValue: dictionaryService },
@@ -107,7 +117,12 @@ describe('FormRecordService', () => {
   });
 
   it('throws when app is missing', async () => {
-    access.requireUse.mockRejectedValue(new NotFoundException('应用不存在'));
+    access.getAccess.mockResolvedValue({
+      app: ownedApp,
+      canUse: false,
+      canConfigure: false,
+      isOwner: false,
+    });
     try {
       await service.create(1, 8, 12, { name: '张三' });
       throw new Error('expected 404');

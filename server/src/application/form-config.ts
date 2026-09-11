@@ -1,3 +1,5 @@
+import { normalizeFormDataAccess } from './form-data-access';
+
 export type FormRecordActions = {
   create: boolean;
   edit: boolean;
@@ -39,9 +41,12 @@ export function normalizeFormConfig(value: unknown): Record<string, unknown> {
   const input =
     value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
   const { workspaceTabOrder: _ignored, ...rest } = input;
+  const dataAccess = normalizeFormDataAccess(input);
   return {
     ...rest,
     recordActions: normalizeRecordActions(input.recordActions),
+    formViewers: dataAccess.formViewers,
+    rowScope: dataAccess.rowScope,
   };
 }
 

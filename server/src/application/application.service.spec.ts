@@ -13,6 +13,7 @@ import { Dictionary } from './dictionary/dictionary.entity';
 import { DictionaryItem } from './dictionary/dictionary-item.entity';
 import { AppAccessAdminService } from './access/app-access-admin.service';
 import { AppAccessService } from './access/app-access.service';
+import { FormDataAccessService } from './form-data-access.service';
 import { FormRecordStore } from './form-record/form-record.store';
 import { FormSerialSeq } from './form-record/form-serial-seq.entity';
 import { WorkflowDefinition } from './workflow/workflow-definition.entity';
@@ -93,6 +94,11 @@ describe('ApplicationService', () => {
     requireConfigure: jest.fn(),
     requireOwner: jest.fn(),
   };
+  const formData = {
+    assertCanViewForm: jest.fn(),
+    filterVisibleFormIds: jest.fn(),
+    decorateViewers: jest.fn(),
+  };
   const accessAdmin = {
     deleteForApp: jest.fn(),
   };
@@ -132,6 +138,12 @@ describe('ApplicationService', () => {
       canConfigure: true,
       isOwner: true,
     }));
+    formData.assertCanViewForm.mockResolvedValue(undefined);
+    formData.filterVisibleFormIds.mockImplementation(
+      async (_userId: number, _access: unknown, formIds: number[]) =>
+        new Set(formIds),
+    );
+    formData.decorateViewers.mockImplementation(async (rows: unknown) => rows);
     access.listAccessible.mockResolvedValue([]);
     workflowInstanceRepo.find.mockResolvedValue([]);
     workflowDefinitionRepo.find.mockResolvedValue([]);
@@ -166,6 +178,7 @@ describe('ApplicationService', () => {
         },
         { provide: FormRecordStore, useValue: formRecordStore },
         { provide: AppAccessService, useValue: access },
+        { provide: FormDataAccessService, useValue: formData },
         { provide: AppAccessAdminService, useValue: accessAdmin },
         { provide: DataSource, useValue: dataSource },
       ],
