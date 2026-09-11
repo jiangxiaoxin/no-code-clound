@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  大额审批子流程（processKey = largeAmountApproval）
+  由主流程的「调用活动」启动：amount / reason / initiator / managerList / voteResults / approved
+  通过 flowable:in 传入（子流程查不到主流程变量；少传的变量取到 null，到用到它的地方才会报错），
+  结束后 approved、voteResults 通过 flowable:out 传回主流程。
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://example.flowable.demo/purchase">
+
+  <process id="largeAmountApproval" name="大额审批子流程" isExecutable="true">
+
+    <!-- 子流程开始：变量已由调用活动传入 -->
+    <startEvent id="subStart" name="开始"/>
+
+    <sequenceFlow id="subFlow1" sourceRef="subStart" targetRef="parallelSplit"/>
+
+    <!-- 并行网关（分支）：两条 outgoing 连线同时走。
+         与排他网关的区别：并行网关不看条件、不写 conditionExpression，两路都走 -->
+    <parallelGateway id="parallelSplit" name="并行分支"/>
+
+    <sequenceFlow id="subFlow2" sourceRef="parallelSplit" targetRef="complianceReview"/>
+    <sequenceFlow id="subFlow3" sourceRef="parallelSplit" targetRef="budgetCheck"/>
+
+    <!-- 合规审查：候选组任务。
+         candidateGroups=compliance：不指定具体人，组内任何人都可先认领（claim）再办理；
+         查询用 taskService.createTaskQuery().taskCandidateGroup("compliance")。
+         与 assignee 的区别：assignee 是指定到人，candidateGroups 是放到组里等人认领 -->
+    <userTask id="complianceReview" name="合规审查" flowable:candidateGroups="compliance"/>
+
+    <!-- 预算核对：服务任务，class 方式 JavaDelegate → delegate/BudgetCheckDelegate。
+         到达该节点自动执行（不需要人办理），执行时把 budgetNote 写回流程变量 -->
+    <serviceTask id="budgetCheck" name="预算核对" flowable:class="com.example.flowable.demo.delegate.BudgetCheckDelegate"/>
+
+    <sequenceFlow id="subFlow4" sourceRef="complianceReview" targetRef="parallelJoin"/>
+    <sequenceFlow id="subFlow5" sourceRef="budgetCheck" targetRef="parallelJoin"/>
+
+    <!-- 并行网关（汇聚）：两条 incoming 连线都到达后才放行（等待，不产生任务） -->
+    <parallelGateway id="parallelJoin" name="并行汇聚"/>
+
+    <sequenceFlow id="subFlow6" sourceRef="parallelJoin" targetRef="managerVote"/>
+
+    <!-- 经理会签：多实例任务（multiInstanceLoopCharacteristics）。
+         isSequential=false：并行，按名单同时生成多份任务；
+         flowable:collection=managerList：名单来自流程变量 managerList（List<String>，经调用活动 flowable:in 传入）；
+         flowable:elementVariable=voter：每份任务把当前名单元素存为局部变量 voter，assignee=${voter} 逐份分配；
+         completionCondition：所有实例都办完才整体完成（nrOfInstances / nrOfCompletedInstances 是引擎内置计数变量）。
+         每份任务完成时提交变量 voteApproved（true 同意 / false 否决），
+         完成时机回调 → listener/VoteCollectTaskListener：否决会把 approved 改成 false -->
+    <userTask id="managerVote" name="经理投票" flowable:assignee="${voter}">
+      <extensionElements>
+        <flowable:taskListener event="complete" class="com.example.flowable.demo.listener.VoteCollectTaskListener"/>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="false"
+          flowable:collection="managerList" flowable:elementVariable="voter">
+        <completionCondition>${nrOfCompletedInstances == nrOfInstances}</completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+
+    <sequenceFlow id="subFlow7" sourceRef="managerVote" targetRef="subEnd"/>
+
+    <!-- 子流程结束：回到主流程调用活动，approved 由 flowable:out 传回 -->
+    <endEvent id="subEnd" name="结束"/>
+  </process>
+</definitions>

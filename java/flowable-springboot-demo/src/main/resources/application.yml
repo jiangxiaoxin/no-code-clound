@@ -1,0 +1,23 @@
+server:
+  port: 8089
+
+spring:
+  datasource:
+    # createDatabaseIfNotExist=true：首次运行自动建 flowable_demo 库（与手动执行 java/sql/ 建库脚本等效）
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/flowable_demo?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:helloca}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+flowable:
+  # 库表缺失时自动创建（学习示例方便；生产应关闭，用 java/sql/ 的官方 DDL 建表）
+  database-schema-update: true
+  # 打开异步执行器，定时边界事件（超时升级）才会真正触发
+  async-executor-activate: true
+  # BPMN 自动部署目录（默认值就是它，写出来便于理解）
+  process-definition-location-prefix: classpath*:/processes/
+
+logging:
+  level:
+    # 引擎内部日志太吵，学习时聚焦自己代码里 System.out 的【监听】【委托】输出
+    org.flowable: warn

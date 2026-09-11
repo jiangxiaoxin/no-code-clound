@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>flowable-console-demo</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <flowable.version>7.1.0</flowable.version>
+    <mysql.version>8.4.0</mysql.version>
+    <!-- exec:java 默认主类；跑请假示例加 -Dexec.mainClass=com.example.flowable.demo.LeaveApplication -->
+    <exec.mainClass>com.example.flowable.demo.ConsoleApplication</exec.mainClass>
+  </properties>
+
+  <dependencies>
+    <!-- Flowable 流程引擎本体（裸引擎用法，不经过 Spring） -->
+    <dependency>
+      <groupId>org.flowable</groupId>
+      <artifactId>flowable-engine</artifactId>
+      <version>${flowable.version}</version>
+    </dependency>
+    <!-- MySQL 驱动（示例库 flowable_demo） -->
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <version>${mysql.version}</version>
+    </dependency>
+    <!-- 日志绑定：Flowable 用 SLF4J 打内部日志，给个 simple 绑定输出到控制台（与 Flowable 7.1.0 的 slf4j 2.0.16 对齐） -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.16</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- 支持 mvnw exec:java 直接跑主类 -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.5.0</version>
+        <configuration>
+          <mainClass>${exec.mainClass}</mainClass>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

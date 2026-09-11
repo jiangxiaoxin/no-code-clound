@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  请假申请审批流程（processKey = leaveRequest）
+  一个尽量小的完整示例：
+    - 发起人提交请假单（驳回后回到这里修改重填）
+    - a、b 两人并行会签：全部同意才通过，任一人不同意立即短路结束会签
+    - 会签结束后按当前结果发「邮件」通知员工（日志模拟，通过/驳回都发）
+    - 通过 → 流程结束，谁也不能再改；驳回 → 员工修改重填，开启新一轮审批
+  与采购示例（purchase-approval）的刻意差异：无定时器（不开异步执行器）、
+  无子流程、无独立「重置」服务任务（驳回重提即重新初始化）。
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="http://example.flowable.demo/leave">
+
+  <process id="leaveRequest" name="请假申请审批配置名" isExecutable="true">
+
+    <!-- 开始节点：发起即建实例，实例停在第一个待办「提交请假单」上 -->
+    <startEvent id="start" name="开始"/>
+
+    <!-- 提交请假单：发起人填写，兼做驳回后的修改重填入口（驳回分支直接回到这里）。
+         assignee=${initiator}：办理人取流程变量 initiator（启动时传入员工姓名）。
+         完成时提交的变量是整轮审批的初始化，驳回重提时同一组键重新赋值即完成重置：
+           days 请假天数、reason 事由（业务数据）
+           approved=true、approvalRejected=false（审批结果，监听器改写，网关按它分流）
+           opinions=[]（审批意见明细列表，监听器逐条追加，重提时换新列表）
+           approverList=["a","b"]（本轮会签处理人集合，每轮可换人）
+         注意：监听器里 setVariable 能更新到流程根作用域，靠的就是这些变量在这里已存在 -->
+    <userTask id="submitLeave" name="提交请假单" flowable:assignee="${initiator}"/>
+
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="submitLeave"/>
+
+    <!-- 会签审批：a、b 两个处理人的并行多实例任务。
+         multiInstanceLoopCharacteristics：
+           isSequential="false" 并行——a、b 同时各拿到一份审批待办；
+           flowable:collection="approverList" 遍历流程变量 approverList；
+           flowable:elementVariable="approver" 每份任务里当前元素叫 approver，
+           assignee=${approver} 于是分别办给 a 和 b。
+         completionCondition 完成条件：每办完一份任务就判断一次，
+           nrOfCompletedInstances / nrOfInstances 是 Flowable 内置计数（办完数 / 总份数）；
+           approvalRejected==true 时立即短路——没办完的待办直接删除，流程往下走，
+           这就是「任一人不同意则驳回」的实现方式。
+         完成时提交变量：approved（true 同意 / false 不同意）、comment 审批意见（必填，
+           示例代码总是传值；生产系统的必填校验属于表单层，引擎示例不重复做）。
+         taskListener(event=complete)：每份任务办结时回调 → listener/ApprovalOpinionTaskListener，
+           把「姓名：同意/不同意（意见）」追加进 opinions，不同意时置 approvalRejected=true、approved=false -->
+    <userTask id="countersignApproval" name="会签审批" flowable:assignee="${approver}">
+      <extensionElements>
+        <flowable:taskListener event="complete" class="com.example.flowable.demo.listener.ApprovalOpinionTaskListener"/>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="false"
+          flowable:collection="approverList" flowable:elementVariable="approver">
+        <completionCondition>${nrOfCompletedInstances == nrOfInstances || approvalRejected == true}</completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+
+    <sequenceFlow id="flow2" sourceRef="submitLeave" targetRef="countersignApproval"/>
+
+    <!-- 发送邮件通知：会签结束后必经此节点（通过、驳回都发），按当前流程变量拼邮件内容。
+         flowable:class 方式 JavaDelegate → delegate/LeaveNotifyDelegate（日志模拟发送；
+         真实邮件改成在里面调 SMTP / 消息队列即可） -->
+    <serviceTask id="notifyByEmail" name="发送邮件通知" flowable:class="com.example.flowable.demo.delegate.LeaveNotifyDelegate"/>
+
+    <sequenceFlow id="flow3" sourceRef="countersignApproval" targetRef="notifyByEmail"/>
+
+    <!-- 排他网关「审批结果」：approved=true 走「通过」，false 走「驳回」。
+         两条连线都带 conditionExpression 且覆盖全部取值（true/false），不会出现无线可走 -->
+    <exclusiveGateway id="resultGateway" name="审批结果"/>
+
+    <sequenceFlow id="flow4" sourceRef="notifyByEmail" targetRef="resultGateway"/>
+
+    <!-- 通过分支：流程结束。结束即终态——引擎里没有任何待办，ACT_RU_* 运行时数据清档，
+         历史记录只读，员工与审批人都无法再改（「谁也不可以再修改」不需要任何额外代码） -->
+    <sequenceFlow id="flowApproved" name="通过" sourceRef="resultGateway" targetRef="endApproved">
+      <conditionExpression xsi:type="tFormalExpression">${approved == true}</conditionExpression>
+    </sequenceFlow>
+
+    <endEvent id="endApproved" name="结束（通过）"/>
+
+    <!-- 驳回分支：直接回到「提交请假单」（BPMN 允许回环）。
+         没有单独的「重置」服务任务——员工重填提交时会重新初始化
+         approved / approvalRejected / opinions / approverList，新一轮从干净状态开始 -->
+    <sequenceFlow id="flowRejected" name="驳回" sourceRef="resultGateway" targetRef="submitLeave">
+      <conditionExpression xsi:type="tFormalExpression">${approved == false}</conditionExpression>
+    </sequenceFlow>
+
+  </process>
+
+  <!-- BPMNDiagram（DI 段）：流程图的坐标与连线信息，只给建模工具（Flowable Modeler、bpmn.io 等）
+       画图用——引擎执行时完全不读它，删掉整个段落流程照跑。
+       主线一行从左到右：开始 → 提交请假单 → 会签审批 → 发送邮件通知 → 审批结果网关 → 结束（通过）；
+       驳回连线从网关底部向下绕回「提交请假单」，对应 BPMN 里的回环。
+       坐标以每个图形的左上角为原点（Bounds），连线用一组 waypoint 折点描述。 -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_leaveRequest">
+    <bpmndi:BPMNPlane id="BPMNPlane_leaveRequest" bpmnElement="leaveRequest">
+
+      <bpmndi:BPMNShape id="BPMNShape_start" bpmnElement="start">
+        <dc:Bounds x="105" y="185" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_submitLeave" bpmnElement="submitLeave">
+        <dc:Bounds x="190" y="163" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_countersignApproval" bpmnElement="countersignApproval">
+        <dc:Bounds x="340" y="163" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_notifyByEmail" bpmnElement="notifyByEmail">
+        <dc:Bounds x="490" y="163" width="100" height="80"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_resultGateway" bpmnElement="resultGateway">
+        <dc:Bounds x="640" y="178" width="50" height="50"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="BPMNShape_endApproved" bpmnElement="endApproved">
+        <dc:Bounds x="740" y="185" width="36" height="36"/>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="BPMNEdge_flow1" bpmnElement="flow1">
+        <di:waypoint x="141" y="203"/>
+        <di:waypoint x="190" y="203"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_flow2" bpmnElement="flow2">
+        <di:waypoint x="290" y="203"/>
+        <di:waypoint x="340" y="203"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_flow3" bpmnElement="flow3">
+        <di:waypoint x="440" y="203"/>
+        <di:waypoint x="490" y="203"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_flow4" bpmnElement="flow4">
+        <di:waypoint x="590" y="203"/>
+        <di:waypoint x="640" y="203"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_flowApproved" bpmnElement="flowApproved">
+        <di:waypoint x="690" y="203"/>
+        <di:waypoint x="740" y="203"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="BPMNEdge_flowRejected" bpmnElement="flowRejected">
+        <di:waypoint x="665" y="228"/>
+        <di:waypoint x="665" y="303"/>
+        <di:waypoint x="240" y="303"/>
+        <di:waypoint x="240" y="243"/>
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

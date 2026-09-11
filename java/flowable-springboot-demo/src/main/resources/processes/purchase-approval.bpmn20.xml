@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  采购申请审批主流程（processKey = purchaseApproval）
+  与 large-amount-approval.bpmn20.xml 配合使用：
+    - 金额 <  10000：部门主管审批后直接出结果
+    - 金额 >= 10000：先调「大额审批子流程」（合规 ∥ 预算 + 经理会签），回来后总监审批（带超时升级）
+  每个元素上方的中文注释说明三件事：业务含义 / 关键属性含义 / 与 Java 代码怎么接。
+-->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="http://example.flowable.demo/purchase">
+
+  <!-- process：流程定义根节点，id 即部署后的 processKey（startProcessInstanceByKey 用它启动）。
+       executionListener(start/end)：流程实例启动、结束时回调 Java 类 → listener/ProcessStartEndExecutionListener -->
+  <process id="purchaseApproval" name="采购申请审批" isExecutable="true">
+    <extensionElements>
+      <flowable:executionListener event="start" class="com.example.flowable.demo.listener.ProcessStartEndExecutionListener"/>
+      <flowable:executionListener event="end" class="com.example.flowable.demo.listener.ProcessStartEndExecutionListener"/>
+    </extensionElements>
+
+    <!-- 开始节点：流程从这里进入第一个任务 -->
+    <startEvent id="start" name="开始"/>
+
+    <!-- 提交采购申请：发起人填写。
+         assignee=${initiator}：办理人取流程变量 initiator（启动时传入发起人姓名）。
+         本任务完成时提交变量：amount（金额）、reason（事由）；
+         驳回重填回到这里时，前置的「重置审批结果」服务任务已把 approved 重置为 true -->
+    <userTask id="submitApplication" name="提交采购申请" flowable:assignee="${initiator}"/>
+
+    <sequenceFlow id="flow1" sourceRef="start" targetRef="submitApplication"/>
+
+    <!-- 排他网关「金额分支」：按条件只走一条 outgoing 连线。
+         两条连线都带 conditionExpression（UEL 表达式），且必须覆盖所有取值，否则报 no outgoing sequence flow -->
+    <exclusiveGateway id="amountGateway" name="金额分支"/>
+
+    <sequenceFlow id="flow2" sourceRef="submitApplication" targetRef="amountGateway"/>
+
+    <!-- 小额分支：amount < 10000。注意 XML 里 < 必须写成 &lt; -->
+    <sequenceFlow id="flowSmall" name="小额" sourceRef="amountGateway" targetRef="supervisorApproval">
+      <conditionExpression xsi:type="tFormalExpression">${amount &lt; 10000}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- 大额分支：amount >= 10000。
+         executionListener(event=take)：流程经过这条连线时回调 → listener/GatewayTakeExecutionListener -->
+    <sequenceFlow id="flowBig" name="大额" sourceRef="amountGateway" targetRef="callLargeAmount">
+      <extensionElements>
+        <flowable:executionListener event="take" class="com.example.flowable.demo.listener.GatewayTakeExecutionListener"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression">${amount &gt;= 10000}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- 部门主管审批：固定办理人（演示写死；生产应改成变量或候选组）。
+         taskListener：任务创建（create）、分配（assignment）、完成（complete）三时机回调 → listener/ApprovalTaskListener。
+         一个事件写一个 <flowable:taskListener> 元素（官方文档和建模器都是这种写法，兼容所有版本）；
+         不要把多个事件挤在一个 event 属性里。
+         完成时提交变量：approved（true 通过 / false 驳回） -->
+    <userTask id="supervisorApproval" name="部门主管审批" flowable:assignee="王主管">
+      <extensionElements>
+        <flowable:taskListener event="create" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+        <flowable:taskListener event="assignment" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+        <flowable:taskListener event="complete" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+      </extensionElements>
+    </userTask>
+
+    <sequenceFlow id="flow3" sourceRef="supervisorApproval" targetRef="resultGateway"/>
+
+    <!-- 调用活动：启动另一个流程定义（calledElement = 子流程的 process id）。
+         关键教学点：子流程变量作用域不跨调用活动边界——子流程里查不到主流程变量，
+         所以子流程需要用到的变量必须逐个 flowable:in 传进去。
+         这里传 6 个：amount/reason/initiator 是业务数据；
+         managerList 是子流程会签的候选人集合（flowable:collection 要用）；
+         voteResults 是会签投票结果列表（会签任务监听器里 append，必须先传入存在）；
+         approved 主流程启动时已是 true，传入后子流程里才可能被否决改写。
+         flowable:out：子流程结束后把子流程变量复制回主流程。
+         会签若有人否决会把子流程里的 approved 改成 false，经 out 传回主流程；
+         voteResults 同样传回，场景末尾的变量快照里能看到投票结果（每票明细由监听器实时打印）。
+         注意：驳回回环只重置 approved，不重置 voteResults——否决后重填再走大额时，旧投票记录会留在列表里 -->
+    <callActivity id="callLargeAmount" name="大额审批子流程" calledElement="largeAmountApproval">
+      <extensionElements>
+        <flowable:in source="amount" target="amount"/>
+        <flowable:in source="reason" target="reason"/>
+        <flowable:in source="initiator" target="initiator"/>
+        <flowable:in source="managerList" target="managerList"/>
+        <flowable:in source="voteResults" target="voteResults"/>
+        <flowable:in source="approved" target="approved"/>
+        <flowable:out source="approved" target="approved"/>
+        <flowable:out source="voteResults" target="voteResults"/>
+      </extensionElements>
+    </callActivity>
+
+    <!-- 总监审批：只在大额路径经过。完成时提交变量 approved -->
+    <userTask id="directorApproval" name="总监审批" flowable:assignee="李总监">
+      <extensionElements>
+        <flowable:taskListener event="create" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+        <flowable:taskListener event="assignment" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+        <flowable:taskListener event="complete" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+      </extensionElements>
+    </userTask>
+
+    <sequenceFlow id="flow4" sourceRef="callLargeAmount" targetRef="directorApproval"/>
+
+    <!-- 定时边界事件：挂在「总监审批」任务上。
+         timeDuration=${timeoutDuration}：超时时长取流程变量（ISO-8601 时长，如 PT24H、PT3S）；
+         cancelActivity=true：超时触发时中断总监审批任务（任务被删除），流程改走边界事件的 outgoing 连线。
+         定时器依赖异步执行器：控制台版 setAsyncExecutorActivate(true)，Boot 版 flowable.async-executor-activate: true -->
+    <boundaryEvent id="directorTimeout" name="审批超时" attachedToRef="directorApproval" cancelActivity="true">
+      <timerEventDefinition>
+        <timeDuration>${timeoutDuration}</timeDuration>
+      </timerEventDefinition>
+    </boundaryEvent>
+
+    <sequenceFlow id="flow5" sourceRef="directorTimeout" targetRef="ceoApproval"/>
+
+    <!-- 总经理特批：超时升级后的兜底审批。完成时提交变量 approved -->
+    <userTask id="ceoApproval" name="总经理特批" flowable:assignee="赵总经理">
+      <extensionElements>
+        <flowable:taskListener event="create" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+        <flowable:taskListener event="assignment" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+        <flowable:taskListener event="complete" class="com.example.flowable.demo.listener.ApprovalTaskListener"/>
+      </extensionElements>
+    </userTask>
+
+    <sequenceFlow id="flow6" sourceRef="directorApproval" targetRef="resultGateway"/>
+    <sequenceFlow id="flow7" sourceRef="ceoApproval" targetRef="resultGateway"/>
+
+    <!-- 排他网关「审批结果」：approved=true 走「通过」，否则走「驳回」。
+         approved 在流程启动时默认 true，任一环节否决会被改成 false -->
+    <exclusiveGateway id="resultGateway" name="审批结果"/>
+
+    <!-- 通过分支：take 监听器演示网关流转日志 -->
+    <sequenceFlow id="flow8" name="通过" sourceRef="resultGateway" targetRef="notifyResult">
+      <extensionElements>
+        <flowable:executionListener event="take" class="com.example.flowable.demo.listener.GatewayTakeExecutionListener"/>
+      </extensionElements>
+      <conditionExpression xsi:type="tFormalExpression">${approved == true}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- 驳回分支：先经过「重置审批结果」把 approved 置回 true，再回到发起人重填（BPMN 允许回环） -->
+    <sequenceFlow id="flow9" name="驳回" sourceRef="resultGateway" targetRef="resetApproved">
+      <conditionExpression xsi:type="tFormalExpression">${approved == false}</conditionExpression>
+    </sequenceFlow>
+
+    <!-- 表达式服务任务：不写 Java 类，直接用 UEL 调 execution.setVariable('approved', true)，
+         保证发起人重新提交后能重新走完整审批链 -->
+    <serviceTask id="resetApproved" name="重置审批结果" flowable:expression="${execution.setVariable('approved', true)}"/>
+
+    <sequenceFlow id="flow10" sourceRef="resetApproved" targetRef="submitApplication"/>
+
+    <!-- 服务任务「发送通知」：class 方式 JavaDelegate → delegate/NotifyDelegate。
+         flowable:field 字段注入：to 是表达式（${initiator}），template 是常量字符串。
+         与 Spring 版 delegateExpression（注入 Spring Bean）写法的对照见运行指南 -->
+    <serviceTask id="notifyResult" name="发送通知" flowable:class="com.example.flowable.demo.delegate.NotifyDelegate">
+      <extensionElements>
+        <flowable:field name="to">
+          <flowable:expression>${initiator}</flowable:expression>
+        </flowable:field>
+        <flowable:field name="template">
+          <flowable:string>采购审批结果通知</flowable:string>
+        </flowable:field>
+      </extensionElements>
+    </serviceTask>
+
+    <sequenceFlow id="flow11" sourceRef="notifyResult" targetRef="endApproved"/>
+
+    <!-- 结束（通过）：流程实例到此结束 -->
+    <endEvent id="endApproved" name="结束（通过）"/>
+  </process>
+</definitions>
