@@ -80,9 +80,17 @@ function isSubformChildEmpty(field: FormField, value: unknown): boolean {
 export function assertSubformConstraints(
   fields: FormField[] | null,
   data: Record<string, unknown>,
+  keys: string[] | 'all' = 'all',
 ) {
+  const wanted = keys === 'all' ? null : new Set(keys);
   for (const field of flattenFields(fields ?? [])) {
     if (field.type !== 'subform') {
+      continue;
+    }
+    if (field.visible === false) {
+      continue;
+    }
+    if (wanted && !wanted.has(field.key!)) {
       continue;
     }
     const rows = Array.isArray(data[field.key])
@@ -146,7 +154,7 @@ export class FormRecordPersistService {
     if (input.requiredKeys) {
       assertRequiredFields(fields, data, input.requiredKeys);
     }
-    assertSubformConstraints(fields, data);
+    assertSubformConstraints(fields, data, input.requiredKeys ?? 'all');
     await this.assertUniqueFields(form.id, fields, data, recordId);
     if (!existing && !input.skipSerial) {
       await this.applySerialNumber(form.id, fields, data);

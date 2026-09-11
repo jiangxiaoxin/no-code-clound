@@ -8,7 +8,6 @@ import { Repository } from 'typeorm';
 import { AppAccessService } from '../access/app-access.service';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
-import { FormRecordStore } from '../form-record/form-record.store';
 import { parseFormSchema } from '../form-schema';
 import { AddSignTaskDto } from './dto/add-sign-task.dto';
 import { CompleteTaskDto } from './dto/complete-task.dto';
@@ -33,7 +32,6 @@ export class WorkflowInstanceService {
     @InjectRepository(AppForm)
     private readonly formRepo: Repository<AppForm>,
     private readonly persist: FormRecordPersistService,
-    private readonly store: FormRecordStore,
     private readonly engine: WorkflowEngine,
     private readonly access: AppAccessService,
     private readonly definition: WorkflowDefinitionService,
@@ -192,7 +190,6 @@ export class WorkflowInstanceService {
     actorId: number,
     data: Record<string, unknown>,
   ) {
-    const existing = await this.store.findById(instance.formId, instance.recordId);
     await this.persist.persist({
       form,
       actorId,
@@ -201,7 +198,6 @@ export class WorkflowInstanceService {
         data,
         parseFormSchema(form.fields).fields,
         instance.graph,
-        existing?.data,
       ),
     });
   }

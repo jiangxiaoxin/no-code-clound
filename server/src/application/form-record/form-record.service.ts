@@ -317,7 +317,6 @@ export class FormRecordService {
           data,
           parseFormSchema(form.fields).fields,
           runtime.graph,
-          existing?.data,
         ),
       });
       const submitted = await this.engine.resubmitApproved({

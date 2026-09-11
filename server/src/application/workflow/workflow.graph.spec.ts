@@ -317,10 +317,48 @@ describe('workflow.graph 抄送', () => {
         { field_reason: '事假', field_days: 3 },
         fields,
         graph,
-        { field_days: 1 },
       ),
     ).toEqual({
-      data: { field_reason: '事假', field_days: 1 },
+      data: { field_reason: '事假' },
+      requiredKeys: ['field_reason'],
+    });
+  });
+
+  it('prepareStartPersistInput 不把只读、不可见字段的客户端值写入补丁', () => {
+    const fields: FormField[] = [
+      { key: 'field_reason', type: 'textarea', title: '事由' },
+      { key: 'field_when', type: 'datetime', title: '申请时间' },
+      { key: 'field_note', type: 'input', title: '内部备注' },
+    ];
+    const graph: WorkflowGraph = {
+      nodes: [
+        {
+          key: 'start',
+          type: 'start',
+          title: '开始',
+          x: 0,
+          y: 0,
+          fieldAccess: {
+            field_reason: 'editable',
+            field_when: 'readonly',
+            field_note: 'hidden',
+          },
+        },
+      ],
+      edges: [],
+    };
+    expect(
+      prepareStartPersistInput(
+        {
+          field_reason: '事假',
+          field_when: '2026-09-08T10:00:00.000Z',
+          field_note: '不该写入',
+        },
+        fields,
+        graph,
+      ),
+    ).toEqual({
+      data: { field_reason: '事假' },
       requiredKeys: ['field_reason'],
     });
   });
