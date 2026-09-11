@@ -253,7 +253,7 @@ export class WorkflowEngine {
           fields,
         );
         assertRequiredFields(fields, merged, requiredKeys);
-        assertSubformConstraints(fields, merged);
+        assertSubformConstraints(fields, merged, requiredKeys);
       }
     }
     const done = await this.taskRepo.update(
