@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { AppForm } from '../app-form.entity';
@@ -12,6 +13,7 @@ import { assertRequiredFields } from './form-record.required';
 import { FormRecordDoc, FormRecordStore } from './form-record.store';
 import { FormField } from './form-record.types';
 import { FormSerialSeqService } from './form-serial-seq.service';
+import { applyFormulaValues } from './formula/evaluator';
 import {
   findSerialField,
   periodKey,
@@ -103,7 +105,7 @@ export function assertSubformConstraints(
     for (const row of rows) {
       for (const child of children) {
         // 不可见子列在填报界面不渲染，不能按必填拦提交
-        if (!child.required || child.visible === false) {
+        if (!child.required || child.visible === false || child.formula) {
           continue;
         }
         if (isSubformChildEmpty(child, row[child.key])) {
@@ -136,6 +138,8 @@ export function assertSubformConstraints(
 
 @Injectable()
 export class FormRecordPersistService {
+  private readonly logger = new Logger(FormRecordPersistService.name);
+
   constructor(
     private readonly store: FormRecordStore,
     private readonly serialSeq: FormSerialSeqService,
@@ -151,6 +155,8 @@ export class FormRecordPersistService {
     const data = existing
       ? mergeRecordData(existing.data ?? {}, input.data, fields)
       : coerceRecordData(fields, input.data);
+    const now = new Date();
+    this.applyFormulas(fields, data, now);
     if (input.requiredKeys) {
       assertRequiredFields(fields, data, input.requiredKeys);
     }
@@ -169,7 +175,6 @@ export class FormRecordPersistService {
       if (!doc) throw new NotFoundException('记录不存在');
       return doc;
     }
-    const now = new Date();
     const inserted = await this.store.insert({
       appId: form.applicationId,
       formId: form.id,
@@ -207,6 +212,16 @@ export class FormRecordPersistService {
       );
     }
     data[field.key] = renderSerialValue(field, data, now, counterValue);
+  }
+
+  applyFormulas(
+    fields: FormField[] | null,
+    data: Record<string, unknown>,
+    now: Date,
+  ) {
+    for (const warning of applyFormulaValues(fields ?? [], data, now)) {
+      this.logger.warn(warning);
+    }
   }
 
   private async assertUniqueFields(

@@ -61,4 +61,17 @@ describe('assertRequiredFields', () => {
     ];
     expect(() => assertRequiredFields(hidden, { reason: '' }, 'all')).not.toThrow();
   });
+
+  it('公式字段跳过必填', () => {
+    const withFormula: FormField[] = [
+      {
+        key: 't',
+        title: '合计',
+        type: 'number',
+        required: true,
+        formula: { expr: "$'a' + 1" },
+      },
+    ];
+    expect(() => assertRequiredFields(withFormula, {}, 'all')).not.toThrow();
+  });
 });

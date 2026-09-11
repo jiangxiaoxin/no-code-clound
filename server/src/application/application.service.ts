@@ -33,6 +33,7 @@ import { normalizeFormViewers } from './form-data-access';
 import { startNodeOf } from './workflow/workflow.graph';
 import { parseFormSchema, serializeFormSchema } from './form-schema';
 import { assertSerialSchema } from './form-record/serial-number';
+import { assertFormulaSchemas } from './formula-schema';
 
 const OPTION_FIELD_TYPES = new Set([
   'input',
@@ -252,6 +253,7 @@ export class ApplicationService {
     const form = await this.requireForm(appId, formId);
     const flat = flattenFields(fields as FormField[]);
     assertSerialSchema(flat);
+    assertFormulaSchemas(fields as FormField[]);
     await this.assertSourceFormsInApp(appId, flat);
     form.fields = serializeFormSchema(
       fields as Record<string, unknown>[],

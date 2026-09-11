@@ -45,7 +45,18 @@
         <el-input v-model="field.description" type="textarea" :rows="3" maxlength="200" show-word-limit
           placeholder="填写后，标题右侧会显示说明" />
       </el-form-item>
-      <el-form-item v-if="!isSerialField && !isRelateSubform" label="校验设置">
+      <el-form-item v-if="canEditFormula" label="计算公式">
+        <div class="formula-row">
+          <span class="formula-summary">{{ formulaSummary(field) || '未设置' }}</span>
+          <el-button link type="primary" @click="formulaDialogVisible = true">
+            编辑公式
+          </el-button>
+          <el-button v-if="hasFieldFormula" link type="danger" @click="onClearFormula">
+            清除
+          </el-button>
+        </div>
+      </el-form-item>
+      <el-form-item v-if="!isSerialField && !isRelateSubform && !hasFieldFormula" label="校验设置">
         <div style="width: 100%;">
           <div class="required-row">
             <span>必填</span>
@@ -724,6 +735,12 @@
         :form-fields="parentSubform ? conditionFields : formFields"
         @confirm="onLinkageConfirm"
       />
+      <FormulaEditorDialog
+        v-model="formulaDialogVisible"
+        :field="field"
+        :fields="fields"
+        @save="onFormulaSaved"
+      />
       <FormOptionFilterDialog
         v-model="filterVisible"
         :app-id="appId"
@@ -1061,6 +1078,13 @@ import DataSelectDisplayFieldsDialog from './DataSelectDisplayFieldsDialog.vue'
 import DataSelectFillMappingDialog from './DataSelectFillMappingDialog.vue'
 import DataSelectProcessDrawer from './DataSelectProcessDrawer.vue'
 import DataLinkageDialog from './DataLinkageDialog.vue'
+import FormulaEditorDialog from './FormulaEditorDialog.vue'
+import {
+  clearFormulaExclusiveFlags,
+  formulaSummary,
+  isFormulaCapable,
+  isFormulaField,
+} from './formulaField.js'
 import SubformLinkageDialog from './SubformLinkageDialog.vue'
 import { hasOptionFilters } from './optionFilters'
 import {
@@ -1487,6 +1511,23 @@ const isCurrentDisplayField = computed(
 
 const isSerialField = computed(() => props.field?.type === 'serialNumber')
 const isRelateSubform = computed(() => isRelateSubformField(props.field))
+
+const canEditFormula = computed(() => isFormulaCapable(props.field?.type))
+const hasFieldFormula = computed(() => isFormulaField(props.field))
+const formulaDialogVisible = ref(false)
+
+function onFormulaSaved({ expr, refs }) {
+  if (!props.field) return
+  props.field.formula = { expr, refs }
+  clearFormulaExclusiveFlags(props.field)
+  formulaDialogVisible.value = false
+}
+
+function onClearFormula() {
+  if (!props.field) return
+  delete props.field.formula
+}
+
 const relateSubformForms = ref([])
 
 const relateSubformLabel = computed(() => {
@@ -2184,6 +2225,22 @@ watch(
 
 .required-row+.required-row {
   margin-top: 12px;
+}
+
+.formula-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.formula-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
 }
 
 .max-length-input {

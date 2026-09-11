@@ -256,6 +256,17 @@ describe('mergeRecordData', () => {
     ).toEqual({ name: 'B', sn: '20260831-00001' });
   });
 
+  it('drops client formula values on coerce and merge', () => {
+    const formulaFields = [
+      { key: 'a', type: 'number' },
+      { key: 't', type: 'number', formula: { expr: "$'a' + 1" } },
+    ];
+    expect(coerceRecordData(formulaFields, { a: 1, t: 999 })).toEqual({ a: 1 });
+    expect(
+      mergeRecordData({ a: 1, t: 2 }, { a: 3, t: 999 }, formulaFields),
+    ).toEqual({ a: 3 });
+  });
+
   it('relate-subform 不入库', () => {
     const fields = [
       { key: 'name', type: 'input' },

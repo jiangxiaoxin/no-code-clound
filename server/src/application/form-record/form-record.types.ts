@@ -10,6 +10,11 @@ export type SerialRuleSegment = {
   fieldKey?: string;
 };
 
+export type FieldFormula = {
+  expr: string;
+  refs?: string[];
+};
+
 export type FormField = {
   key: string;
   type: string;
@@ -19,10 +24,12 @@ export type FormField = {
   dictCode?: string;
   required?: boolean;
   visible?: boolean;
+  format?: string;
   optionSource?: string;
   addressFormat?: string;
   serialSeparator?: string;
   serialRule?: SerialRuleSegment[];
+  formula?: FieldFormula;
   panes?: { id: string; title?: string; fields?: FormField[] }[];
   fields?: FormField[];
 };

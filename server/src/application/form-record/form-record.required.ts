@@ -47,6 +47,7 @@ export function assertRequiredFields(
   for (const field of flattenFields(fields ?? [])) {
     if (field.visible === false || !field.required || !field.key) continue;
     if (SKIP_REQUIRED_TYPES.has(field.type)) continue;
+    if (field.formula) continue;
     if (wanted && !wanted.has(field.key)) continue;
     if (isMainFieldEmpty(field, data[field.key])) {
       throw new BadRequestException(`请填写${field.title || '未命名'}`);

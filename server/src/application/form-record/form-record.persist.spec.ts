@@ -63,4 +63,25 @@ describe('assertSubformConstraints', () => {
       assertSubformConstraints([detail], {}, ['rows']),
     ).toThrow('[订单明细]不能为空');
   });
+
+  it('公式子列不算必填', () => {
+    const fields: FormField[] = [
+      {
+        ...detail,
+        fields: [
+          {
+            key: 'name',
+            title: '物料名称',
+            type: 'input',
+            required: true,
+            formula: { expr: "$'qty'" },
+          },
+          { key: 'qty', title: '数量', type: 'number' },
+        ],
+      },
+    ];
+    expect(() =>
+      assertSubformConstraints(fields, { rows: [{ qty: 2 }] }),
+    ).not.toThrow();
+  });
 });

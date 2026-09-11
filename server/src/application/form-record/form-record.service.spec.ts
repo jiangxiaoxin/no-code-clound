@@ -243,6 +243,47 @@ describe('FormRecordService', () => {
     );
   });
 
+  it('创建时按公式重算并丢弃客户端传值', async () => {
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        { key: 'a', type: 'number' },
+        { key: 't', type: 'number', formula: { expr: "$'a' + 1" } },
+      ],
+    });
+    store.insert.mockResolvedValue({ id: doc._id.toHexString() });
+    store.findById.mockResolvedValue(doc);
+    userRepo.find.mockResolvedValue([]);
+
+    await service.create(1, 8, 12, { a: 1, t: 999 });
+
+    expect(store.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { a: 1, t: 2 } }),
+    );
+  });
+
+  it('更新时按公式重算覆盖客户端传值', async () => {
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        { key: 'a', type: 'number' },
+        { key: 't', type: 'number', formula: { expr: "$'a' + 1" } },
+      ],
+    });
+    store.findById.mockResolvedValue({ ...doc, data: { a: 1, t: 2 } });
+    store.replaceData.mockResolvedValue({ ...doc, data: { a: 5, t: 6 } });
+    userRepo.find.mockResolvedValue([]);
+
+    await service.update(1, 8, 12, doc._id.toHexString(), { a: 5, t: 999 });
+
+    expect(store.replaceData).toHaveBeenCalledWith(
+      12,
+      doc._id.toHexString(),
+      { a: 5, t: 6 },
+      1,
+    );
+  });
+
   it('rejects create when a unique number value already exists', async () => {
     formRepo.findOne.mockResolvedValue({
       ...form,

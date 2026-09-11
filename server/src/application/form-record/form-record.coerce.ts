@@ -112,6 +112,10 @@ function coerceSubformValue(field: FormField, value: unknown): unknown {
 }
 
 function coerceFieldValue(field: FormField, value: unknown): unknown {
+  // 公式字段的值一律由服务端重算，客户端传值直接丢弃，防篡改
+  if (field.formula?.expr) {
+    return undefined;
+  }
   switch (field.type) {
     case 'divider':
     case 'tabs':

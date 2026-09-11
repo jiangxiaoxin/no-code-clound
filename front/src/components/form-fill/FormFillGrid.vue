@@ -76,6 +76,11 @@ import { resolveFieldAccess } from '../workflow-design/fieldAccess.js'
 import FormFillField from './FormFillField.vue'
 import { emptyValue, isSchemaVisible } from './fillValues.js'
 import {
+  collectMainFormulaFields,
+  computeMainFormulaWrites,
+  mainFormulaSignature,
+} from './formulaRuntime'
+import {
   applyLinkageResult,
   applyPendingValueWrites,
   linkageConditionsReady,
@@ -142,6 +147,26 @@ watch(
 const fillTips = computed(() => fillInfluencerTips(props.fields))
 const flatFields = computed(() => flattenFields(props.fields))
 const tabsField = computed(() => findTabsField(props.fields))
+
+const mainFormulaFields = computed(() => collectMainFormulaFields(props.fields))
+const formulaSignature = computed(() =>
+  mainFormulaSignature(mainFormulaFields.value, props.values),
+)
+watch(
+  formulaSignature,
+  () => {
+    // 纯同步计算，不需要防抖；写回触发的下一轮签名不变会自然收敛
+    for (const item of computeMainFormulaWrites(
+      mainFormulaFields.value,
+      props.values,
+    )) {
+      if (props.values[item.key] !== item.value) {
+        props.values[item.key] = item.value
+      }
+    }
+  },
+  { immediate: true },
+)
 const activePaneId = ref('')
 const tableItemsByKey = ref({})
 const linkageItemsByKey = ref({})

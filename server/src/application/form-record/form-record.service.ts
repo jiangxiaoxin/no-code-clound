@@ -549,6 +549,7 @@ export class FormRecordService {
         bucket.add(value);
       }
       if (skip) continue;
+      this.persist.applyFormulas(fields, data, now);
       await this.persist.applySerialNumber(formId, fields, data);
       docs.push({
         appId,

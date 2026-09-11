@@ -272,6 +272,8 @@ export function firstRequiredError(
 ) {
   for (const field of flattenFields(fields)) {
     if (skipRequiredByAccess(field, fieldAccess)) continue
+    // 公式字段值由计算得出，用户无需填写，必填校验跳过
+    if (field.formula?.expr) continue
     if (field.type === 'subform') {
       if (!workflowForm && !isSchemaVisible(field)) continue
       const required = subformRowsRequiredError(field, values[field.key])
@@ -342,7 +344,8 @@ export function isInlineEditable(field) {
     INLINE_EDIT_TYPES.has(field.type) &&
     !field.disabled &&
     field.editable !== false &&
-    field.optionSource !== 'linkage'
+    field.optionSource !== 'linkage' &&
+    !field.formula?.expr
   )
 }
 

@@ -11,6 +11,11 @@
           <Link />
         </el-icon>
       </el-tooltip>
+      <el-tooltip v-if="isFormulaField" content="按公式自动计算" placement="top">
+        <el-icon class="fill-field-fill">
+          <Odometer />
+        </el-icon>
+      </el-tooltip>
       <el-tooltip v-if="fillTip" :content="fillTip" placement="top">
         <el-icon class="fill-field-fill">
           <Connection />
@@ -268,7 +273,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Connection, InfoFilled, Link } from '@element-plus/icons-vue'
+import { Connection, InfoFilled, Link, Odometer } from '@element-plus/icons-vue'
 import { widthClass } from '../form-design/fieldTypes'
 import {
   hasLinkage,
@@ -337,8 +342,11 @@ const linked = computed(
 const isRelateSubform = computed(() => isRelateSubformField(props.field))
 const relateSubformTitleTip = RELATE_SUBFORM_TITLE_TIP
 
+const isFormulaField = computed(() => Boolean(props.field.formula?.expr))
+
 const isDisabled = computed(
   () =>
+    isFormulaField.value ||
     props.disabled ||
     Boolean(props.field.disabled) ||
     (!props.workflowForm && props.updating && props.field.editable === false),

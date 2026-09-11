@@ -1038,6 +1038,46 @@ describe('ApplicationService', () => {
         expect.objectContaining({ fields }),
       );
     });
+
+    it('saves a valid formula and writes back refs', async () => {
+      repo.findOne.mockResolvedValue(ownedApp);
+      formRepo.findOne.mockResolvedValue({
+        id: 10,
+        name: '入职登记',
+        applicationId: 8,
+        groupId: 2,
+        fields: null,
+      });
+      formRepo.save.mockImplementation(async (row: AppForm) => row);
+      formRecordStore.syncIndexes.mockResolvedValue(undefined);
+      const fields = [
+        { key: 'a', type: 'number', title: '数量' },
+        {
+          key: 't',
+          type: 'number',
+          title: '合计',
+          formula: { expr: "$'a' + 1" },
+        },
+      ];
+
+      await expect(service.saveFields(1, 8, 10, fields)).resolves.toEqual({
+        id: 10,
+        name: '入职登记',
+        groupId: 2,
+        formKind: 'normal',
+        fields: [
+          { key: 'a', type: 'number', title: '数量' },
+          {
+            key: 't',
+            type: 'number',
+            title: '合计',
+            formula: { expr: "$'a' + 1", refs: ['a'] },
+          },
+        ],
+        columns: 1,
+      });
+      expect(formRepo.save).toHaveBeenCalled();
+    });
   });
 
   describe('listFormFields', () => {

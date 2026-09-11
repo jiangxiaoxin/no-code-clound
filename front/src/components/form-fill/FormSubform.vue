@@ -107,6 +107,11 @@ import {
   shouldSubformDataSelectMultiple,
 } from './subformField.js'
 import {
+  collectRowFormulaChildren,
+  computeRowFormulaWrites,
+  rowFormulaSignature,
+} from './formulaRuntime'
+import {
   applyLinkageResult,
   linkageConditionsReady,
   linkageQueryPaging,
@@ -219,6 +224,30 @@ function commit(next) {
   emit('update:modelValue', plainRows(next))
   syncing = false
 }
+
+const rowFormulaChildren = computed(() => collectRowFormulaChildren(children.value))
+// 签名只含非公式子字段的值和主表引用快照，公式写回不会反过来触发自身
+const rowFormulaSig = computed(() =>
+  rowFormulaSignature(rowFormulaChildren.value, rows.value, props.recordValues),
+)
+watch(
+  rowFormulaSig,
+  () => {
+    const writes = []
+    for (const row of rows.value) {
+      const next = computeRowFormulaWrites(
+        rowFormulaChildren.value,
+        row,
+        props.recordValues,
+      )
+      for (const [key, value] of Object.entries(next)) {
+        if (row[key] !== value) writes.push({ uid: row.__uid, key, value })
+      }
+    }
+    if (writes.length) commit(applyCellWrites(rows.value, writes))
+  },
+  { immediate: true },
+)
 
 watch(
   () => props.modelValue,

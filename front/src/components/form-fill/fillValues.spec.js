@@ -478,3 +478,15 @@ test('流程表单按节点权限跳过不可见和只读字段的必填', () =>
     'days',
   )
 })
+
+test('formula field skips required and inline edit', () => {
+  const field = {
+    key: 't',
+    type: 'number',
+    title: '合计',
+    required: true,
+    formula: { expr: "$'a' + 1", refs: ['a'] },
+  }
+  assert.equal(isInlineEditable(field), false)
+  assert.equal(firstRequiredError([field], {}), null)
+})
