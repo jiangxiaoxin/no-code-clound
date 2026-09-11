@@ -10,7 +10,7 @@
         />
         <h1 class="admin-title">{{ appName }}</h1>
       </div>
-      <el-button v-if="isOwner" @click="openTransfer">移交所有者</el-button>
+      <el-button v-if="isOwner" @click="openTransfer" type="danger">移交所有者</el-button>
     </el-header>
     <el-container class="admin-body">
       <el-aside class="admin-aside" width="200px">

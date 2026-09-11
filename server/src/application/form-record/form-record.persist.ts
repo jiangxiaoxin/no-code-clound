@@ -96,7 +96,7 @@ export function assertSubformConstraints(
     const rows = Array.isArray(data[field.key])
       ? (data[field.key] as Record<string, unknown>[])
       : [];
-    if (field.required && field.visible !== false && rows.length === 0) {
+    if (field.required && rows.length === 0) {
       throw new BadRequestException(`[${field.title || '未命名'}]不能为空`);
     }
     const children = field.fields ?? [];

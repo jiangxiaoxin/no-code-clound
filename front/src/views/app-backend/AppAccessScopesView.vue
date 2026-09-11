@@ -3,8 +3,8 @@
     <div class="page-toolbar">
       <h2 class="page-title">使用范围</h2>
       <div class="toolbar-actions">
-        <el-button @click="openDept">添加部门</el-button>
-        <el-button @click="openRole">添加角色</el-button>
+        <el-button type="primary" @click="openDept">添加部门</el-button>
+        <el-button type="primary" @click="openRole">添加角色</el-button>
         <el-button type="primary" @click="openUser">添加人员</el-button>
       </div>
     </div>
@@ -32,12 +32,14 @@
     <h3 class="section-title">开放范围</h3>
     <div class="table-wrap">
       <el-table v-loading="loading" :data="scopes" border stripe height="100%">
-        <el-table-column label="类型" width="100">
+        <el-table-column label="类型" >
           <template #default="{ row }">
-            {{ typeLabel(row.type) }}
+            <el-tag size="small" :type="typeTagType(row.type)">
+              {{ typeLabel(row.type) }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="对象" min-width="240">
+        <el-table-column label="对象">
           <template #default="{ row }">
             {{ row.label }}
           </template>
@@ -66,6 +68,7 @@
         check-strictly
         clearable
         placeholder="选择部门"
+        :default-expand-all="true"
       />
       <template #footer>
         <el-button @click="closeDept">取消</el-button>
@@ -139,6 +142,12 @@ function typeLabel(type) {
   if (type === 'department') return '部门'
   if (type === 'role') return '角色'
   return '人员'
+}
+
+function typeTagType(type) {
+  if (type === 'department') return 'primary'
+  if (type === 'role') return 'warning'
+  return 'success'
 }
 
 // 换应用很快时旧请求可能比新请求后回来：只认最后一次 load 的响应，旧的直接扔掉
