@@ -247,6 +247,58 @@ describe('WorkflowEngine', () => {
     );
   });
 
+  it('审批通过时不拦只读或不可见的必填子表', async () => {
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        { key: 'field_reason', type: 'textarea', title: '事由' },
+        {
+          key: 'field_detail',
+          type: 'subform',
+          title: '请假明细',
+          required: true,
+          fields: [{ key: 'name', type: 'input', title: '说明', required: true }],
+        },
+      ],
+    });
+    store.findById.mockResolvedValue({ data: { field_leave_type: '事假' } });
+    taskRepo.findOne.mockResolvedValue({
+      id: 3,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        currentNodeKey: 'n1',
+        graph: {
+          ...leaveGraph,
+          nodes: leaveGraph.nodes.map((node) =>
+            node.key === 'n1'
+              ? {
+                  ...node,
+                  fieldAccess: {
+                    field_reason: 'editable',
+                    field_detail: 'hidden',
+                  },
+                }
+              : node,
+          ),
+        },
+      }),
+    );
+    await engine.completeTask({
+      taskId: 3,
+      actorId: 21,
+      action: 'approve',
+      comment: '',
+      dataPatch: { field_reason: '同意' },
+    });
+    expect(persist.persist).toHaveBeenCalled();
+  });
+
   it('会签：李四也通过后已通过', async () => {
     taskRepo.findOne.mockResolvedValue({
       id: 4,
