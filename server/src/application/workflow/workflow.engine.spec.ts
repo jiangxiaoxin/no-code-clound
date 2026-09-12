@@ -1076,4 +1076,59 @@ describe('WorkflowEngine 抄送', () => {
     await expect(engine.expireIfOverdue(1)).resolves.toBe(false);
     expect(instanceRepo.update).not.toHaveBeenCalled();
   });
+
+  it('抢占失败时不要先取消待办', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        dueAt: new Date(Date.now() - 1000),
+      }),
+    );
+    instanceRepo.update.mockResolvedValue({ affected: 0 });
+    await expect(engine.expireIfOverdue(1)).resolves.toBe(false);
+    expect(taskRepo.update).not.toHaveBeenCalled();
+    expect(store.setWorkflowMeta).not.toHaveBeenCalled();
+  });
+
+  it('同意过程中被超时驳回时不要把单据写回审批中', async () => {
+    const running = runningInstance({
+      dueAt: new Date(Date.now() + 60_000),
+    });
+    const rejected = {
+      ...running,
+      status: 'rejected',
+      currentNodeKey: null,
+    };
+    taskRepo.findOne.mockResolvedValue({
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne
+      .mockResolvedValueOnce(running)
+      .mockResolvedValueOnce(running)
+      .mockResolvedValueOnce(rejected)
+      .mockResolvedValueOnce(rejected);
+    await expect(
+      engine.completeTask({
+        taskId: 1,
+        actorId: 21,
+        action: 'approve',
+        comment: '',
+        dataPatch: {},
+      }),
+    ).rejects.toThrow('流程已超时');
+    expect(store.setWorkflowMeta).toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'rejected' }),
+    );
+    expect(store.setWorkflowMeta).not.toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'running' }),
+    );
+  });
 });

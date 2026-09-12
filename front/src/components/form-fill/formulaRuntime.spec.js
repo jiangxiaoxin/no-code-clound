@@ -75,7 +75,9 @@ test('computeMainFormulaWrites 引用缺失时该字段留空', () => {
   const formulaFields = [
     { key: 't', type: 'number', formula: { expr: "$'a' + 1", refs: ['a'] } },
   ]
-  assert.deepEqual(computeMainFormulaWrites(formulaFields, {}), [])
+  assert.deepEqual(computeMainFormulaWrites(formulaFields, { t: 9 }), [
+    { key: 't', value: undefined },
+  ])
 })
 
 test('computeMainFormulaWrites 聚合子表列', () => {
@@ -177,12 +179,14 @@ test('computeRowFormulaWrites 引用本行与主表字段并支持链式', () =>
   )
 })
 
-test('computeRowFormulaWrites 行值优先于主表且空结果不写', () => {
+test('computeRowFormulaWrites 行值优先于主表且空结果清掉旧值', () => {
   const children = [
     { key: 'a', type: 'number', formula: { expr: "$'qty'", refs: ['qty'] } },
   ]
   assert.deepEqual(computeRowFormulaWrites(children, { __uid: 1, qty: 3 }, { qty: 9 }), {
     a: 3,
   })
-  assert.deepEqual(computeRowFormulaWrites(children, { __uid: 1, qty: null }, {}), {})
+  assert.deepEqual(computeRowFormulaWrites(children, { __uid: 1, qty: null, a: 8 }, {}), {
+    a: undefined,
+  })
 })

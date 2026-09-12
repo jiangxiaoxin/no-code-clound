@@ -145,6 +145,50 @@ describe('applyFormulaValues', () => {
     expect(data.total).toBe(8);
   });
 
+  it('结果为空时清掉主表上一次算出的值', () => {
+    const fields = [
+      {
+        key: 'sub01',
+        type: 'subform',
+        title: '明细',
+        fields: [{ key: 'qty', type: 'number', title: '数量' }],
+      },
+      {
+        key: 'total',
+        type: 'number',
+        title: '合计',
+        formula: { expr: "SUM($'sub01.qty')" },
+      },
+    ];
+    const data: Record<string, unknown> = { sub01: [], total: 100 };
+    const warnings = applyFormulaValues(fields as never, data, now);
+    expect(warnings).toEqual([]);
+    expect(data.total).toBeUndefined();
+  });
+
+  it('结果为空时清掉行内上一次算出的值', () => {
+    const fields = [
+      {
+        key: 'sub01',
+        type: 'subform',
+        title: '明细',
+        fields: [
+          { key: 'qty', type: 'number', title: '数量' },
+          {
+            key: 'amount',
+            type: 'number',
+            title: '金额',
+            formula: { expr: "$'qty' * 2" },
+          },
+        ],
+      },
+    ];
+    const data = { sub01: [{ qty: null, amount: 20 }] };
+    const warnings = applyFormulaValues(fields as never, data, now);
+    expect(warnings).toEqual([]);
+    expect((data.sub01[0] as Record<string, unknown>).amount).toBeUndefined();
+  });
+
   it('表达式非法时字段留空并给警告', () => {
     const fields = [
       { key: 'a', type: 'number', title: 'A', formula: { expr: 'SUM((' } },
