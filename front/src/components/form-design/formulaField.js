@@ -37,12 +37,15 @@ export function isFormulaField(field) {
   return typeof expr === 'string' && expr.trim() !== ''
 }
 
-export function formulaSummary(field, max = 24) {
-  const expr = field?.formula?.expr
-  if (typeof expr !== 'string') return ''
-  const text = expr.trim()
-  if (!text) return ''
+function truncate(text, max) {
   return text.length > max ? `${text.slice(0, max)}…` : text
+}
+
+// 属性面板的摘要：和编辑器一样按字段标题显示，不要露出一串字段 key
+export function formulaDisplaySummary(field, fields, max = 24) {
+  const expr = String(field?.formula?.expr || '').trim()
+  if (!expr) return ''
+  return truncate(formulaToDisplay(expr, buildFormulaRefLabels(fields, field)), max)
 }
 
 export function clearFormulaExclusiveFlags(field) {
@@ -70,9 +73,10 @@ export function buildFormulaRefGroups(fields, currentField) {
     }))
   const parent = findParentSubform(list, currentField?.key)
   if (parent) {
+    const parentLabel = parent.title || '子表单'
     const groups = [
       {
-        label: parent.title || '子表单',
+        label: parentLabel,
         items: (parent.fields || [])
           .filter(
             (child) =>
@@ -82,7 +86,8 @@ export function buildFormulaRefGroups(fields, currentField) {
           )
           .map((child) => ({
             token: `$'${child.key}'`,
-            label: child.title || child.key,
+            // 本行字段也带上子表单标题，和主表公式里的子表列叫法一致
+            label: `${parentLabel}.${child.title || child.key}`,
             type: child.type,
             path: [child.key],
           })),
@@ -107,6 +112,65 @@ export function buildFormulaRefGroups(fields, currentField) {
     }
   }
   return groups
+}
+
+// 编辑器里给人看的是字段标题，存库仍是字段 key，所以要在「显示文本」和「引用路径」之间来回翻译。
+// 标题重名时给后面的加序号；标题里单双引号都有时写不进 $'...'，退回 key。
+export function buildFormulaRefLabels(fields, currentField) {
+  const byLabel = new Map()
+  const byPath = new Map()
+  const tokenByPath = new Map()
+  const used = new Set()
+  for (const group of buildFormulaRefGroups(fields, currentField)) {
+    for (const item of group.items) {
+      const path = item.path.join('.')
+      const title = String(item.label || '').trim()
+      const label = uniqueRefLabel(
+        title.includes("'") && title.includes('"') ? path : title,
+        used,
+      )
+      used.add(label)
+      byLabel.set(label, path)
+      byPath.set(path, label)
+      tokenByPath.set(path, refToken(label) || item.token)
+    }
+  }
+  return { byLabel, byPath, tokenByPath }
+}
+
+function uniqueRefLabel(label, used) {
+  if (!used.has(label)) return label
+  let index = 2
+  while (used.has(`${label}(${index})`)) index += 1
+  return `${label}(${index})`
+}
+
+function refToken(label) {
+  if (!label.includes("'")) return `$'${label}'`
+  if (!label.includes('"')) return `$"${label}"`
+  return ''
+}
+
+// 把一条引用路径写成公式里的引用文本
+export function formulaRefToken(path) {
+  return refToken(path)
+}
+
+const REF_TOKEN_RE = /\$(["'])([\s\S]*?)\1/g
+
+function replaceRefTokens(text, resolve) {
+  return String(text || '').replace(REF_TOKEN_RE, (whole, quote, inner) => {
+    const value = resolve(inner.trim())
+    return value ? refToken(value) || whole : whole
+  })
+}
+
+export function formulaToDisplay(expr, labels) {
+  return replaceRefTokens(expr, (inner) => labels.byPath.get(inner))
+}
+
+export function formulaFromDisplay(text, labels) {
+  return replaceRefTokens(text, (inner) => labels.byLabel.get(inner))
 }
 
 function formulaStaticType(type) {

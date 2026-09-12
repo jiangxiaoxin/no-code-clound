@@ -20,6 +20,20 @@ export type FormulaError = {
 
 type Pos = { line: number; column: number };
 
+// 参数个数报错要带上用法和期望个数，不然用户只知道错了、不知道该补什么
+function arityMessage(
+  def: { minArgs: number; maxArgs: number; summary?: string },
+  name: string,
+  count: number,
+): string {
+  const usage = String(def.summary || '').split('：')[0] || name;
+  let need: string;
+  if (def.maxArgs === Infinity) need = `至少要 ${def.minArgs} 个参数`;
+  else if (def.minArgs === def.maxArgs) need = `要 ${def.minArgs} 个参数`;
+  else need = `要 ${def.minArgs}～${def.maxArgs} 个参数`;
+  return `函数 ${name} 参数个数不正确：用法 ${usage}，${need}，现在给了 ${count} 个`;
+}
+
 export type FormulaAst =
   | (Pos & { kind: 'num'; value: number })
   | (Pos & { kind: 'str'; value: string })
@@ -133,7 +147,7 @@ class Tokenizer {
         if (next !== "'" && next !== '"') {
           return {
             ok: false,
-            error: err('syntax', "字段引用需写作 $'字段key'", line, column),
+            error: err('syntax', "字段引用要写成 $'字段标题'", line, column),
           };
         }
         this.advance();
@@ -402,7 +416,7 @@ class Parser {
     if (args.length < def.minArgs || args.length > def.maxArgs) {
       return {
         ok: false,
-        error: err('arity', `函数 ${name} 参数个数不正确`, nameToken.line, nameToken.column),
+        error: err('arity', arityMessage(def, name, args.length), nameToken.line, nameToken.column),
       };
     }
     return {

@@ -47,7 +47,7 @@
       </el-form-item>
       <el-form-item v-if="canEditFormula" label="计算公式">
         <div class="formula-row">
-          <span class="formula-summary">{{ formulaSummary(field) || '未设置' }}</span>
+          <span class="formula-summary">{{ formulaSummaryText || '未设置' }}</span>
           <el-button link type="primary" @click="formulaDialogVisible = true">
             编辑公式
           </el-button>
@@ -1081,7 +1081,7 @@ import DataLinkageDialog from './DataLinkageDialog.vue'
 import FormulaEditorDialog from './FormulaEditorDialog.vue'
 import {
   clearFormulaExclusiveFlags,
-  formulaSummary,
+  formulaDisplaySummary,
   isFormulaCapable,
   isFormulaField,
 } from './formulaField.js'
@@ -1514,6 +1514,9 @@ const isRelateSubform = computed(() => isRelateSubformField(props.field))
 
 const canEditFormula = computed(() => isFormulaCapable(props.field?.type))
 const hasFieldFormula = computed(() => isFormulaField(props.field))
+const formulaSummaryText = computed(() =>
+  formulaDisplaySummary(props.field, props.fields),
+)
 const formulaDialogVisible = ref(false)
 
 function onFormulaSaved({ expr, refs }) {

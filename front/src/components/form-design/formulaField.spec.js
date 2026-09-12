@@ -2,8 +2,11 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   buildFormulaRefGroups,
+  buildFormulaRefLabels,
   clearFormulaExclusiveFlags,
-  formulaSummary,
+  formulaDisplaySummary,
+  formulaFromDisplay,
+  formulaToDisplay,
   isFormulaCapable,
   isFormulaField,
   validateFormulaConfig,
@@ -40,11 +43,16 @@ test('isFormulaField 要求公式表达式非空', () => {
   assert.equal(isFormulaField(null), false)
 })
 
-test('formulaSummary 超长截断', () => {
-  const long = '1234567890123456789012345678'
-  assert.equal(formulaSummary({ formula: { expr: ` ${long} ` } }), `${long.slice(0, 24)}…`)
-  assert.equal(formulaSummary({ formula: { expr: 'abc' } }), 'abc')
-  assert.equal(formulaSummary({}), '')
+test('formulaDisplaySummary 按字段标题显示并超长截断', () => {
+  const expr = "CONCATENATE($'name', $'price')"
+  const display = "CONCATENATE($'姓名', $'单价')"
+  assert.equal(
+    formulaDisplaySummary({ key: 'total', formula: { expr } }, fields),
+    `${display.slice(0, 24)}…`,
+  )
+  assert.equal(formulaDisplaySummary({ key: 'total', formula: { expr: '1 + 2' } }, fields), '1 + 2')
+  assert.equal(formulaDisplaySummary({ formula: { expr: '  ' } }, fields), '')
+  assert.equal(formulaDisplaySummary({}, fields), '')
 })
 
 test('clearFormulaExclusiveFlags 清掉必填与重复值标记', () => {
@@ -69,6 +77,8 @@ test('行内公式的字段列表是本子表兄弟列加主表字段', () => {
   const groups = buildFormulaRefGroups(fields, { key: 'note', type: 'input' })
   const sub = groups.find((group) => group.label === '明细')
   assert.deepEqual(sub.items.map((item) => item.token), ["$'qty'"])
+  // 本行字段也写成「子表单标题.字段标题」，和主表公式里的子表列叫法一致
+  assert.deepEqual(sub.items.map((item) => item.label), ['明细.数量'])
   const main = groups.find((group) => group.label === '主表字段')
   assert.deepEqual(main.items.map((item) => item.token), ["$'name'", "$'price'"])
 })
@@ -133,4 +143,74 @@ test('validateFormulaConfig 行内公式可引用兄弟列与主表字段', () =
     fields,
   })
   assert.equal(result.ok, true)
+})
+
+test('编辑器显示字段标题，存库仍是字段 key', () => {
+  const labels = buildFormulaRefLabels(fields, { key: 'total', type: 'number' })
+  assert.equal(
+    formulaToDisplay("CONCATENATE($'name', $'price')", labels),
+    "CONCATENATE($'姓名', $'单价')",
+  )
+  assert.equal(
+    formulaFromDisplay("CONCATENATE($'姓名', $'单价')", labels),
+    "CONCATENATE($'name', $'price')",
+  )
+})
+
+test('子表列显示为「子表标题.字段标题」，翻译回子表路径', () => {
+  const labels = buildFormulaRefLabels(fields, { key: 'total', type: 'number' })
+  assert.equal(formulaToDisplay("SUM($'sub01.qty')", labels), "SUM($'明细.数量')")
+  assert.equal(formulaFromDisplay("SUM($'明细.数量')", labels), "SUM($'sub01.qty')")
+})
+
+test('行内公式的兄弟列带子表单标题、主表字段只写标题', () => {
+  const labels = buildFormulaRefLabels(fields, { key: 'note', type: 'input' })
+  assert.equal(
+    formulaToDisplay("CONCATENATE($'qty', $'name')", labels),
+    "CONCATENATE($'明细.数量', $'姓名')",
+  )
+  assert.equal(
+    formulaFromDisplay("CONCATENATE($'明细.数量', $'姓名')", labels),
+    "CONCATENATE($'qty', $'name')",
+  )
+  assert.equal(labels.tokenByPath.get('qty'), "$'明细.数量'")
+})
+
+test('标题重名时第二个带序号，仍能各自翻译回自己的 key', () => {
+  const duplicated = [
+    { key: 'a', type: 'input', title: '单行文本' },
+    { key: 'b', type: 'input', title: '单行文本' },
+    { key: 'c', type: 'input', title: '单行文本(2)' },
+  ]
+  const labels = buildFormulaRefLabels(duplicated, { key: 't', type: 'input' })
+  assert.equal(
+    formulaToDisplay("CONCATENATE($'a', $'b', $'c')", labels),
+    "CONCATENATE($'单行文本', $'单行文本(2)', $'单行文本(2)(2)')",
+  )
+  assert.equal(
+    formulaFromDisplay("CONCATENATE($'单行文本', $'单行文本(2)', $'单行文本(2)(2)')", labels),
+    "CONCATENATE($'a', $'b', $'c')",
+  )
+})
+
+test('标题里有引号时换一种引号，两种都有则退回 key', () => {
+  const oneQuote = buildFormulaRefLabels(
+    [{ key: 'x1', type: 'input', title: "客户's名称" }],
+    { key: 't', type: 'input' },
+  )
+  assert.equal(formulaToDisplay("$'x1'", oneQuote), '$"客户\'s名称"')
+  assert.equal(formulaFromDisplay('$"客户\'s名称"', oneQuote), "$'x1'")
+
+  const bothQuotes = buildFormulaRefLabels(
+    [{ key: 'x2', type: 'input', title: '客户\'s"名称' }],
+    { key: 't', type: 'input' },
+  )
+  assert.equal(formulaToDisplay("$'x2'", bothQuotes), "$'x2'")
+  assert.equal(formulaFromDisplay("$'x2'", bothQuotes), "$'x2'")
+})
+
+test('认不出的引用（手打的错字段名）原样保留', () => {
+  const labels = buildFormulaRefLabels(fields, { key: 'price', type: 'number' })
+  assert.equal(formulaToDisplay("$'missing' + 1", labels), "$'missing' + 1")
+  assert.equal(formulaFromDisplay("$'missing' + 1", labels), "$'missing' + 1")
 })
