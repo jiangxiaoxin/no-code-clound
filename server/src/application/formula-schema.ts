@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { flattenFields } from './form-record/flatten-fields';
 import { FieldFormula, FormField } from './form-record/form-record.types';
-import { inferType, StaticType } from './form-record/formula/evaluator';
+import { formulaTypeLabel, inferType, StaticType } from './form-record/formula/evaluator';
 import {
   AGGREGATE_FUNCTION_NAMES,
   FORMULA_FIELD_TYPES,
@@ -192,14 +192,19 @@ function typeOfPath(path: string[], ctx: RefContext): StaticType {
 }
 
 function assertRootType(field: FormField, type: StaticType): void {
+  // 说不清"哪里不对"的报错等于没说：点明算出来是什么、字段要什么、以及怎么改
   if (field.type === 'number' && type !== 'number' && type !== 'unknown') {
-    formulaBadRequest('公式结果类型与字段不匹配');
+    formulaBadRequest(
+      `公式结果是${formulaTypeLabel(type)}，数字字段只收数字结果（数字文本转数字用 VALUE；要输出带文字的内容，请把公式配到单行文本字段上）`,
+    );
   }
   if (
     DATE_LIKE_FIELD_TYPES.includes(field.type) &&
     !['date', 'number', 'unknown'].includes(type)
   ) {
-    formulaBadRequest('公式结果类型与字段不匹配');
+    formulaBadRequest(
+      `公式结果是${formulaTypeLabel(type)}，日期/时间字段只收日期结果（取今天用 TODAY()、日期加减用 DATEDELTA、相差天数用 DATEDIF）`,
+    );
   }
 }
 

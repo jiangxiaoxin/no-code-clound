@@ -48,9 +48,38 @@ function err(code, message, line, column) {
   return { code, message, line, column }
 }
 
+// 报错要带上用法，用户才知道该补什么
+function functionUsage(def, name) {
+  return String(def.summary || '').split('：')[0] || name
+}
+
+const FORMULA_TYPE_LABELS = {
+  number: '数字',
+  string: '文本',
+  date: '日期',
+  boolean: '真假',
+  unknown: '未知',
+}
+
+export function formulaTypeLabel(type) {
+  return FORMULA_TYPE_LABELS[type] || FORMULA_TYPE_LABELS.unknown
+}
+
+const PARAM_TYPE_LABELS = {
+  number: '数字',
+  string: '文本',
+  boolean: '真假（条件）',
+  date: '日期',
+  any: '任意值',
+}
+
+function paramTypeLabel(type) {
+  return PARAM_TYPE_LABELS[type] || PARAM_TYPE_LABELS.any
+}
+
 // 参数个数报错要带上用法和期望个数，不然用户只知道错了、不知道该补什么
 function arityMessage(def, name, count) {
-  const usage = String(def.summary || '').split('：')[0] || name
+  const usage = functionUsage(def, name)
   let need
   if (def.maxArgs === Infinity) need = `至少要 ${def.minArgs} 个参数`
   else if (def.minArgs === def.maxArgs) need = `要 ${def.minArgs} 个参数`
@@ -967,7 +996,7 @@ function inferNode(node, typeOf) {
             ok: false,
             error: {
               code: 'type',
-              message: `函数 ${node.name} 参数类型不正确`,
+              message: `函数 ${node.name} 参数类型不正确：第 ${i + 1} 个参数要${paramTypeLabel(formal)}，现在是${formulaTypeLabel(arg.type)}（用法 ${functionUsage(def, node.name)}）`,
               line: node.line,
               column: node.column,
             },

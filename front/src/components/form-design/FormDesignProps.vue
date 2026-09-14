@@ -45,17 +45,6 @@
         <el-input v-model="field.description" type="textarea" :rows="3" maxlength="200" show-word-limit
           placeholder="填写后，标题右侧会显示说明" />
       </el-form-item>
-      <el-form-item v-if="canEditFormula" label="计算公式">
-        <div class="formula-row">
-          <span class="formula-summary">{{ formulaSummaryText || '未设置' }}</span>
-          <el-button link type="primary" @click="formulaDialogVisible = true">
-            编辑公式
-          </el-button>
-          <el-button v-if="hasFieldFormula" link type="danger" @click="onClearFormula">
-            清除
-          </el-button>
-        </div>
-      </el-form-item>
       <el-form-item v-if="!isSerialField && !isRelateSubform && !hasFieldFormula" label="校验设置">
         <div style="width: 100%;">
           <div class="required-row">
@@ -518,6 +507,17 @@
               :value="item.value"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item v-if="field.optionSource === 'formula'" label="计算公式">
+          <div class="formula-row">
+            <span class="formula-summary">{{ formulaSummaryText || '未设置' }}</span>
+            <el-button link type="primary" @click="formulaDialogVisible = true">
+              编辑公式
+            </el-button>
+            <el-button v-if="hasFieldFormula" link type="danger" @click="onClearFormula">
+              清除
+            </el-button>
+          </div>
         </el-form-item>
         <el-form-item v-if="field.optionSource === 'dictionary'" label="选项字典">
           <el-select v-model="field.dictCode" clearable placeholder="请选择字典">
@@ -1082,7 +1082,6 @@ import FormulaEditorDialog from './FormulaEditorDialog.vue'
 import {
   clearFormulaExclusiveFlags,
   formulaDisplaySummary,
-  isFormulaCapable,
   isFormulaField,
 } from './formulaField.js'
 import SubformLinkageDialog from './SubformLinkageDialog.vue'
@@ -1512,7 +1511,6 @@ const isCurrentDisplayField = computed(
 const isSerialField = computed(() => props.field?.type === 'serialNumber')
 const isRelateSubform = computed(() => isRelateSubformField(props.field))
 
-const canEditFormula = computed(() => isFormulaCapable(props.field?.type))
 const hasFieldFormula = computed(() => isFormulaField(props.field))
 const formulaSummaryText = computed(() =>
   formulaDisplaySummary(props.field, props.fields),
@@ -1529,6 +1527,7 @@ function onFormulaSaved({ expr, refs }) {
 function onClearFormula() {
   if (!props.field) return
   delete props.field.formula
+  props.field.optionSource = 'custom'
 }
 
 const relateSubformForms = ref([])
@@ -1963,6 +1962,10 @@ async function loadOptions() {
 function onOptionSourceChange(value) {
   if (!props.field) {
     return
+  }
+  // 取值来源不再是公式，公式配置一起清掉，字段恢复可填
+  if (value !== 'formula') {
+    delete props.field.formula
   }
   if (value !== 'dictionary') {
     delete props.field.dictCode

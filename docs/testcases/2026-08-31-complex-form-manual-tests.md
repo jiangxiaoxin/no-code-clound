@@ -376,7 +376,7 @@ P-08、P-09 需要人员专项里的「人员源」表。没有该表时跳过�
 | 流程表单 | `docs/testcases/2026-09-06-workflow-form-test-cases.md` | 请假单；和标签页 / 子表 / 选择数据 / 流水号叠在一起见该专项 §7 |
 | 应用配置权 / 使用范围 | `docs/testcases/2026-09-06-app-permission-test-cases.md` | 只有使用权不能进设计见 C-23；配置者转流程见 C-24 |
 | 流水号规格验收 1–12 | `docs/superpowers/specs/2026-08-31-serial-number-design.md` §10 | 与本文 §2 对应；跨日重置、并发占号以规格为准 |
-| 公式（六类字段的「计算公式」配置、行内、聚合） | `docs/testcases/2026-09-11-formula-test-cases.md` | 用「订单统计」表；和标签页 / 子表 / 联动 / 流水号叠在一起见本文 §12 |
+| 公式（六类字段「取值来源 → 公式」、行内、聚合） | `docs/testcases/2026-09-11-formula-test-cases.md` | 用「订单统计」表；和标签页 / 子表 / 联动 / 流水号叠在一起见本文 §12 |
 
 ---
 
