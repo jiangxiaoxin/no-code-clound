@@ -3,6 +3,7 @@ import { findParentSubform } from '../form-fill/subformField.js'
 import {
   AGGREGATE_FUNCTION_NAMES,
   FORMULA_FIELD_TYPES,
+  formulaTypeLabel,
   inferType,
   parseFormula,
 } from '../form-fill/formula/evaluator.js'
@@ -258,14 +259,18 @@ export function validateFormulaConfig(expr, { field, fields }) {
   )
   if (!inferred.ok) return { ok: false, message: inferred.error.message }
   const rootType = inferred.type
-  if (
-    (field?.type === 'number' &&
-      rootType !== 'number' &&
-      rootType !== 'unknown') ||
-    (DATE_LIKE_FIELD_TYPES.includes(field?.type) &&
-      !['date', 'number', 'unknown'].includes(rootType))
-  ) {
-    return { ok: false, message: '公式结果类型与字段不匹配' }
+  // 说不清"哪里不对"的报错等于没说：这里点明算出来是什么、字段要什么、以及怎么改
+  if (field?.type === 'number' && rootType !== 'number' && rootType !== 'unknown') {
+    return {
+      ok: false,
+      message: `公式结果是${formulaTypeLabel(rootType)}，数字字段只收数字结果（数字文本转数字用 VALUE；要输出带文字的内容，请把公式配到单行文本字段上）`,
+    }
+  }
+  if (DATE_LIKE_FIELD_TYPES.includes(field?.type) && !['date', 'number', 'unknown'].includes(rootType)) {
+    return {
+      ok: false,
+      message: `公式结果是${formulaTypeLabel(rootType)}，日期/时间字段只收日期结果（取今天用 TODAY()、日期加减用 DATEDELTA、相差天数用 DATEDIF）`,
+    }
   }
   return { ok: true, refs: parsed.refs }
 }

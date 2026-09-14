@@ -11,10 +11,14 @@ import {
 } from './linkage.js'
 
 test('option source choices: value fields get custom and linkage, select gets three, radio none', () => {
-  assert.deepEqual(
-    optionSourceChoices('input').map((item) => item.value),
-    ['custom', 'linkage'],
-  )
+  // 能配公式的六类字段，取值来源里多一个「公式」
+  for (const type of ['input', 'textarea', 'number', 'date', 'time', 'datetime']) {
+    assert.deepEqual(
+      optionSourceChoices(type).map((item) => item.value),
+      ['custom', 'linkage', 'formula'],
+      `${type} 的取值来源应有公式`,
+    )
+  }
   assert.deepEqual(
     optionSourceChoices('select').map((item) => item.value),
     ['dictionary', 'table_data', 'linkage'],

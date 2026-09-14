@@ -174,6 +174,35 @@ export function evaluateAst(ast: FormulaAst, ctx: EvalContext): EvalResult {
   }
 }
 
+const FORMULA_TYPE_LABELS: Record<StaticType, string> = {
+  number: '数字',
+  string: '文本',
+  date: '日期',
+  boolean: '真假',
+  unknown: '未知',
+};
+
+export function formulaTypeLabel(type: StaticType): string {
+  return FORMULA_TYPE_LABELS[type] || FORMULA_TYPE_LABELS.unknown;
+}
+
+const PARAM_TYPE_LABELS: Record<FormulaParamType, string> = {
+  number: '数字',
+  string: '文本',
+  boolean: '真假（条件）',
+  date: '日期',
+  any: '任意值',
+};
+
+function paramTypeLabel(type: FormulaParamType | undefined): string {
+  return (type && PARAM_TYPE_LABELS[type]) || PARAM_TYPE_LABELS.any;
+}
+
+// 报错要带上用法，用户才知道该补什么
+function functionUsage(def: { summary?: string }, name: string): string {
+  return String(def.summary || '').split('：')[0] || name;
+}
+
 function paramMatches(formal: FormulaParamType, actual: StaticType): boolean {
   switch (formal) {
     case 'any':
@@ -248,7 +277,7 @@ function inferNode(node: FormulaAst, typeOf: (path: string[]) => StaticType): In
             ok: false,
             error: {
               code: 'type',
-              message: `函数 ${node.name} 参数类型不正确`,
+              message: `函数 ${node.name} 参数类型不正确：第 ${i + 1} 个参数要${paramTypeLabel(formal)}，现在是${formulaTypeLabel(arg.type)}（用法 ${functionUsage(def, node.name)}）`,
               line: node.line,
               column: node.column,
             },

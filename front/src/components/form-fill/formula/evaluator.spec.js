@@ -46,6 +46,19 @@ function contextOf(f) {
   }
 }
 
+test('参数类型报错说清第几个参数、要什么、现在是什么', () => {
+  const parsed = parseFormula("ROUND('abc', 2)")
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) return
+  const inferred = inferType(parsed.ast, () => 'unknown')
+  assert.equal(inferred.ok, false)
+  if (inferred.ok) return
+  assert.equal(
+    inferred.error.message,
+    '函数 ROUND 参数类型不正确：第 1 个参数要数字，现在是文本（用法 ROUND(数字, 位数)）',
+  )
+})
+
 for (const f of fixtures) {
   test(f.desc, () => {
     const parsed = parseFormula(f.expr)

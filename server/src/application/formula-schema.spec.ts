@@ -180,7 +180,17 @@ describe('assertFormulaSchemas', () => {
       { key: 'x', type: 'date', formula: { expr: "LEFT($'txt', 1)" } },
     ]);
     expect(() => assertFormulaSchemas(fields)).toThrow(
-      '公式结果类型与字段不匹配',
+      '公式结果是文本，日期/时间字段只收日期结果',
+    );
+  });
+
+  it('数字字段配文本公式时提示改用文本字段', () => {
+    const fields = fieldsOf([
+      { key: 'txt', type: 'input', title: '名称' },
+      { key: 'x', type: 'number', formula: { expr: "CONCATENATE($'txt', 'x')" } },
+    ]);
+    expect(() => assertFormulaSchemas(fields)).toThrow(
+      '公式结果是文本，数字字段只收数字结果',
     );
   });
 

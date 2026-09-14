@@ -119,13 +119,34 @@ test('validateFormulaConfig 拦住聚合非数字列', () => {
   assert.equal(result.message, '聚合函数参数请选择子表单数字字段')
 })
 
-test('validateFormulaConfig 拦住数字字段配文本公式', () => {
+test('validateFormulaConfig 拦住数字字段配文本公式，并说清该怎么改', () => {
   const result = validateFormulaConfig("CONCATENATE($'name', 'x')", {
     field: { key: 't', type: 'number' },
     fields,
   })
   assert.equal(result.ok, false)
-  assert.equal(result.message, '公式结果类型与字段不匹配')
+  assert.equal(
+    result.message,
+    '公式结果是文本，数字字段只收数字结果（数字文本转数字用 VALUE；要输出带文字的内容，请把公式配到单行文本字段上）',
+  )
+  // 同一个公式放到单行文本字段上是合法的（比如「输入的长度是 12」这种拼接结果就该配文本字段）
+  const asText = validateFormulaConfig("CONCATENATE($'name', 'x')", {
+    field: { key: 't', type: 'input' },
+    fields,
+  })
+  assert.equal(asText.ok, true)
+})
+
+test('validateFormulaConfig 拦住日期字段配文本公式，并提示日期函数', () => {
+  const result = validateFormulaConfig("CONCATENATE('a', 'b')", {
+    field: { key: 't', type: 'date' },
+    fields,
+  })
+  assert.equal(result.ok, false)
+  assert.equal(
+    result.message,
+    '公式结果是文本，日期/时间字段只收日期结果（取今天用 TODAY()、日期加减用 DATEDELTA、相差天数用 DATEDIF）',
+  )
 })
 
 test('validateFormulaConfig 语法错误带行列', () => {

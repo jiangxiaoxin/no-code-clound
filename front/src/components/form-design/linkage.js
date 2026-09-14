@@ -1,4 +1,5 @@
 import { isSelectType } from './fieldTypes.js'
+import { isFormulaCapable } from './formulaField.js'
 import {
   cloneOptionFilters,
   needsFilterValue,
@@ -34,10 +35,13 @@ export function optionSourceChoices(type) {
     ]
   }
   if (LINKAGE_VALUE_TYPES.includes(type)) {
-    return [
+    const choices = [
       { value: 'custom', label: '自定义' },
       { value: 'linkage', label: '数据联动' },
     ]
+    // 对齐简道云：能配公式的六类字段，取值来源里还有「公式」这一种
+    if (isFormulaCapable(type)) choices.push({ value: 'formula', label: '公式' })
+    return choices
   }
   if (type === 'select' || type === 'select-multiple') {
     return [
