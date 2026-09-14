@@ -71,9 +71,10 @@ export function computeMainFormulaWrites(formulaFields, values) {
           : undefined
       },
     })
-    if (!result.ok) continue
-    const value = normalizeFormulaValue(field, result.value)
-    if (value === undefined) continue
+    const value =
+      result.ok && result.value !== undefined
+        ? normalizeFormulaValue(field, result.value)
+        : undefined
     overlay[field.key] = value
     writes.push({ key: field.key, value })
   }
@@ -121,9 +122,10 @@ export function computeRowFormulaWrites(formulaChildren, row, parentValues) {
         return row[path[0]] ?? parentValues?.[path[0]]
       },
     })
-    if (!result.ok) continue
-    const value = normalizeFormulaValue(child, result.value)
-    if (value === undefined) continue
+    const value =
+      result.ok && result.value !== undefined
+        ? normalizeFormulaValue(child, result.value)
+        : undefined
     overlay[child.key] = value
     next[child.key] = value
   }

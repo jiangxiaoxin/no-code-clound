@@ -306,6 +306,12 @@ export class WorkflowEngine {
       throw new ConflictException('单据状态已变化，请刷新后再看');
     }
     await this.writeBack(instance, node, input.dataPatch, input.actorId);
+    const afterWrite = await this.requireInstance(instance.id);
+    if (afterWrite.status === 'rejected') {
+      throw new ConflictException(
+        afterWrite.dueAt ? '流程已超时' : '这条待办已处理',
+      );
+    }
     await this.instanceRepo.update(
       { id: instance.id },
       { retryStep: 'advance', retryPatch: null, retryActorId: null },
@@ -320,6 +326,12 @@ export class WorkflowEngine {
         },
       });
       if (pending > 0) {
+        const waiting = await this.requireInstance(instance.id);
+        if (waiting.status === 'rejected') {
+          throw new ConflictException(
+            waiting.dueAt ? '流程已超时' : '这条待办已处理',
+          );
+        }
         await this.instanceRepo.update({ id: instance.id }, { retryStep: null });
         return { waitingOthers: true };
       }
@@ -327,6 +339,12 @@ export class WorkflowEngine {
       await this.cancelPending(instance.id, task.nodeKey, '或签其他人已通过');
     }
     const advanced = await this.advance(instance, task.nodeKey);
+    const latest = await this.requireInstance(instance.id);
+    if (latest.status === 'rejected') {
+      throw new ConflictException(
+        latest.dueAt ? '流程已超时' : '这条待办已处理',
+      );
+    }
     return {
       waitingOthers: false,
       nextNodeTitle: titleOf(advanced.graph, advanced.currentNodeKey),
@@ -837,6 +855,14 @@ export class WorkflowEngine {
           skipSerial: true,
         });
       }
+      const fresh = await this.instanceRepo.findOne({ where: { id: instance.id } });
+      if (fresh?.status === 'rejected') {
+        await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+          workflowStatus: 'rejected',
+          workflowInstanceId: instance.id,
+        });
+        return;
+      }
       await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
         workflowStatus: instance.status === 'error' ? 'running' : instance.status,
         workflowInstanceId: instance.id,
@@ -1330,7 +1356,6 @@ export class WorkflowEngine {
     ) {
       return false;
     }
-    await this.cancelAllPending(instance.id, '流程已超时');
     const notes = appendNote(instance.notes, '流程已超时，系统自动驳回');
     const expired = await this.instanceRepo.update(
       { id: instance.id, status: 'running' },
@@ -1343,6 +1368,7 @@ export class WorkflowEngine {
       },
     );
     if (!expired.affected) return false;
+    await this.cancelAllPending(instance.id, '流程已超时');
     await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
       workflowStatus: 'rejected',
       workflowInstanceId: instance.id,

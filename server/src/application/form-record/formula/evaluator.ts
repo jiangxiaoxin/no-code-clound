@@ -474,11 +474,19 @@ export function applyFormulaValues(
       warnings.push(
         `[${unitTitle(unit.field)}] 公式计算失败：${result.error.message}`,
       );
+      write(undefined);
       return;
     }
-    if (result.value === undefined) return;
-    const normalized = normalizeFormulaValue(unit.field, result.value);
-    if (normalized !== undefined) write(normalized);
+    if (result.value === undefined) {
+      write(undefined);
+      return;
+    }
+    write(normalizeFormulaValue(unit.field, result.value));
+  }
+
+  function assignFormula(target: Record<string, unknown>, key: string, value: unknown) {
+    if (value === undefined) delete target[key];
+    else target[key] = value;
   }
 
   for (const unit of order) {
@@ -488,7 +496,7 @@ export function applyFormulaValues(
         resolve: (path) => resolveMainRef(path, data),
       };
       run(unit, ctx, (value) => {
-        data[unit.field.key] = value;
+        assignFormula(data, unit.field.key, value);
       });
     } else {
       const rows = data[unit.subKey];
@@ -501,7 +509,7 @@ export function applyFormulaValues(
           resolve: (path) => resolveRowRef(path, record, data),
         };
         run(unit, ctx, (value) => {
-          record[unit.field.key] = value;
+          assignFormula(record, unit.field.key, value);
         });
       }
     }
