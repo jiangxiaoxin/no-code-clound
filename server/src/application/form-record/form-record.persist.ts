@@ -164,6 +164,8 @@ export class FormRecordPersistService {
     await this.assertUniqueFields(form.id, fields, data, recordId);
     if (!existing && !input.skipSerial) {
       await this.applySerialNumber(form.id, fields, data);
+      // 流水号在公式之后才占号，引用流水号的公式要再算一遍才能入库
+      this.applyFormulas(fields, data, now);
     }
     if (existing) {
       const doc = await this.store.replaceData(

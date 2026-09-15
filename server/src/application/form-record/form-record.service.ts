@@ -551,6 +551,7 @@ export class FormRecordService {
       if (skip) continue;
       this.persist.applyFormulas(fields, data, now);
       await this.persist.applySerialNumber(formId, fields, data);
+      this.persist.applyFormulas(fields, data, now);
       docs.push({
         appId,
         formId,

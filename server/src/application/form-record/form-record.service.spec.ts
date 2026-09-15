@@ -262,6 +262,72 @@ describe('FormRecordService', () => {
     );
   });
 
+  it('创建时公式引用流水号，入库值带上刚生成的号码', async () => {
+    serialSeq.takeNext.mockResolvedValue(1);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        {
+          key: 'sn',
+          type: 'serialNumber',
+          serialSeparator: '-',
+          serialRule: [
+            { kind: 'datetime', format: 'YYYYMMDD' },
+            { kind: 'counter', start: 1, digits: 5 },
+          ],
+        },
+        {
+          key: 'label',
+          type: 'input',
+          formula: { expr: "CONCATENATE($'sn', '-副本')" },
+        },
+      ],
+    });
+    store.insert.mockResolvedValue({ id: doc._id.toHexString() });
+    store.findById.mockResolvedValue(doc);
+    userRepo.find.mockResolvedValue([]);
+
+    await service.create(1, 8, 12, {});
+
+    const inserted = store.insert.mock.calls[0][0];
+    expect(inserted.data.sn).toMatch(/^\d{8}-00001$/);
+    expect(inserted.data.label).toBe(`${inserted.data.sn}-副本`);
+  });
+
+  it('创建时流水号字段段仍用重算后的公式值', async () => {
+    serialSeq.takeNext.mockResolvedValue(1);
+    formRepo.findOne.mockResolvedValue({
+      ...form,
+      fields: [
+        { key: 'name', type: 'input' },
+        {
+          key: 'mark',
+          type: 'input',
+          formula: { expr: "CONCATENATE('订单-', $'name')" },
+        },
+        {
+          key: 'sn',
+          type: 'serialNumber',
+          serialSeparator: '-',
+          serialRule: [
+            { kind: 'datetime', format: 'YYYYMMDD' },
+            { kind: 'field', fieldKey: 'mark' },
+            { kind: 'counter', start: 1, digits: 5 },
+          ],
+        },
+      ],
+    });
+    store.insert.mockResolvedValue({ id: doc._id.toHexString() });
+    store.findById.mockResolvedValue(doc);
+    userRepo.find.mockResolvedValue([]);
+
+    await service.create(1, 8, 12, { name: '螺丝' });
+
+    const inserted = store.insert.mock.calls[0][0];
+    expect(inserted.data.mark).toBe('订单-螺丝');
+    expect(inserted.data.sn).toMatch(/^\d{8}-订单-螺丝-00001$/);
+  });
+
   it('更新时按公式重算覆盖客户端传值', async () => {
     formRepo.findOne.mockResolvedValue({
       ...form,
