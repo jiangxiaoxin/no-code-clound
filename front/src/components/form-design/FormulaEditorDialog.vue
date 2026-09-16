@@ -197,6 +197,7 @@ const helpVisible = ref(false)
 const exprEditor = ref(null)
 
 // 编辑器里字段是一颗颗 token（显示标题），拿到的表达式里是字段 key
+// 最原始的记录
 const rawExpr = ref('')
 const refLabels = computed(() => buildFormulaRefLabels(props.fields, props.field))
 const expr = computed(() => formulaFromDisplay(rawExpr.value, refLabels.value))
@@ -318,6 +319,8 @@ watch(
   (open) => {
     if (!open) return
     rawExpr.value = props.field?.formula?.expr || ''
+    console.log('rawExpr....', rawExpr.value);
+    
     functionKeyword.value = ''
     fieldKeyword.value = ''
     showRaw.value = false

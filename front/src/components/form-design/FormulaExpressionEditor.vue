@@ -60,10 +60,15 @@ import {
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
-  refGroups: { type: Array, default: () => [] },
+  refGroups: { type: Array, default: () => [] }, // 主表，子表的分组字段
   refLabels: { type: Object, required: true },
   placeholder: { type: String, default: '' },
 })
+
+console.log('props reflabels', props.refLabels);
+console.log('props refgroups', props.refGroups);
+
+
 
 const emit = defineEmits(['update:modelValue'])
 
@@ -73,7 +78,7 @@ const SUGGEST_HEIGHT = 260
 
 const contentRef = ref(null)
 const empty = ref(true)
-const composing = ref(false)
+const composing = ref(false) // 当前正在进行中文输入
 const suggestOpen = ref(false)
 const suggestItems = ref([])
 const activeIndex = ref(0)
@@ -87,18 +92,25 @@ const refItems = computed(() =>
   (props.refGroups || []).flatMap((group) => group.items || []),
 )
 
+// 从dom上的视觉元素转为数据库里的纯字符串记录，重点是字段key
 function domToExpression(root) {
+  console.log("🚀🚀🚀🚀🚀 ~ FormulaExpressionEditor.vue:96 ~ domToExpression ~ root:", root)
+  // debugger
   if (!root) return ''
   let text = ''
   for (const node of root.childNodes) {
-    if (node.nodeType === 3) {
-      text += node.data
+    if (node.nodeType === 3) { // 3 = text node
+      text += node.data // 是文本的，直接加
       continue
     }
-    if (node.nodeType !== 1) continue
-    if (node.classList.contains('fx-token')) text += node.dataset.expr || ''
+    if (node.nodeType !== 1) continue // 1 = element node 如果不是element node 那都不用处理，按照正常此处不会有别的东西
+    if (node.classList.contains('fx-token')) text += node.dataset.expr || '' // 确定是 element 后，看看是不是 token类型，token 类型就是用来记录 字段key的 
     else if (node.tagName === 'BR') text += '\n'
-    else text += domToExpression(node)
+    else {
+      console.log('0000000000000继续递归', node);
+      // 其他的带 fx-类似的class，比如 fx-k-fn -num 这种，它本身是 element node，然后进递归以后，内部元素就是text，nodeType是3，在上面就可以加到 text 里了
+      text += domToExpression(node)
+    }
   }
   return text.replace(/\u200B/g, '')
 }
@@ -158,9 +170,14 @@ function tokenSourceLength(node) {
   return String(node.dataset.expr || '').length
 }
 
+/**
+ * 当前 range 如果在编辑区内则返回 range，否则返回null
+ */
 function currentRange() {
   const root = contentRef.value
   const selection = window.getSelection()
+  // console.log("🚀 ~ FormulaExpressionEditor.vue:169 ~ currentRange ~ selection:", selection)
+
   if (!root || !selection || !selection.rangeCount) return null
   const range = selection.getRangeAt(0)
   // 选区两端都得在编辑器里，否则删/插会波及外面
@@ -181,7 +198,7 @@ function cloneBeforeCaret() {
     return null
   }
   const holder = document.createElement('div')
-  holder.appendChild(probe.cloneContents())
+  holder.appendChild(probe.cloneContents()) // 复制一份，内部的dom结构也会一起复制出来
   return holder
 }
 
@@ -192,6 +209,7 @@ function textBeforeCaret() {
 }
 
 function caretSourceOffset() {
+  console.log('textBeforeCaret()', textBeforeCaret(), textBeforeCaret().length);
   return textBeforeCaret().length
 }
 
@@ -234,27 +252,32 @@ function createTokenNode(segment) {
   const span = document.createElement('span')
   span.className = 'fx-token'
   span.contentEditable = 'false'
-  span.dataset.expr = segmentExpression(segment)
-  span.textContent = segment.label
+  span.dataset.expr = segmentExpression(segment) // 找对应的字段key
+  span.textContent = segment.label // 显示字段标题
   return span
 }
 
 function renderSegments(root, segments) {
   const fragment = document.createDocumentFragment()
   for (const segment of segments) {
+    // type = token, text
     if (segment.type === 'token') {
       fragment.appendChild(createTokenNode(segment))
       continue
     }
     const lines = String(segment.text).split('\n')
     lines.forEach((line, index) => {
-      if (index > 0) fragment.appendChild(document.createElement('br'))
+      if (index > 0) {
+        fragment.appendChild(document.createElement('br'))
+      }
       if (!line) return
       if (segment.kind === 'plain') {
         fragment.appendChild(document.createTextNode(line))
         return
       }
+
       const span = document.createElement('span')
+      // kind= str, num， fn
       span.className = `fx-k-${segment.kind}`
       span.textContent = line
       fragment.appendChild(span)
@@ -267,8 +290,12 @@ function renderFromModel(expr) {
   const root = contentRef.value
   if (!root) return
   const segments = buildFormulaSegments(expr, props.refLabels)
+  console.log('拆分成不同的分段===', segments);
+  
   renderSegments(root, segments)
   lastSignature = segmentsSignature(segments)
+  console.log("🚀 ~ FormulaExpressionEditor.vue:284 ~ renderFromModel ~ lastSignature:", lastSignature)
+
   empty.value = root.textContent === ''
 }
 
@@ -429,10 +456,15 @@ function tokensMatch(root, segments) {
 function syncFromDom() {
   const root = contentRef.value
   if (!root) return ''
-  // 输入区没焦点时选区可能已经没了，别把记下的光标位置冲成 0
+  // 输入区没焦点时选区可能已经没了，用 lastCaret 兜底，别把光标冲成 0
   const hasRange = Boolean(currentRange())
-  const caret = hasRange ? caretSourceOffset() : lastCaret ?? 0
-  if (hasRange) lastCaret = caret
+  let caret = 0
+  if (hasRange) {
+    caret = caretSourceOffset()
+    lastCaret = caret
+  } else if (lastCaret != null) {
+    caret = lastCaret
+  }
   const text = domToExpression(root)
   emit('update:modelValue', text)
   const segments = buildFormulaSegments(text, props.refLabels)
@@ -521,6 +553,8 @@ function focus() {
   const root = contentRef.value
   if (!root) return
   root.focus()
+  console.log(root.childNodes, 'nodes....');
+  
   setCaret(domToExpression(root).length)
 }
 
@@ -537,12 +571,14 @@ function onWrapperClick(event) {
 
 function onInput() {
   if (composing.value) return
+  // 输入中文时，不触发 syncFromDom 和 updateSuggest，等输入完了再触发
   syncFromDom()
   updateSuggest()
 }
 
 function onKeydown(event) {
   if (suggestOpen.value && suggestItems.value.length) {
+    // 开启提示选择以后，按下箭头键，会触发 moveActive 移动选择项
     if (event.key === 'ArrowDown') {
       event.preventDefault()
       moveActive(1)
@@ -563,6 +599,8 @@ function onKeydown(event) {
     closeSuggest()
     return
   }
+
+  // isComposing 是 true 说明正在输入中文，虽然敲了拼音了，但还没选择文字。不处理退格和删除，此时是在处理拼音的删除
   if (!event.isComposing && event.key === 'Backspace') {
     if (deleteBackward()) event.preventDefault()
     return
@@ -572,6 +610,7 @@ function onKeydown(event) {
     return
   }
   // 公式是单行表达式，回车不留空行
+  // 虽然按了 enter，但没按 shift，就认为这是无效的，不应该的。继续输入公式就行了
   if (event.key === 'Enter' && !event.shiftKey) event.preventDefault()
 }
 
@@ -581,11 +620,15 @@ function onKeyup(event) {
 }
 
 function onMouseup() {
+  console.log('onMouseup....');
+  
   rememberCaret()
   updateSuggest()
 }
 
 function onBlur() {
+  console.log('onblur....');
+  
   rememberCaret()
   closeSuggest()
 }
@@ -644,6 +687,8 @@ function onCompositionEnd() {
 // 光标前那一段连续的普通文本，遇到字段 token 或换行就断
 function tailTextAtCaret() {
   const holder = cloneBeforeCaret()
+  console.log("🚀 ~ FormulaExpressionEditor.vue:690 ~ tailTextAtCaret ~ holder:", holder)
+  // debugger
   if (!holder) return ''
   let tail = ''
   const walk = (node) => {
@@ -658,11 +703,14 @@ function tailTextAtCaret() {
     }
   }
   walk(holder)
+  console.log('计算出 tail   ', tail);
+  
   return tail
 }
 
 function currentWord() {
   const range = currentRange()
+  // 如果没有range，也就是光标当前不在编辑区，或者虽然在，但是选区选中了一堆东西，就返回
   if (!range || !range.collapsed) return ''
   const tail = tailTextAtCaret()
   const match = /[A-Za-z0-9_\u4e00-\u9fa5$'"]*$/.exec(tail)
@@ -751,7 +799,9 @@ function updateSuggest() {
   positionSuggest()
 }
 
+// 关闭选择提示框
 function closeSuggest() {
+  // debugger
   suggestOpen.value = false
   suggestItems.value = []
   suggestWord = ''
@@ -822,10 +872,20 @@ function applySuggest(item) {
 }
 
 function onDocumentMouseDown(event) {
+  // return
   if (!suggestOpen.value) return
   const root = contentRef.value
-  if (root && root.contains(event.target)) return
-  if (event.target.closest && event.target.closest('.formula-suggest')) return
+  if (root && root.contains(event.target)) {
+    console.log('在editable div 里，所以不通过这里去关');
+    return
+  }
+  if (event.target.closest && event.target.closest('.formula-suggest')) {
+    // 从target 往上找，能找到.formula-suggest 的话，说明是点了suggest里的东西，所以不通过这里关弹框，不是不关。
+    // 点击了suggest里的不同部位，要么会触发 blur事件，要么就是点击了 suggest-item，触发绑定的回调，添加 suggest 到内容区
+    return
+  }
+  console.log('点在别的地方，要关掉suggest');
+  
   closeSuggest()
 }
 

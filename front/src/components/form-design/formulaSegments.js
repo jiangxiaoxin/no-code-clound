@@ -28,7 +28,7 @@ function splitPlainText(text, out) {
       kind = 'num'
     }
     pushText(out, kind, piece)
-    match = PLAIN_RE.exec(text)
+    match = PLAIN_RE.exec(text) // 会从lastIndex 往后查，查完了会自动更新 lastIndex。这样while 重复时又会接着往后走
   }
 }
 
@@ -49,13 +49,14 @@ export function buildFormulaSegments(expr, labels = {}) {
   while (index < src.length) {
     const ch = src[index]
     if (ch === '$' && (src[index + 1] === "'" || src[index + 1] === '"')) {
+      // $ 后面跟 ' 或者 ""，这是要引用字段
       const quote = src[index + 1]
       const end = src.indexOf(quote, index + 2)
       if (end === -1) {
         plain += src.slice(index)
         break
       }
-      const inner = src.slice(index + 2, end)
+      const inner = src.slice(index + 2, end) // 拿到中间的那个key
       const path = byPath.has(inner) ? inner : byLabel.get(inner.trim())
       if (path) {
         flush()
@@ -74,8 +75,9 @@ export function buildFormulaSegments(expr, labels = {}) {
     }
     if (ch === "'" || ch === '"') {
       flush()
-      const end = src.indexOf(ch, index + 1)
+      const end = src.indexOf(ch, index + 1) // 找下一个匹配的 ’ 或者 "
       const stop = end === -1 ? src.length : end + 1
+      // 如果遇到 ‘ 有可能是 ￥’ 这种变量形式，也可能是普通字符串。而上面的判断拦截了变量的形式，这里就直接认为是普通字符串的形式
       pushText(out, 'str', src.slice(index, stop))
       index = stop
       continue
@@ -84,6 +86,9 @@ export function buildFormulaSegments(expr, labels = {}) {
     index += 1
   }
   flush()
+
+  console.log('拆分out', out);
+  
   return out
 }
 
