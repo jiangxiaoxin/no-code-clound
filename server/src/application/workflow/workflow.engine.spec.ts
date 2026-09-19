@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { In } from 'typeorm';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
 import { FormRecordStore } from '../form-record/form-record.store';
@@ -1057,7 +1058,7 @@ describe('WorkflowEngine 抄送', () => {
       }),
     );
     expect(instanceRepo.update).toHaveBeenCalledWith(
-      { id: 1, status: 'running' },
+      { id: 1, status: In(['running', 'error']) },
       expect.objectContaining({ status: 'rejected' }),
     );
     expect(store.setWorkflowMeta).toHaveBeenCalledWith(
@@ -1087,6 +1088,40 @@ describe('WorkflowEngine 抄送', () => {
     await expect(engine.expireIfOverdue(1)).resolves.toBe(false);
     expect(taskRepo.update).not.toHaveBeenCalled();
     expect(store.setWorkflowMeta).not.toHaveBeenCalled();
+  });
+
+  it('异常单过期后也自动驳回，不能一直挂着等重试', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        status: 'error',
+        retryStep: 'dispatch',
+        dueAt: new Date(Date.now() - 1000),
+      }),
+    );
+    await expect(engine.expireIfOverdue(1)).resolves.toBe(true);
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 1 }),
+      expect.objectContaining({ status: 'rejected' }),
+    );
+    expect(store.setWorkflowMeta).toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'rejected' }),
+    );
+  });
+
+  it('异常单已过期时点重试要提示超时，不能重新派审批人', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        status: 'error',
+        retryStep: 'dispatch',
+        dueAt: new Date(Date.now() - 1000),
+      }),
+    );
+    approver.resolve.mockResolvedValue({ userIds: [21] });
+    await expect(engine.retry({ instanceId: 1 })).rejects.toThrow('流程已超时');
+    expect(taskRepo.insert).not.toHaveBeenCalled();
+    expect(approver.resolve).not.toHaveBeenCalled();
   });
 
   it('同意过程中被超时驳回时不要把单据写回审批中', async () => {

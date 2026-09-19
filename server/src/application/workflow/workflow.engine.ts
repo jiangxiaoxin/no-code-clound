@@ -382,6 +382,9 @@ export class WorkflowEngine {
   }
 
   async retry(input: { instanceId: number }): Promise<void> {
+    if (await this.expireIfOverdue(input.instanceId)) {
+      throw new ConflictException('流程已超时');
+    }
     const instance = await this.requireInstance(input.instanceId);
     if (instance.status !== 'error') return;
     if (instance.retryStep === 'mongo') {
@@ -1350,7 +1353,7 @@ export class WorkflowEngine {
     });
     if (
       !instance ||
-      instance.status !== 'running' ||
+      (instance.status !== 'running' && instance.status !== 'error') ||
       !instance.dueAt ||
       instance.dueAt.getTime() > Date.now()
     ) {
@@ -1358,7 +1361,7 @@ export class WorkflowEngine {
     }
     const notes = appendNote(instance.notes, '流程已超时，系统自动驳回');
     const expired = await this.instanceRepo.update(
-      { id: instance.id, status: 'running' },
+      { id: instance.id, status: In(['running', 'error']) },
       {
         status: 'rejected',
         currentNodeKey: null,

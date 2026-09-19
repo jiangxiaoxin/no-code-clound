@@ -32,6 +32,20 @@ describe('WorkflowTimeoutService', () => {
     service = module.get(WorkflowTimeoutService);
   });
 
+  it('扫库要把已过期的异常单也算进去', async () => {
+    await service.sweepOverdue();
+    expect(instanceRepo.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: expect.objectContaining({
+            _type: 'in',
+            _value: expect.arrayContaining(['running', 'error']),
+          }),
+        }),
+      }),
+    );
+  });
+
   it('扫库时逐条调用 expireIfOverdue，单条失败不影响其余', async () => {
     engine.expireIfOverdue
       .mockRejectedValueOnce(new Error('boom'))

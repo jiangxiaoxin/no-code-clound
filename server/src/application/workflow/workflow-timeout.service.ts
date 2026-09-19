@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
 import { WorkflowEngine } from './workflow.engine';
 import { WorkflowInstance } from './workflow-instance.entity';
 
@@ -25,7 +25,7 @@ export class WorkflowTimeoutService {
   async sweepOverdue(): Promise<void> {
     const rows = await this.instanceRepo.find({
       where: {
-        status: 'running',
+        status: In(['running', 'error']),
         dueAt: LessThanOrEqual(new Date()),
       },
       select: { id: true },
