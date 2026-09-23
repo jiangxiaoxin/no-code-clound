@@ -1042,6 +1042,47 @@ describe('WorkflowEngine 抄送', () => {
     );
   });
 
+  it('打回发起人后已过截止时间再提交，不能继续流转或直接通过', async () => {
+    const overdue = runningInstance({
+      currentNodeKey: 'start',
+      visitedNodeKeys: ['start'],
+      round: 2,
+      dueAt: new Date(Date.now() - 1000),
+    });
+    const rejected = {
+      ...overdue,
+      status: 'rejected',
+      currentNodeKey: null,
+    };
+    taskRepo.findOne.mockResolvedValue({
+      id: 8,
+      instanceId: 1,
+      nodeKey: 'start',
+      assigneeId: 5,
+      status: 'pending',
+      round: 2,
+    });
+    instanceRepo.findOne
+      .mockResolvedValueOnce(overdue)
+      .mockResolvedValueOnce(rejected);
+    await expect(
+      engine.resubmitStart({ taskId: 8, actorId: 5 }),
+    ).rejects.toThrow('流程已超时');
+    expect(taskRepo.update).not.toHaveBeenCalledWith(
+      { id: 8, status: 'pending', assigneeId: 5 },
+      expect.objectContaining({ status: 'done', action: 'resubmit' }),
+    );
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1, status: 'running' },
+      expect.objectContaining({ status: 'rejected' }),
+    );
+    expect(store.setWorkflowMeta).toHaveBeenCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'rejected' }),
+    );
+  });
+
   it('到期自动驳回并取消待办', async () => {
     instanceRepo.findOne.mockResolvedValue(
       runningInstance({

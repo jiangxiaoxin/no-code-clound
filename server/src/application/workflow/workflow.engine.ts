@@ -561,6 +561,12 @@ export class WorkflowEngine {
     instance: WorkflowInstance,
     fromNodeKey: string,
   ): Promise<WorkflowInstance> {
+    if (instance.status === 'running') {
+      const expired = await this.expireIfOverdue(instance.id);
+      if (expired) {
+        throw new ConflictException('流程已超时');
+      }
+    }
     const record = await this.store.findById(instance.formId, instance.recordId);
     const stay = nextStay(instance.graph, fromNodeKey, record?.data ?? {});
     if (stay.kind === 'error') {
@@ -1247,7 +1253,11 @@ export class WorkflowEngine {
     if (task.nodeKey !== 'start') {
       throw new BadRequestException('不是发起人待办');
     }
+    await this.expireIfOverdue(task.instanceId);
     const instance = await this.requireInstance(task.instanceId);
+    if (instance.status === 'rejected' && instance.dueAt) {
+      throw new ConflictException('流程已超时');
+    }
     if (instance.status !== 'running') {
       throw new ConflictException('单据状态已变化，请刷新后再看');
     }
