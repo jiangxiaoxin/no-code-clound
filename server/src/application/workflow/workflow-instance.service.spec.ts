@@ -28,6 +28,7 @@ describe('WorkflowInstanceService', () => {
     addSign: jest.fn(),
     returnTo: jest.fn(),
     resubmitStart: jest.fn(),
+    expireIfOverdue: jest.fn(),
   };
   const definition = { getRuntime: jest.fn() };
   const access = {
@@ -52,6 +53,7 @@ describe('WorkflowInstanceService', () => {
       currentNodeKey: 'n1',
     });
     engine.completeTask.mockResolvedValue({ waitingOthers: false });
+    engine.expireIfOverdue.mockResolvedValue(false);
     definition.getRuntime.mockResolvedValue({ graph: {} });
     const module = await Test.createTestingModule({
       providers: [
@@ -110,6 +112,23 @@ describe('WorkflowInstanceService', () => {
     await expect(service.saveDraft(1, 5, {})).rejects.toThrow(
       '当前状态不能修改',
     );
+  });
+
+  it('异常单已过期时再提交不能先改数据', async () => {
+    instanceRepo.findOne.mockResolvedValue({
+      id: 1,
+      initiatorId: 5,
+      status: 'error',
+      formId: 12,
+      recordId,
+      appId: 8,
+    });
+    engine.expireIfOverdue.mockResolvedValue(true);
+    await expect(service.submit(1, 5, { field_reason: '改' })).rejects.toThrow(
+      '流程已超时',
+    );
+    expect(persist.persist).not.toHaveBeenCalled();
+    expect(engine.submit).not.toHaveBeenCalled();
   });
 
   it('关掉终止后再交时已驳回不能再存再交', async () => {

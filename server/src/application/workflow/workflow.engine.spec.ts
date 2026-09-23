@@ -1074,7 +1074,7 @@ describe('WorkflowEngine 抄送', () => {
       expect.objectContaining({ status: 'done', action: 'resubmit' }),
     );
     expect(instanceRepo.update).toHaveBeenCalledWith(
-      { id: 1, status: 'running' },
+      { id: 1, status: In(['running', 'error']) },
       expect.objectContaining({ status: 'rejected' }),
     );
     expect(store.setWorkflowMeta).toHaveBeenCalledWith(
@@ -1163,6 +1163,55 @@ describe('WorkflowEngine 抄送', () => {
     await expect(engine.retry({ instanceId: 1 })).rejects.toThrow('流程已超时');
     expect(taskRepo.insert).not.toHaveBeenCalled();
     expect(approver.resolve).not.toHaveBeenCalled();
+  });
+
+  it('异常单已过期时发起人再提交，要先自动驳回，不能换新截止时间重新开一轮', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        status: 'error',
+        retryStep: 'dispatch',
+        dueAt: new Date(Date.now() - 1000),
+      }),
+    );
+    await expect(
+      engine.submit({ form, recordId, actorId: 5 }),
+    ).rejects.toThrow('流程已超时');
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1, status: In(['running', 'error']) },
+      expect.objectContaining({ status: 'rejected' }),
+    );
+    expect(instanceRepo.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        status: In(['draft', 'rejected', 'error']),
+      }),
+      expect.objectContaining({ status: 'running' }),
+    );
+    expect(approver.resolve).not.toHaveBeenCalled();
+  });
+
+  it('审批中已过期且还没人批过时，发起人撤回要提示超时，不能退回草稿', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        dueAt: new Date(Date.now() - 1000),
+        hasApproved: false,
+      }),
+    );
+    await expect(engine.cancel({ instanceId: 1, actorId: 5 })).rejects.toThrow(
+      '流程已超时',
+    );
+    expect(instanceRepo.update).toHaveBeenCalledWith(
+      { id: 1, status: In(['running', 'error']) },
+      expect.objectContaining({ status: 'rejected' }),
+    );
+    expect(instanceRepo.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        initiatorId: 5,
+        hasApproved: false,
+      }),
+      expect.objectContaining({ status: 'draft' }),
+    );
   });
 
   it('同意过程中被超时驳回时不要把单据写回审批中', async () => {

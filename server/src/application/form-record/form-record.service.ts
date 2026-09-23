@@ -300,6 +300,9 @@ export class FormRecordService {
     }
     const status = existing.workflowStatus as InstanceStatus | undefined;
     const instance = await this.findInstance(formId, recordId, existing.workflowInstanceId);
+    if (instance && (await this.engine.expireIfOverdue(instance.id))) {
+      throw new BadRequestException('流程已超时');
+    }
 
     // MySQL 实例行才是真相：Mongo 的 workflowStatus 曾因历史写失败残留旧值时，
     // 不能放行对一张实际审批中的单据的编辑
