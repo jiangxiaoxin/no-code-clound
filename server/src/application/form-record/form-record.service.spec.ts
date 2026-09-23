@@ -49,6 +49,7 @@ describe('FormRecordService', () => {
     ensureDraft: jest.fn(),
     resubmitApproved: jest.fn(),
     onRecordDeleted: jest.fn(),
+    expireIfOverdue: jest.fn(),
   };
   const instanceRepo = { findOne: jest.fn(), find: jest.fn() };
   const taskRepo = { find: jest.fn() };
@@ -114,6 +115,7 @@ describe('FormRecordService', () => {
     service = module.get(FormRecordService);
     instanceRepo.find.mockResolvedValue([]);
     taskRepo.find.mockResolvedValue([]);
+    engine.expireIfOverdue.mockResolvedValue(false);
   });
 
   it('throws when app is missing', async () => {
@@ -628,6 +630,33 @@ describe('FormRecordService', () => {
     await expect(
       service.update(1, 8, 12, doc._id.toHexString(), { name: 'y' }, 'submit'),
     ).rejects.toThrow('只有发起人能修改这条数据');
+  });
+
+  it('异常单已过期时数据管理再提交不能改已超时的单据', async () => {
+    formRepo.findOne.mockResolvedValue({ ...form, formKind: 'workflow' });
+    definition.getRuntime.mockResolvedValue({
+      hasBeenEnabled: true,
+      enabled: true,
+      graph: {},
+      version: 1,
+    });
+    store.findById.mockResolvedValue({
+      ...doc,
+      createdBy: 1,
+      workflowStatus: 'error',
+      workflowInstanceId: 7,
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 7,
+      initiatorId: 1,
+      status: 'error',
+    });
+    engine.expireIfOverdue.mockResolvedValue(true);
+    await expect(
+      service.update(1, 8, 12, doc._id.toHexString(), { name: 'y' }, 'submit'),
+    ).rejects.toThrow('流程已超时');
+    expect(store.replaceData).not.toHaveBeenCalled();
+    expect(engine.submit).not.toHaveBeenCalled();
   });
 
   it('流程终止后关掉再提交则已通过和已驳回都不能改', async () => {

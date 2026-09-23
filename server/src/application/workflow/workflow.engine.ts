@@ -124,6 +124,9 @@ export class WorkflowEngine {
       refreshGraph = runtime.graph;
       refreshVersion = runtime.version;
     }
+    if (await this.expireIfOverdue(instance.id)) {
+      throw new ConflictException('流程已超时');
+    }
     const nextRound = instance.round + 1;
     const startedAt = new Date();
     const graphForDue = refreshGraph ?? instance.graph;
@@ -352,6 +355,9 @@ export class WorkflowEngine {
   }
 
   async cancel(input: { instanceId: number; actorId: number }): Promise<void> {
+    if (await this.expireIfOverdue(input.instanceId)) {
+      throw new ConflictException('流程已超时');
+    }
     const cancelled = await this.instanceRepo.update(
       {
         id: input.instanceId,

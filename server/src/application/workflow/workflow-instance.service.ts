@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -43,6 +44,9 @@ export class WorkflowInstanceService {
     data: Record<string, unknown>,
   ) {
     const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
+    if (await this.engine.expireIfOverdue(instance.id)) {
+      throw new ConflictException('流程已超时');
+    }
     await this.assertTerminatedEditable(instance);
     const form = await this.requireForm(instance.formId);
     await this.persistAsInitiator(instance, form, actorId, data);
@@ -59,6 +63,9 @@ export class WorkflowInstanceService {
     data: Record<string, unknown>,
   ) {
     const instance = await this.requireInitiator(instanceId, actorId, EDITABLE);
+    if (await this.engine.expireIfOverdue(instance.id)) {
+      throw new ConflictException('流程已超时');
+    }
     await this.assertTerminatedEditable(instance);
     const form = await this.requireForm(instance.formId);
     await this.persistAsInitiator(instance, form, actorId, data);
