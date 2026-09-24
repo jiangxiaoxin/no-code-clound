@@ -705,6 +705,25 @@ describe('FormRecordService', () => {
     );
   });
 
+  it('列表仍是草稿但 MySQL 实例已审批中时也不能删除', async () => {
+    formRepo.findOne.mockResolvedValue({ ...form, formKind: 'workflow' });
+    store.findById.mockResolvedValue({
+      ...doc,
+      workflowStatus: 'draft',
+      workflowInstanceId: 3,
+    });
+    instanceRepo.findOne.mockResolvedValue({
+      id: 3,
+      initiatorId: 1,
+      status: 'running',
+    });
+    await expect(
+      service.remove(1, 8, 12, doc._id.toHexString()),
+    ).rejects.toThrow('审批中的数据不能删除');
+    expect(store.deleteById).not.toHaveBeenCalled();
+    expect(engine.onRecordDeleted).not.toHaveBeenCalled();
+  });
+
   it('发布页关了【编辑】时，直接调修改接口也拒', async () => {
     formRepo.findOne.mockResolvedValue(form);
     formConfigRepo.findOne.mockResolvedValue({

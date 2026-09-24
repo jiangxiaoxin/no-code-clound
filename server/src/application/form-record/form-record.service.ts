@@ -420,7 +420,9 @@ export class FormRecordService {
         recordId,
         existing.workflowInstanceId,
       );
-      if (status === 'running') {
+      // 和编辑一样以 MySQL 实例为准：提交后写回 Mongo 状态失败时，
+      // 列表可能还是「草稿」，实际已经在审批中，不能删
+      if (status === 'running' || instance?.status === 'running') {
         throw new BadRequestException('审批中的数据不能删除');
       }
       if (
