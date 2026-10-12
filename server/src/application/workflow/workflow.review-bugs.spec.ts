@@ -88,6 +88,31 @@ function runningInstance(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function criterionMatches(actual: unknown, expected: unknown): boolean {
+  if (
+    expected &&
+    typeof expected === 'object' &&
+    'type' in expected &&
+    typeof (expected as { type: unknown }).type === 'string'
+  ) {
+    const op = expected as { type: string; value?: unknown };
+    if (op.type === 'isNull') return actual == null;
+    if (op.type === 'in') {
+      return Array.isArray(op.value) && op.value.includes(actual);
+    }
+  }
+  return actual === expected;
+}
+
+function whereMatches(
+  row: Record<string, unknown>,
+  where: Record<string, unknown>,
+): boolean {
+  return Object.entries(where).every(([key, expected]) =>
+    criterionMatches(row[key], expected),
+  );
+}
+
 describe('评审问题复现：workflow.engine 重试路径', () => {
   let engine: WorkflowEngine;
   const instanceRepo = {
@@ -391,6 +416,74 @@ describe('评审问题复现：workflow.engine 重试路径', () => {
       expect.objectContaining({
         actorId: 21,
         data: expect.objectContaining({ field_reason: '张三改的' }),
+      }),
+    );
+  });
+
+  it('或签一人退回发起人、另一人同时同意：不能写回同意内容，也不能把 hasApproved 置真', async () => {
+    const row = runningInstance() as Record<string, unknown>;
+    instanceRepo.findOne.mockImplementation(async () => ({ ...row }));
+    instanceRepo.update.mockImplementation(async (where, patch) => {
+      if (!whereMatches(row, where as Record<string, unknown>)) {
+        return { affected: 0 };
+      }
+      Object.assign(row, patch);
+      return { affected: 1 };
+    });
+    const zhangTask = {
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    };
+    const liTask = {
+      id: 2,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 22,
+      status: 'pending',
+      round: 1,
+    };
+    taskRepo.findOne.mockImplementation(async ({ where }: { where: { id?: number } }) => {
+      if (where.id === 1) return { ...zhangTask };
+      if (where.id === 2) return { ...liTask };
+      return null;
+    });
+    taskRepo.find.mockResolvedValue([zhangTask, liTask]);
+    taskRepo.update.mockImplementation(async (where: { id?: number }, patch: { action?: string }) => {
+      if (where.id === 1 && patch.action === 'approve') {
+        await engine.returnTo({
+          taskId: 2,
+          actorId: 22,
+          target: 'start',
+          comment: '请改',
+        });
+      }
+      return { affected: 1 };
+    });
+
+    await expect(
+      engine.completeTask({
+        taskId: 1,
+        actorId: 21,
+        action: 'approve',
+        comment: '',
+        dataPatch: { field_reason: '张三改的' },
+      }),
+    ).rejects.toThrow('单据状态已变化');
+
+    expect(persist.persist).not.toHaveBeenCalled();
+    expect(row.currentNodeKey).toBe('start');
+    expect(row.round).toBe(2);
+    expect(row.hasApproved).toBe(false);
+    expect(taskRepo.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        nodeKey: 'start',
+        round: 2,
+        assigneeId: 5,
+        status: 'pending',
       }),
     );
   });

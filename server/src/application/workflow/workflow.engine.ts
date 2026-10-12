@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, type QueryDeepPartialEntity } from 'typeorm';
+import { In, IsNull, Repository, type QueryDeepPartialEntity } from 'typeorm';
 import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
 import { mergeRecordData } from '../form-record/form-record.coerce';
@@ -293,8 +293,15 @@ export class WorkflowEngine {
       });
       return { waitingOthers: false };
     }
+    // 抢占必须带上当前节点+轮次：或签另一人已经退回发起人时，
+    // 不能再写回可编辑字段，也不能把 hasApproved 置真挡住撤回
     const claimed = await this.instanceRepo.update(
-      { id: instance.id, status: 'running' },
+      {
+        id: instance.id,
+        status: 'running',
+        currentNodeKey: task.nodeKey,
+        round: instance.round,
+      },
       {
         retryStep: 'mongo',
         hasApproved: true,
@@ -1137,13 +1144,16 @@ export class WorkflowEngine {
       input.target === 'previous'
         ? `退回至「${prevTitle}」`
         : '退回至发起人';
-    // 抢占要带上「当前节点+轮次」：两个审批人同时退回时只有一人成功，
-    // 后到者拿到 409；取消他人待办放在抢占成功之后，避免误伤并发赢家刚派出的新待办
+    // 抢占要带上「当前节点+轮次」，并且还没人开始写回（retryStep 为空）：
+    // 两个审批人同时退回时只有一人成功；另一人若已抢到同意写回，退回必须 409，
+    // 避免单据已经回到发起人手里还被写进同意内容。取消他人待办放在抢占成功之后，
+    // 避免误伤并发赢家刚派出的新待办
     const claimWhere = {
       id: instance.id,
       status: 'running' as const,
       currentNodeKey: task.nodeKey,
       round: instance.round,
+      retryStep: IsNull(),
     };
     const nextRound = instance.round + 1;
     if (input.target === 'previous' && prevKey) {
