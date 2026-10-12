@@ -1,6 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { In } from 'typeorm';
+import { In, IsNull } from 'typeorm';
 import { AppForm } from '../app-form.entity';
 import { FormRecordPersistService } from '../form-record/form-record.persist';
 import { FormRecordStore } from '../form-record/form-record.store';
@@ -942,7 +942,13 @@ describe('WorkflowEngine 抄送', () => {
       comment: '请补事由',
     });
     expect(instanceRepo.update).toHaveBeenCalledWith(
-      { id: 1, status: 'running', currentNodeKey: 'n2', round: 1 },
+      {
+        id: 1,
+        status: 'running',
+        currentNodeKey: 'n2',
+        round: 1,
+        retryStep: IsNull(),
+      },
       expect.objectContaining({
         currentNodeKey: 'n1',
         round: 2,
@@ -997,7 +1003,13 @@ describe('WorkflowEngine 抄送', () => {
       comment: '请改日期',
     });
     expect(instanceRepo.update).toHaveBeenCalledWith(
-      { id: 1, status: 'running', currentNodeKey: 'n2', round: 1 },
+      {
+        id: 1,
+        status: 'running',
+        currentNodeKey: 'n2',
+        round: 1,
+        retryStep: IsNull(),
+      },
       expect.objectContaining({
         currentNodeKey: 'start',
         round: 2,
