@@ -391,6 +391,9 @@ export class WorkflowEngine {
       const node = instance.currentNodeKey
         ? findApproveNode(instance.graph, instance.currentNodeKey)
         : null;
+      // 发起人「再次提交」会把 error 改成 running 并加 round。这里若还按内存里的旧异常单
+      // 去写回审批补丁，会把新一轮改过的内容盖掉，再从旧节点往下推进会跳过新一轮待办。
+      await this.assertStillErrorRound(instance);
       if (node) {
         await this.writeBack(
           instance,
@@ -409,8 +412,8 @@ export class WorkflowEngine {
             },
           });
           if (pending > 0) {
-            await this.instanceRepo.update(
-              { id: instance.id, status: 'error' },
+            const resumed = await this.instanceRepo.update(
+              { id: instance.id, status: 'error', round: instance.round },
               {
                 status: 'running',
                 errorReason: null,
@@ -419,6 +422,9 @@ export class WorkflowEngine {
                 retryActorId: null,
               },
             );
+            if (!resumed.affected) {
+              throw new ConflictException('单据状态已变化，请刷新后再看');
+            }
             return;
           }
         } else {
@@ -427,14 +433,18 @@ export class WorkflowEngine {
           await this.cancelPending(instance.id, node.key, '或签其他人已通过');
         }
       }
-      await this.instanceRepo.update(
-        { id: instance.id, status: 'error' },
+      const stepped = await this.instanceRepo.update(
+        { id: instance.id, status: 'error', round: instance.round },
         { retryStep: 'advance', retryPatch: null, retryActorId: null },
       );
+      if (!stepped.affected) {
+        throw new ConflictException('单据状态已变化，请刷新后再看');
+      }
       await this.advance(instance, instance.currentNodeKey ?? 'start');
       return;
     }
     if (instance.retryStep === 'advance') {
+      await this.assertStillErrorRound(instance);
       const advanceNode = instance.currentNodeKey
         ? findApproveNode(instance.graph, instance.currentNodeKey)
         : null;
@@ -504,9 +514,9 @@ export class WorkflowEngine {
         );
         return;
       }
-      // 带状态条件翻转：发起人恰好撤回时这里落空，不能给已撤回的单派待办
+      // 带状态条件翻转：发起人恰好撤回或再次提交时这里落空，不能给已换轮次的单派待办
       const resumed = await this.instanceRepo.update(
-        { id: instance.id, status: 'error' },
+        { id: instance.id, status: 'error', round: instance.round },
         { status: 'running', errorReason: null, retryStep: null },
       );
       if (!resumed.affected) {
@@ -545,6 +555,7 @@ export class WorkflowEngine {
       }
       return;
     }
+    await this.assertStillErrorRound(instance);
     await this.advance(instance, instance.currentNodeKey ?? 'start');
   }
 
@@ -824,8 +835,13 @@ export class WorkflowEngine {
 
   private claimWhere(instance: WorkflowInstance, fromNodeKey: string) {
     return fromNodeKey === 'start'
-      ? { id: instance.id, status: In(['running', 'error']) }
-      : { id: instance.id, currentNodeKey: fromNodeKey, status: In(['running', 'error']) };
+      ? { id: instance.id, status: In(['running', 'error']), round: instance.round }
+      : {
+          id: instance.id,
+          currentNodeKey: fromNodeKey,
+          status: In(['running', 'error']),
+          round: instance.round,
+        };
   }
 
   private async writeBack(
@@ -1393,6 +1409,19 @@ export class WorkflowEngine {
     const instance = await this.instanceRepo.findOne({ where: { id } });
     if (!instance) throw new NotFoundException('单据不存在');
     return instance;
+  }
+
+  private async assertStillErrorRound(instance: WorkflowInstance) {
+    const latest = await this.instanceRepo.findOne({
+      where: { id: instance.id },
+    });
+    if (
+      !latest ||
+      latest.status !== 'error' ||
+      latest.round !== instance.round
+    ) {
+      throw new ConflictException('单据状态已变化，请刷新后再看');
+    }
   }
 
   private async requirePublished(formId: number): Promise<{

@@ -403,6 +403,57 @@ describe('评审问题复现：workflow.engine 重试路径', () => {
     expect(taskRepo.delete).toHaveBeenCalledWith({ instanceId: 1 });
     expect(instanceRepo.delete).toHaveBeenCalledWith({ id: 1 });
   });
+
+  it('写回失败后重试：发起人已再次提交则不能把旧补丁写进新一轮', async () => {
+    const errorInstance = runningInstance({
+      status: 'error',
+      retryStep: 'mongo',
+      hasApproved: true,
+      retryPatch: { field_reason: '审批人改过的事由' },
+      retryActorId: 21,
+      round: 1,
+    });
+    const resubmitted = runningInstance({
+      status: 'running',
+      retryStep: null,
+      hasApproved: false,
+      round: 2,
+    });
+    instanceRepo.findOne
+      .mockResolvedValueOnce(errorInstance)
+      .mockResolvedValueOnce(errorInstance)
+      .mockResolvedValue(resubmitted);
+    await expect(engine.retry({ instanceId: 1 })).rejects.toThrow(
+      '单据状态已变化，请刷新后再看',
+    );
+    expect(persist.persist).not.toHaveBeenCalled();
+    expect(instanceRepo.update).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ currentNodeKey: 'n2' }),
+    );
+  });
+
+  it('写回失败后重试：写回后发现已经再次提交，不能从旧节点继续推进', async () => {
+    instanceRepo.findOne.mockResolvedValue(
+      runningInstance({
+        status: 'error',
+        retryStep: 'mongo',
+        hasApproved: true,
+        retryPatch: { field_reason: '旧补丁' },
+        retryActorId: 21,
+        round: 1,
+      }),
+    );
+    instanceRepo.update.mockResolvedValue({ affected: 0 });
+    await expect(engine.retry({ instanceId: 1 })).rejects.toThrow(
+      '单据状态已变化，请刷新后再看',
+    );
+    expect(persist.persist).toHaveBeenCalled();
+    expect(instanceRepo.update).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ currentNodeKey: 'n2' }),
+    );
+  });
 });
 
 describe('评审问题复现：workflow.render 跨应用取数', () => {
