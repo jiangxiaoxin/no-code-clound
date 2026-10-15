@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, type QueryDeepPartialEntity } from 'typeorm';
+import { In, IsNull, Repository, type QueryDeepPartialEntity } from 'typeorm';
 import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
 import { mergeRecordData } from '../form-record/form-record.coerce';
@@ -293,8 +293,19 @@ export class WorkflowEngine {
       });
       return { waitingOthers: false };
     }
+    // 或签只要一人通过即可推进。抢占必须带当前节点+轮次，并且还没人开始写回：
+    // 两人同时点【同意】时只有先抢到的人能写回；后到者 409，避免已通过后又被写成审批中，
+    // 或下一节点已经派单后被失败的写回打成异常。会签仍允许多人依次写回。
     const claimed = await this.instanceRepo.update(
-      { id: instance.id, status: 'running' },
+      node.signMode === 'any'
+        ? {
+            id: instance.id,
+            status: 'running',
+            currentNodeKey: task.nodeKey,
+            round: instance.round,
+            retryStep: IsNull(),
+          }
+        : { id: instance.id, status: 'running' },
       {
         retryStep: 'mongo',
         hasApproved: true,
