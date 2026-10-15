@@ -88,6 +88,53 @@ function runningInstance(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function criterionMatches(actual: unknown, expected: unknown): boolean {
+  if (
+    expected &&
+    typeof expected === 'object' &&
+    'type' in expected &&
+    typeof (expected as { type: unknown }).type === 'string'
+  ) {
+    const op = expected as { type: string; value?: unknown };
+    if (op.type === 'isNull') return actual == null;
+    if (op.type === 'in') {
+      return Array.isArray(op.value) && op.value.includes(actual);
+    }
+  }
+  return actual === expected;
+}
+
+function whereMatches(
+  row: Record<string, unknown>,
+  where: Record<string, unknown>,
+): boolean {
+  return Object.entries(where).every(([key, expected]) =>
+    criterionMatches(row[key], expected),
+  );
+}
+
+const orSignEndGraph: WorkflowGraph = {
+  nodes: [
+    { key: 'start', type: 'start', title: '开始', x: 0, y: 0 },
+    {
+      key: 'n1',
+      type: 'approve',
+      title: '人事备案',
+      x: 0,
+      y: 1,
+      approver: { userIds: [21, 22], roleIds: [], memberFieldKeys: [] },
+      signMode: 'any',
+      commentRequiredOnApprove: false,
+      fieldAccess: { field_reason: 'editable' },
+    },
+    { key: 'end', type: 'end', title: '结束', x: 0, y: 2 },
+  ],
+  edges: [
+    { key: 'e1', from: 'start', to: 'n1' },
+    { key: 'e2', from: 'n1', to: 'end' },
+  ],
+};
+
 describe('评审问题复现：workflow.engine 重试路径', () => {
   let engine: WorkflowEngine;
   const instanceRepo = {
@@ -349,7 +396,10 @@ describe('评审问题复现：workflow.engine 重试路径', () => {
     // 用一行可变状态模拟真实库：update 真正落库、findOne 读回，不做任何事后矫正
     const row = runningInstance() as Record<string, unknown>;
     instanceRepo.findOne.mockImplementation(async () => ({ ...row }));
-    instanceRepo.update.mockImplementation(async (_where, patch) => {
+    instanceRepo.update.mockImplementation(async (where, patch) => {
+      if (!whereMatches(row, where as Record<string, unknown>)) {
+        return { affected: 0 };
+      }
       Object.assign(row, patch);
       return { affected: 1 };
     });
@@ -363,15 +413,17 @@ describe('评审问题复现：workflow.engine 重试路径', () => {
     };
     taskRepo.findOne.mockResolvedValueOnce(zhangTask);
     persist.persist.mockImplementationOnce(async () => {
-      // 李四的通过恰好落在张三「已抢占、写库尚未失败」的窗口里，或签一人通过流程即推进
+      // 李四的通过落在张三「已抢占、写库尚未失败」的窗口里：或签槽位已被占，后到者必须 409
       taskRepo.findOne.mockResolvedValueOnce({ ...zhangTask, id: 2, assigneeId: 22 });
-      await engine.completeTask({
-        taskId: 2,
-        actorId: 22,
-        action: 'approve',
-        comment: '',
-        dataPatch: { field_reason: '李四改的' },
-      });
+      await expect(
+        engine.completeTask({
+          taskId: 2,
+          actorId: 22,
+          action: 'approve',
+          comment: '',
+          dataPatch: { field_reason: '李四改的' },
+        }),
+      ).rejects.toThrow('单据状态已变化');
       throw new Error('写库失败');
     });
     await expect(
@@ -393,6 +445,82 @@ describe('评审问题复现：workflow.engine 重试路径', () => {
         data: expect.objectContaining({ field_reason: '张三改的' }),
       }),
     );
+  });
+
+  it('或签两人同时同意：后到者不能写回，也不能把已通过单据改回审批中', async () => {
+    const row = runningInstance({
+      graph: orSignEndGraph,
+      currentNodeKey: 'n1',
+      visitedNodeKeys: ['n1'],
+    }) as Record<string, unknown>;
+    instanceRepo.findOne.mockImplementation(async () => ({ ...row }));
+    instanceRepo.update.mockImplementation(async (where, patch) => {
+      if (!whereMatches(row, where as Record<string, unknown>)) {
+        return { affected: 0 };
+      }
+      Object.assign(row, patch);
+      return { affected: 1 };
+    });
+    const zhangTask = {
+      id: 1,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    };
+    const liTask = {
+      id: 2,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 22,
+      status: 'pending',
+      round: 1,
+    };
+    taskRepo.findOne.mockImplementation(async ({ where }: { where: { id?: number } }) => {
+      if (where.id === 1) return { ...zhangTask };
+      if (where.id === 2) return { ...liTask };
+      return null;
+    });
+    taskRepo.find.mockResolvedValue([zhangTask, liTask]);
+    persist.persist.mockImplementationOnce(async () => {
+      await expect(
+        engine.completeTask({
+          taskId: 2,
+          actorId: 22,
+          action: 'approve',
+          comment: '',
+          dataPatch: { field_reason: '李四改的' },
+        }),
+      ).rejects.toThrow('单据状态已变化');
+    });
+
+    await engine.completeTask({
+      taskId: 1,
+      actorId: 21,
+      action: 'approve',
+      comment: '',
+      dataPatch: { field_reason: '张三改的' },
+    });
+
+    expect(persist.persist).toHaveBeenCalledTimes(1);
+    expect(persist.persist).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 21,
+        data: expect.objectContaining({ field_reason: '张三改的' }),
+      }),
+    );
+    expect(row.status).toBe('approved');
+    expect(store.setWorkflowMeta).toHaveBeenLastCalledWith(
+      12,
+      recordId,
+      expect.objectContaining({ workflowStatus: 'approved' }),
+    );
+    const statuses = store.setWorkflowMeta.mock.calls.map(
+      (call) => call[2]?.workflowStatus,
+    );
+    const lastApproved = statuses.lastIndexOf('approved');
+    expect(statuses.slice(lastApproved + 1)).not.toContain('running');
   });
 
   it('【建议修5】删除异常单后实例应一并清理，否则重试会给已删数据派待办', async () => {
