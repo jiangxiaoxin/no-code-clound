@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, type QueryDeepPartialEntity } from 'typeorm';
+import { In, IsNull, Repository, type QueryDeepPartialEntity } from 'typeorm';
 import { User } from '../../user/user.entity';
 import { AppForm } from '../app-form.entity';
 import { mergeRecordData } from '../form-record/form-record.coerce';
@@ -256,6 +256,47 @@ export class WorkflowEngine {
         assertSubformConstraints(fields, merged, requiredKeys);
       }
     }
+    if (input.action === 'reject') {
+      // 先抢单据再消费待办：另一人已经点【同意】占了写回槽位时，
+      // 驳回必须 409 且待办还在，不能先把待办吃掉再抢失败。
+      // retryStep 为空才能驳回，避免同意已开始写回后把单据打成已驳回、写回仍把改过的字段落库。
+      const rejected = await this.instanceRepo.update(
+        {
+          id: instance.id,
+          status: 'running',
+          currentNodeKey: task.nodeKey,
+          round: instance.round,
+          retryStep: IsNull(),
+        },
+        {
+          status: 'rejected',
+          currentNodeKey: null,
+          endedAt: new Date(),
+          retryStep: null,
+        },
+      );
+      if (!rejected.affected) throw new ConflictException('这条待办已处理');
+      const done = await this.taskRepo.update(
+        { id: task.id, status: 'pending', assigneeId: input.actorId },
+        {
+          status: 'done',
+          action: 'reject',
+          comment: input.comment,
+          finishedAt: new Date(),
+        },
+      );
+      if (!done.affected) throw new ConflictException('这条待办已处理');
+      await this.cancelPending(
+        instance.id,
+        task.nodeKey,
+        node?.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
+      );
+      await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+        workflowStatus: 'rejected',
+        workflowInstanceId: instance.id,
+      });
+      return { waitingOthers: false };
+    }
     const done = await this.taskRepo.update(
       { id: task.id, status: 'pending', assigneeId: input.actorId },
       {
@@ -266,33 +307,6 @@ export class WorkflowEngine {
       },
     );
     if (!done.affected) throw new ConflictException('这条待办已处理');
-    if (input.action === 'reject') {
-      await this.cancelPending(
-        instance.id,
-        task.nodeKey,
-        node?.signMode === 'all' ? '会签节点已驳回' : '或签其他人已驳回',
-      );
-      const rejected = await this.instanceRepo.update(
-        {
-          id: instance.id,
-          status: 'running',
-          currentNodeKey: task.nodeKey,
-          round: instance.round,
-        },
-        {
-          status: 'rejected',
-          currentNodeKey: null,
-          endedAt: new Date(),
-          retryStep: null,
-        },
-      );
-      if (!rejected.affected) throw new ConflictException('这条待办已处理');
-      await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
-        workflowStatus: 'rejected',
-        workflowInstanceId: instance.id,
-      });
-      return { waitingOthers: false };
-    }
     const claimed = await this.instanceRepo.update(
       { id: instance.id, status: 'running' },
       {
@@ -845,6 +859,22 @@ export class WorkflowEngine {
       if (key in dataPatch) data[key] = dataPatch[key];
     }
     try {
+      const fresh = await this.instanceRepo.findOne({
+        where: { id: instance.id },
+      });
+      // 同意抢到写回槽位之后，并发驳回/超时/撤回可能已经把单据打成终态。
+      // 必须在落库前看一眼：规格是驳回不写可编辑字段，终态单不能被同意补丁覆盖。
+      if (
+        fresh &&
+        fresh.status !== 'running' &&
+        fresh.status !== 'error'
+      ) {
+        await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
+          workflowStatus: fresh.status,
+          workflowInstanceId: instance.id,
+        });
+        return;
+      }
       if (requiredKeys.length && Object.keys(data).length) {
         await this.persist.persist({
           form,
@@ -864,10 +894,16 @@ export class WorkflowEngine {
           skipSerial: true,
         });
       }
-      const fresh = await this.instanceRepo.findOne({ where: { id: instance.id } });
-      if (fresh?.status === 'rejected') {
+      const after = await this.instanceRepo.findOne({
+        where: { id: instance.id },
+      });
+      if (
+        after &&
+        after.status !== 'running' &&
+        after.status !== 'error'
+      ) {
         await this.store.setWorkflowMeta(instance.formId, instance.recordId, {
-          workflowStatus: 'rejected',
+          workflowStatus: after.status,
           workflowInstanceId: instance.id,
         });
         return;
