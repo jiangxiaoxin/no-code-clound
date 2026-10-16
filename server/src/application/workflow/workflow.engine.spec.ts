@@ -355,6 +355,57 @@ describe('WorkflowEngine', () => {
     );
   });
 
+  it('或签一人已开始写回时，另一人驳回不能吃掉待办，也不能让同意把字段写入已驳回单据', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 5,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 22,
+      status: 'pending',
+      round: 1,
+    });
+    instanceRepo.findOne.mockResolvedValue(runningInstance());
+    instanceRepo.update.mockResolvedValue({ affected: 0 });
+    await expect(
+      engine.completeTask({
+        taskId: 5,
+        actorId: 22,
+        action: 'reject',
+        comment: '不批',
+        dataPatch: { field_reason: '不该写入' },
+      }),
+    ).rejects.toThrow('这条待办已处理');
+    expect(persist.persist).not.toHaveBeenCalled();
+    expect(taskRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('同意写回前单据已被驳回：不把可编辑字段写入已驳回的记录', async () => {
+    taskRepo.findOne.mockResolvedValue({
+      id: 3,
+      instanceId: 1,
+      nodeKey: 'n1',
+      assigneeId: 21,
+      status: 'pending',
+      round: 1,
+    });
+    let finds = 0;
+    instanceRepo.findOne.mockImplementation(async () => {
+      finds += 1;
+      if (finds <= 2) return runningInstance();
+      return runningInstance({ status: 'rejected', currentNodeKey: null });
+    });
+    await expect(
+      engine.completeTask({
+        taskId: 3,
+        actorId: 21,
+        action: 'approve',
+        comment: '',
+        dataPatch: { field_reason: '同意改的' },
+      }),
+    ).rejects.toThrow('这条待办已处理');
+    expect(persist.persist).not.toHaveBeenCalled();
+  });
+
   it('撤回：有人通过过则失败', async () => {
     instanceRepo.update.mockResolvedValue({ affected: 0 });
     await expect(engine.cancel({ instanceId: 1, actorId: 5 })).rejects.toThrow(
@@ -1074,7 +1125,7 @@ describe('WorkflowEngine 抄送', () => {
       expect.objectContaining({ status: 'done', action: 'resubmit' }),
     );
     expect(instanceRepo.update).toHaveBeenCalledWith(
-      { id: 1, status: 'running' },
+      { id: 1, status: In(['running', 'error']) },
       expect.objectContaining({ status: 'rejected' }),
     );
     expect(store.setWorkflowMeta).toHaveBeenCalledWith(
